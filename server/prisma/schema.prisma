@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Huesped {
+  id            String         @id @default(cuid())
+  waId          String         @unique @map("wa_id")
+  nombre        String?
+  telefono      String?
+  email         String?
+  notas         String?
+  creadoEn      DateTime       @default(now()) @map("creado_en")
+  actualizadoEn DateTime       @updatedAt @map("actualizado_en")
+  conversaciones Conversacion[]
+  reservas      Reserva[]
+
+  @@map("huespedes")
+}
+
+model Agente {
+  id            String         @id @default(cuid())
+  nombre        String
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  rol           String         @default("agente")
+  activo        Boolean        @default(true)
+  online        Boolean        @default(false)
+  creadoEn      DateTime       @default(now()) @map("creado_en")
+  conversaciones Conversacion[]
+
+  @@map("agentes")
+}
+
+model Conversacion {
+  id              String    @id @default(cuid())
+  huespedId       String    @map("huesped_id")
+  agenteId        String?   @map("agente_id")
+  estado          String    @default("bot")
+  ultimoMensaje   String?   @map("ultimo_mensaje")
+  ultimoMensajeEn DateTime? @map("ultimo_mensaje_en")
+  creadoEn        DateTime  @default(now()) @map("creado_en")
+  actualizadoEn   DateTime  @updatedAt @map("actualizado_en")
+  huesped         Huesped   @relation(fields: [huespedId], references: [id])
+  agente          Agente?   @relation(fields: [agenteId], references: [id])
+  mensajes        Mensaje[]
+  reservas        Reserva[]
+
+  @@map("conversaciones")
+}
+
+model Mensaje {
+  id              String       @id @default(cuid())
+  conversacionId  String       @map("conversacion_id")
+  tipo            String       @default("text")
+  direccion       String
+  origen          String
+  contenido       String
+  metadata        Json?
+  waMessageId     String?      @unique @map("wa_message_id")
+  creadoEn        DateTime     @default(now()) @map("creado_en")
+  conversacion    Conversacion @relation(fields: [conversacionId], references: [id])
+
+  @@index([conversacionId, creadoEn])
+  @@map("mensajes")
+}
+
+model Reserva {
+  id              String       @id @default(cuid())
+  huespedId       String?      @map("huesped_id")
+  conversacionId  String?      @map("conversacion_id")
+  nombreHuesped   String?      @map("nombre_huesped")
+  telefonoHuesped String?      @map("telefono_huesped")
+  fechaEntrada    DateTime     @map("fecha_entrada")
+  fechaSalida     DateTime     @map("fecha_salida")
+  numHuespedes    Int          @default(1) @map("num_huespedes")
+  habitacion      String?
+  tarifaNoche     Decimal?     @map("tarifa_noche")
+  precioTotal     Decimal      @default(0) @map("precio_total")
+  montoReserva    Decimal?     @map("monto_reserva")
+  saldo           Decimal?
+  estado          String       @default("pre_reserva")
+  origenReserva   String?      @map("origen_reserva")
+  nroFactura      String?      @map("nro_factura")
+  importeUsd      Decimal?     @map("importe_usd")
+  notas           String?
+  creadoEn        DateTime     @default(now()) @map("creado_en")
+  actualizadoEn   DateTime     @updatedAt @map("actualizado_en")
+  huesped         Huesped?     @relation(fields: [huespedId], references: [id])
+  conversacion    Conversacion? @relation(fields: [conversacionId], references: [id])
+
+  @@map("reservas")
+}
+
+model Inventario {
+  id         String   @id @default(cuid())
+  fecha      DateTime
+  habitacion String
+  disponible Boolean  @default(true)
+  precio     Decimal  @default(0)
+  notas      String?
+
+  @@unique([fecha, habitacion])
+  @@map("inventario")
+}
+
+model WaTemplate {
+  id        String   @id @default(cuid())
+  nombre    String   @unique
+  idioma    String   @default("es")
+  contenido String
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now()) @map("creado_en")
+
+  @@map("wa_templates")
+}
+
+model Complejo {
+  id            String      @id @default(cuid())
+  nombre        String      @unique
+  aliases       String[]    @default([])
+  direccion     String?
+  ubicacion     String?
+  tipo          String?
+  superficie    String?
+  capacidad     Int         @default(4)
+  cantidadUnidades Int      @default(1) @map("cantidad_unidades")
+  dormitorios   Int         @default(1)
+  banos         Int         @default(1)
+  amenities     String[]    @default([])
+  checkIn       String?     @map("check_in")
+  checkOut      String?     @map("check_out")
+  estadiaMinima Int?        @map("estadia_minima")
+  mascotas      Boolean     @default(false)
+  ninos         Boolean     @default(true)
+  fumar         Boolean     @default(false)
+  fiestas       Boolean     @default(false)
+  videoTour     String?     @map("video_tour")
+  icalUrl       String?     @map("ical_url")
+  titularCuenta String?     @map("titular_cuenta")
+  banco         String?
+  cbu           String?
+  aliasCbu      String?     @map("alias_cbu")
+  cuit          String?
+  linkMercadoPago String?   @map("link_mercadopago")
+  porcentajeReserva Int     @default(30) @map("porcentaje_reserva")
+  activo        Boolean     @default(true)
+  creadoEn      DateTime    @default(now()) @map("creado_en")
+  actualizadoEn DateTime    @updatedAt @map("actualizado_en")
+  tarifas           Tarifa[]
+  tarifasEspeciales TarifaEspecial[]
+  media             MediaFile[]
+  bloqueos          Bloqueo[]
+
+  @@map("complejos")
+}
+
+model Tarifa {
+  id            String   @id @default(cuid())
+  complejoId    String   @map("complejo_id")
+  temporada     String
+  precioNoche   Decimal  @map("precio_noche")
+  estadiaMinima Int?     @map("estadia_minima")
+  complejo      Complejo @relation(fields: [complejoId], references: [id], onDelete: Cascade)
+
+  @@unique([complejoId, temporada])
+  @@map("tarifas")
+}
+
+model TarifaEspecial {
+  id            String   @id @default(cuid())
+  complejoId    String   @map("complejo_id")
+  fechaInicio   DateTime @map("fecha_inicio")
+  fechaFin      DateTime @map("fecha_fin")
+  precioNoche   Decimal  @map("precio_noche")
+  estadiaMinima Int?     @map("estadia_minima")
+  motivo        String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+  complejo      Complejo @relation(fields: [complejoId], references: [id], onDelete: Cascade)
+
+  @@map("tarifas_especiales")
+}
+
+model MediaFile {
+  id         String   @id @default(cuid())
+  complejoId String   @map("complejo_id")
+  tipo       String   @default("image")
+  url        String
+  caption    String?
+  orden      Int      @default(0)
+  creadoEn   DateTime @default(now()) @map("creado_en")
+  complejo   Complejo @relation(fields: [complejoId], references: [id], onDelete: Cascade)
+
+  @@map("media_files")
+}
+
+model Bloqueo {
+  id          String   @id @default(cuid())
+  complejoId  String   @map("complejo_id")
+  fechaInicio DateTime @map("fecha_inicio")
+  fechaFin    DateTime @map("fecha_fin")
+  motivo      String?
+  unidades    Int      @default(0)
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  complejo    Complejo @relation(fields: [complejoId], references: [id], onDelete: Cascade)
+
+  @@map("bloqueos")
+}
+
+model BotConfig {
+  id                  String   @id @default(cuid())
+  nombreAgente        String   @default("Las Grutas Departamentos") @map("nombre_agente")
+  ubicacion           String   @default("Las Grutas, Rio Negro, Patagonia Argentina")
+  tono                String   @default("amable, profesional y cercano")
+  idioma              String   @default("es_AR")
+  usarEmojis          Boolean  @default(false) @map("usar_emojis")
+  longitudRespuesta   String   @default("corta") @map("longitud_respuesta")
+  autoPreReserva      Boolean  @default(true) @map("auto_pre_reserva")
+  modoEnvioFotos      String   @default("auto") @map("modo_envio_fotos")
+  escalarSiQueja      Boolean  @default(true) @map("escalar_si_queja")
+  escalarSiPago       Boolean  @default(true) @map("escalar_si_pago")
+  mensajeBienvenida   String   @default("Hola! Bienvenido a Las Grutas Departamentos. Tenemos departamentos a pocas cuadras de la playa en Las Grutas, Rio Negro. En que puedo ayudarte? Puedo informarte sobre disponibilidad, precios, departamentos o actividades en la zona.") @map("mensaje_bienvenida")
+  mensajeDespedida    String   @default("Gracias por contactarnos! Si necesitas algo mas, no dudes en escribirnos. Que tengas un excelente dia!") @map("mensaje_despedida")
+  mensajeFueraHorario String   @default("Gracias por tu mensaje. En este momento estamos fuera de horario. Te responderemos a la brevedad.") @map("mensaje_fuera_horario")
+  mensajeEsperaHumano String   @default("Entendido, te voy a comunicar con uno de nuestros agentes. Te va a atender en breve. Gracias por tu paciencia.") @map("mensaje_espera_humano")
+  horarioInicio       String?  @map("horario_inicio")
+  horarioFin          String?  @map("horario_fin")
+  telefonoContacto    String   @default("+54 2920 561033") @map("telefono_contacto")
+  creadoEn            DateTime @default(now()) @map("creado_en")
+  actualizadoEn       DateTime @updatedAt @map("actualizado_en")
+
+  @@map("bot_config")
+}

@@ -1,0 +1,95 @@
+❯ consulta que te parece escalar esta aplicacion a un producto , donde otros alojamientos tambien puedan usarlo y administrarlo
+  con su propio panel ? es decir que no crucen los departamentos cargados con otros usuario que puedan registrar los suyos y
+  comercializarlo ?
+
+● Es una muy buena idea. Tu base actual ya tiene el 70% del trabajo funcional resuelto (bot, reservas, inventario, panel admin).
+  Convertirlo en SaaS multi-tenant es el paso lógico. Te doy mi análisis:
+
+  Lo que ya tenés resuelto
+
+  - Motor de bot con clasificación + respuestas contextuales
+  - Flujo completo de reservas (pre-reserva → confirmación)
+  - Panel admin (complejos, tarifas, inventario, conversaciones)
+  - Simulador, health check, rate limiting, cleanup automático
+
+  Lo que falta para multi-tenant
+
+  1. Modelo de datos — Tenant isolation (el cambio más grande)
+
+  Agregar una tabla Organizacion (tenant) y un organizacionId en todas las tablas:
+
+  Organizacion → tiene muchos → Complejos, Agentes, Huespedes
+
+  - Complejo, Huesped, Conversacion, Reserva, Agente, Inventario — todos llevan organizacionId
+  - Cada query de Prisma necesita filtrar por organizacionId (middleware de Prisma o wrapper)
+  - Los datos de un tenant NUNCA se cruzan con otro
+
+  2. Auth multi-tenant
+
+  - Login scoped por organización (subdominio hotel-x.chatboot.com o selector de tenant)
+  - Roles: super-admin (vos, gestiona tenants) + admin (dueño del alojamiento) + agente
+  - Cada tenant administra sus propios usuarios
+
+  3. WhatsApp — un número por tenant
+
+  - Cada alojamiento necesita su propio número de WhatsApp Business
+  - El webhook rutea por número destino → identifica tenant → procesa
+  - Meta cobra ~$0.05/conversación (ellos lo pagan o se lo incluís en el plan)
+
+  4. Claude API — costo compartido
+
+  - Una sola API key (la tuya), con tracking de uso por tenant
+  - El costo de API se traslada al precio del plan o se cobra por mensaje
+
+  5. Frontend — tenant-scoped
+
+  - El panel admin muestra SOLO los datos del tenant logueado
+  - Branding opcional (logo, colores) por tenant
+
+  Modelo de negocio sugerido
+
+  ┌─────────┬────────────────────┬───────────────────────────────────────────┐
+  │  Plan   │  Precio estimado   │                  Incluye                  │
+  ├─────────┼────────────────────┼───────────────────────────────────────────┤
+  │ Básico  │ $15.000-25.000/mes │ 1-4 deptos, 500 msgs/mes, 1 agente        │
+  ├─────────┼────────────────────┼───────────────────────────────────────────┤
+  │ Pro     │ $35.000-50.000/mes │ Hasta 15 deptos, 2000 msgs/mes, 5 agentes │
+  ├─────────┼────────────────────┼───────────────────────────────────────────┤
+  │ Premium │ $70.000+/mes       │ Ilimitado, soporte prioritario, branding  │
+  └─────────┴────────────────────┴───────────────────────────────────────────┘
+
+  (Pesos argentinos, ajustar según mercado)
+
+  Esfuerzo estimado de desarrollo
+
+  ┌────────────────────────────────────────────────┬───────────────────┐
+  │                     Tarea                      │    Complejidad    │
+  ├────────────────────────────────────────────────┼───────────────────┤
+  │ Tenant isolation en DB (migraciones + queries) │ Alta — es el core │
+  ├────────────────────────────────────────────────┼───────────────────┤
+  │ Auth multi-tenant + roles                      │ Media             │
+  ├────────────────────────────────────────────────┼───────────────────┤
+  │ Routing WhatsApp por tenant                    │ Media             │
+  ├────────────────────────────────────────────────┼───────────────────┤
+  │ Super-admin panel (gestión de tenants)         │ Media             │
+  ├────────────────────────────────────────────────┼───────────────────┤
+  │ Billing/tracking de uso                        │ Media-Baja        │
+  ├────────────────────────────────────────────────┼───────────────────┤
+  │ Onboarding flow (registro tenant)              │ Baja              │
+  └────────────────────────────────────────────────┴───────────────────┘
+
+  Mi recomendación
+
+  Sí, vale la pena. El producto ya funciona para un caso real. El paso más crítico es el tenant isolation en la base de datos — una
+  vez resuelto eso, todo lo demás es incremental.
+
+  Estrategia:
+  1. Primero terminá de estabilizar el producto actual (tu propio alojamiento como "tenant 0")
+  2. Después agregá la capa de organizacionId en el modelo de datos
+  3. Luego auth multi-tenant + routing WhatsApp
+  4. Último billing y onboarding self-service
+
+  El approach más seguro es row-level isolation (un organizacionId en cada tabla) en vez de una base de datos separada por tenant,
+  porque escala mejor y es más simple de mantener con Prisma.
+
+  ¿Querés que planifique la implementación del tenant isolation como primer paso?

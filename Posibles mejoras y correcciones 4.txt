@@ -1,0 +1,427 @@
+1. Configuración del perfil de WhatsApp (nivel canal)
+
+Esto no es realmente del bot, sino del perfil del número en WhatsApp Business.
+
+En WhatsApp Business Platform podés configurar:
+
+Datos del perfil:
+
+Foto de perfil
+
+Nombre del negocio
+
+Descripción
+
+Categoría
+
+Dirección
+
+Email
+
+Sitio web
+
+Horarios
+
+Ejemplo:
+
+Nombre: Cabañas Luminar
+Descripción: Alquiler turístico en Villa La Angostura
+Horario: 9:00 - 20:00
+Sitio web: luminar.com
+
+📌 Esto normalmente se configura:
+
+en Meta Business Manager
+
+o vía API si tu plataforma lo permite.
+
+Tu sistema no necesariamente tiene que administrarlo, pero muchas apps SaaS sí lo exponen.
+
+2. Configuración del agente IA (nivel bot)
+
+Este sí es muy recomendable que lo agregues en tu sistema.
+
+Se suele llamar:
+
+Agent Settings
+Bot Personality
+Assistant Configuration
+
+Configuraciones típicas:
+
+Identidad del agente
+Nombre del agente
+Ej: Sofía
+
+Esto se usa en prompts:
+
+Hola! Soy Sofía, asistente de reservas de Luminar.
+Tono de conversación
+
+Opciones comunes:
+
+formal
+informal
+amigable
+conciso
+profesional
+
+Ejemplo:
+
+Formal:
+
+Con gusto puedo ayudarle con la disponibilidad.
+
+Informal:
+
+¡Claro! Te cuento qué fechas tenemos disponibles.
+
+Esto modifica el system prompt.
+
+Idioma principal
+es
+en
+pt
+Emojis
+permitir emojis
+no usar emojis
+
+Muy útil en turismo.
+
+Estilo de respuesta
+
+Ejemplo:
+
+conciso
+explicativo
+vendedor
+Nivel de venta
+informativo
+equilibrado
+agresivo
+
+Ejemplo:
+
+Además tenemos una promo si reservás hoy.
+3. Configuración del comportamiento del bot
+
+Esto también suele estar en el mismo panel.
+
+Ejemplo:
+
+Auto crear reservas: ON/OFF
+Auto enviar fotos: ON/OFF
+Escalar a humano si: queja / pago / error
+4. Configuración de contenido
+
+Muchas apps agregan también:
+
+mensajes base
+
+Ejemplo:
+
+mensaje bienvenida
+mensaje fuera de horario
+mensaje humano
+mensaje despedida
+5. Cómo suele implementarse técnicamente
+
+Tabla simple:
+
+AgentConfig
+
+ejemplo:
+
+AgentConfig {
+ id
+ nombre_agente
+ tono
+ idioma
+ usar_emojis
+ estilo_respuesta
+ mensaje_bienvenida
+ mensaje_fuera_horario
+ updatedAt
+}
+
+Luego en botEngine:
+
+const agent = await getAgentConfig()
+
+const prompt = buildPrompt({
+   agentName: agent.nombre_agente,
+   tone: agent.tono,
+   emojis: agent.usar_emojis
+})
+6. Para tu MVP
+
+No es obligatorio, pero sí es muy recomendable agregar al menos:
+
+mínimo
+nombre_agente
+tono
+mensaje_bienvenida
+mensaje_fuera_horario
+
+Eso ya mejora mucho la experiencia.
+
+7. Algo importante para tu caso
+
+Tu bot hoy tiene system prompt fijo.
+
+Eso funciona para 1 cliente.
+
+Pero si tu app evoluciona a:
+
+SaaS para hoteles / cabañas
+
+vas a necesitar configuración por cliente.
+
+8. Recomendación concreta para tu sistema
+
+Agregar un panel simple:
+
+Configuración del asistente
+
+Campos:
+
+Nombre del asistente
+Tono
+Usar emojis
+Mensaje bienvenida
+Mensaje fuera de horario
+Idioma
+
+configuraciones que casi todos los sistemas agregan después del MVP porque evitan muchos problemas operativos y reducen intervención humana.
+
+Te las ordeno por impacto real en producción.
+
+1. Horarios de atención del bot ⏰
+
+Muy importante.
+
+Permite definir cuándo el bot responde automáticamente.
+
+Ejemplo:
+
+Lunes a Viernes: 08:00 - 22:00
+Sábado: 09:00 - 20:00
+Domingo: cerrado
+
+Comportamiento:
+
+Dentro de horario
+
+bot responde normalmente
+
+Fuera de horario
+
+mensaje automático:
+
+Hola! Gracias por escribir a Luminar 😊
+
+Nuestro horario de atención es de 8:00 a 22:00.
+Igualmente puedo ayudarte con disponibilidad y precios.
+
+Configuración:
+
+horario_inicio
+horario_fin
+mensaje_fuera_horario
+2. Mensaje de bienvenida 👋
+
+Se envía cuando el usuario inicia conversación.
+
+Ejemplo:
+
+Hola! Soy Sofía, asistente de reservas de Luminar.
+
+Puedo ayudarte con:
+• disponibilidad
+• precios
+• fotos de los departamentos
+
+¿Para qué fecha querés alojarte?
+
+Esto mejora mucho la conversión.
+
+Configuración:
+
+mensaje_bienvenida
+activar_bienvenida (true/false)
+3. Política de reservas automática 🏨
+
+Define qué puede hacer el bot sin humano.
+
+Opciones típicas:
+
+crear_pre_reserva_auto
+crear_reserva_auto
+solo_consultas
+
+En tu caso ya aplicaste buena práctica:
+
+bot solo crea pre_reserva
+
+Configurable:
+
+auto_pre_reserva = true
+4. Reglas de escalamiento a humano 👩‍💻
+
+Evita que el bot maneje situaciones sensibles.
+
+Triggers comunes:
+
+queja
+pago
+transferencia
+problema
+cancelación
+
+Ejemplo:
+
+Si detecta "reclamo" → pasar a humano
+
+Configuración:
+
+escalar_si_pago
+escalar_si_queja
+escalar_si_cancelacion
+5. Control de envío de fotos 📷
+
+Muy útil en alojamientos.
+
+Opciones:
+
+enviar fotos automáticamente
+solo si usuario pide fotos
+no enviar fotos
+
+Configuración:
+
+modo_envio_fotos
+auto | on_request | off
+6. Configuración del tono del agente 💬
+
+Define personalidad.
+
+Ejemplo:
+
+formal
+amigable
+informal
+premium
+
+Esto modifica el prompt del LLM.
+
+Ejemplo prompt:
+
+Responde de manera amigable, clara y breve.
+
+Configuración:
+
+tone
+emoji_level
+7. Control de respuestas largas 📏
+
+Evita que el LLM escriba demasiado.
+
+Configuración:
+
+longitud_respuesta
+
+Ejemplo:
+
+corta
+media
+detallada
+
+Esto reduce tokens y mejora UX.
+
+8. Mensajes automáticos clave 🤖
+
+Bots maduros permiten configurar mensajes estándar.
+
+Ejemplos:
+
+confirmación de disponibilidad
+
+Tenemos disponibilidad para esas fechas 😊
+
+sin disponibilidad
+
+Para esas fechas no tenemos disponibilidad,
+pero puedo mostrarte alternativas.
+
+pre-reserva creada
+
+Perfecto! Te reservé provisionalmente el departamento.
+
+Configuración:
+
+mensaje_sin_disponibilidad
+mensaje_pre_reserva
+mensaje_confirmacion
+Ejemplo de tabla real
+
+Podrías tener algo así:
+
+AgentSettings
+AgentSettings {
+ id
+ nombre_agente
+ tono
+ usar_emojis
+ mensaje_bienvenida
+ mensaje_fuera_horario
+ horario_inicio
+ horario_fin
+ auto_pre_reserva
+ modo_envio_fotos
+ escalar_si_pago
+ escalar_si_queja
+ longitud_respuesta
+}
+Cómo se usa en tu botEngine
+
+Cuando construís el prompt:
+
+const agent = await agentService.getConfig()
+
+const systemPrompt = `
+Eres ${agent.nombre_agente}, asistente de reservas.
+
+Tono: ${agent.tono}
+
+Reglas:
+- Usa emojis: ${agent.usar_emojis}
+- Mantén respuestas ${agent.longitud_respuesta}
+`
+Qué agregaría yo en TU sistema
+
+Tu bot ya está bastante avanzado.
+
+Para tu caso agregaría solo 5 cosas inicialmente:
+
+nombre_agente
+tono
+mensaje_bienvenida
+horarios_atencion
+modo_envio_fotos
+
+Eso es suficiente para un MVP muy sólido.
+
+Recomendación importante
+
+Si planeás convertir esto en SaaS para hoteles, agregá desde ahora:
+
+tenant_id
+
+en:
+
+AgentSettings
+Complejo
+Reserva
+Inventario
+
+Así soportás múltiples hoteles en el mismo sistema.

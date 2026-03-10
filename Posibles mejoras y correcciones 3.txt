@@ -1,0 +1,371 @@
+Revisé tu botEngine.ts completo junto con la documentación que enviaste.
+Te voy a dar una evaluación técnica realista de tu MVP, basada en el código real.
+
+Voy a cubrir:
+
+Evaluación general del botEngine
+
+Qué está muy bien diseñado
+
+Problemas reales que detecté en el código
+
+Riesgos para producción
+
+Cambios mínimos recomendados antes de ir a producción
+
+Archivos adicionales que todavía sería ideal revisar
+
+1. Evaluación general del botEngine
+
+Honestamente: el bot está muy bien diseñado para un MVP.
+
+Tiene muchas cosas que normalmente no aparecen hasta versiones mucho más avanzadas:
+
+✔ clasificación de intentos
+✔ memoria conversacional acumulada
+✔ normalización de entidades
+✔ manejo de fotos fuera del LLM
+✔ control de capacidad de departamentos
+✔ chequeo de estadía mínima
+✔ validación de datos bancarios
+✔ creación automática de reserva
+✔ escalamiento a humano
+
+La estructura principal del flujo es correcta:
+
+mensaje whatsapp
+      ↓
+classifyIntent
+      ↓
+sanitizeEntities
+      ↓
+merge with accumulated entities
+      ↓
+availability check
+      ↓
+context builder
+      ↓
+Claude response
+      ↓
+send whatsapp
+      ↓
+optional auto-reservation
+
+Esto es arquitectura sólida.
+
+2. Cosas muy bien hechas (de verdad)
+
+Hay varias decisiones muy buenas.
+
+1. Sanitización de entidades
+
+Esto es muy importante y está bien hecho.
+
+const VALID_ENTITY_KEYS = new Set([
+ 'num_personas',
+ 'fecha_entrada',
+ 'fecha_salida',
+ 'habitacion'
+]);
+
+Y luego filtras todo lo demás.
+
+Esto evita problemas clásicos de LLM como:
+
+personas
+cantidad_personas
+guests
+
+Excelente.
+
+2. Resolución de fechas relativas
+
+Esto es muy bueno:
+
+resolveRelativeDate()
+
+Soporta:
+
+hoy
+mañana
+pasado mañana
+
+y convierte a YYYY-MM-DD.
+
+Muchos bots fallan acá.
+
+3. Cálculo automático de fecha_salida
+
+Este fallback es muy inteligente:
+
+fecha_entrada + num_noches
+
+Eso soluciona cuando el usuario dice:
+
+quiero quedarme 3 noches
+
+Muy bien pensado.
+
+4. TTL de memoria conversacional
+
+Esto me gustó mucho:
+
+ENTITY_TTL_MS = 24h
+
+Evita esto:
+
+usuario vuelve 3 dias despues
+bot recuerda datos viejos
+
+Muy buena decisión.
+
+5. Reset con saludo
+
+Este detalle es muy profesional:
+
+hola
+
+reinicia el estado.
+
+Implementado con:
+
+last saludo intent
+
+Excelente UX.
+
+6. Bypass de Claude para fotos
+
+Esto es arquitectura correcta.
+
+sendImage()
+
+en lugar de pedirle al LLM que invente URLs.
+
+Gran decisión.
+
+7. Validación de capacidad de departamentos
+
+Este bloque está muy bien:
+
+ANALISIS DE CAPACIDAD
+
+Calcula:
+
+capacidad por unidad
+cantidad de unidades
+capacidad total
+
+Y previene que el bot ofrezca cosas imposibles.
+
+Excelente.
+
+8. Validación de estadía mínima
+
+Esto también está muy bien diseñado:
+
+orden de prioridad:
+
+TarifaEspecial
+Tarifa temporada
+Complejo.estadiaMinima
+
+Muy buen diseño.
+
+9. Protección contra fraude bancario
+
+Este bloque me sorprendió positivamente.
+
+TRUSTED_HOLDERS
+
+y si el titular no está verificado:
+
+escalar a humano
+
+Eso evita fraudes.
+
+Muy buena práctica.
+
+3. Problemas reales detectados
+
+Ahora lo importante: los problemas reales.
+
+No son muchos, pero algunos sí importan.
+
+PROBLEMA 1 — Race condition en reservas
+
+Este bloque:
+
+if (!existing) {
+   await createReserva(...)
+}
+
+No está protegido por transacción.
+
+Si dos usuarios reservan simultáneamente:
+
+User A → confirm
+User B → confirm
+
+ambos pueden crear reserva.
+
+Solución:
+
+usar transacción serializable.
+
+Ejemplo:
+
+await prisma.$transaction(async (tx) => {
+
+ const existing = await tx.reserva.findFirst(...)
+
+ if (!existing) {
+    await tx.reserva.create(...)
+ }
+
+})
+
+Esto es muy importante para producción.
+
+PROBLEMA 2 — deduplicación de mensajes WA
+
+No aparece en este archivo.
+
+Si WhatsApp reintenta el webhook (muy común):
+
+podrías tener:
+
+mensaje duplicado
+bot responde duplicado
+
+Esto debería resolverse en:
+
+webhookProcessor
+
+con:
+
+waMessageId UNIQUE
+PROBLEMA 3 — hardcode de departamentos
+
+Esto:
+
+const ALL_HABITATIONS = [
+ 'Pewmafe',
+ 'Luminar Mono',
+ 'Luminar 2Amb',
+ 'LG'
+]
+
+es frágil.
+
+Si agregás uno nuevo:
+
+rompe la lógica
+
+Mejor:
+
+const complejos = await prisma.complejo.findMany()
+PROBLEMA 4 — lógica de fotos puede dispararse mal
+
+Este regex:
+
+/fotos?|imagene?s?|pictures?|mostrame|ver el depto/i
+
+puede dispararse con frases como:
+
+quiero ver el depto disponible
+
+y enviar fotos inesperadamente.
+
+Mejor:
+
+detectar también intención:
+
+intent === consulta_fotos
+PROBLEMA 5 — falta timeout de Claude
+
+Estas llamadas no tienen timeout:
+
+classifyIntent
+generateResponse
+
+Si Claude tarda:
+
+WhatsApp queda colgado
+
+Recomendado:
+
+timeout 3–5s
+fallback response
+PROBLEMA 6 — acumulación de entidades depende del bot
+
+Tu memoria se basa en:
+
+metadata.entities
+de mensajes del BOT
+
+Si Claude falla en una respuesta:
+
+entidad perdida
+
+Es mejor guardar entidades también cuando las dice el usuario.
+
+PROBLEMA 7 — costo potencial del LLM
+
+Cada mensaje ejecuta:
+
+classifyIntent
+generateResponse
+
+Sin rate limit.
+
+Un usuario puede enviar:
+
+20 mensajes seguidos
+
+y disparar muchas llamadas.
+
+Recomendado:
+
+rate limit por conversacion
+4. Riesgos reales para producción
+
+Te los ordeno por impacto.
+
+Riesgo	Impacto
+Race condition reservas	ALTO
+Duplicación mensajes WA	ALTO
+Timeout LLM	MEDIO
+Hardcode departamentos	MEDIO
+Fotos mal detectadas	BAJO
+Costo LLM	BAJO
+5. Cambios mínimos antes de producción
+
+Si solo haces 4 cambios, ya estás bastante seguro.
+
+1️⃣ transacción en reservas
+
+Muy importante.
+
+2️⃣ deduplicación de mensajes WA
+
+En webhook.
+
+3️⃣ timeout Claude
+
+3–5 segundos.
+
+4️⃣ eliminar hardcode departamentos
+
+usar DB.
+
+6. Conclusión honesta
+
+Mi evaluación del MVP completo + botEngine:
+
+Área	Evaluación
+Arquitectura	🟢 muy buena
+Código backend	🟢 limpio
+Control de errores	🟢 bueno
+Manejo de entidades	🟢 muy bueno
+Lógica de negocio	🟢 sólida
+Preparación producción	🟡 casi lista

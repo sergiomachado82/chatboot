@@ -1,0 +1,145 @@
+Paso 1 de 3
+Selecciona una imagen para instalar
+
+Ferozo Panel en Alma Linux 8
+Mínimo vCPU: 2 / RAM: 4 GB
+Detalles
+
+cPanel & WHM en Alma Linux 9
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+CloudPanel en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Easypanel en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Cyberpanel en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Instalación Mínima en Windows Server 2022
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Instalación Mínima en Alma Linux 8
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Instalación Mínima en Alma Linux 9
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Instalación Mínima en Ubuntu 22.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Instalación Mínima en Ubuntu 24.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Instalación Mínima en Debian 12
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Instalación Mínima en Debian 13
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Instalación Mínima en Rocky Linux 8
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Instalación Mínima en Rocky Linux 9
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Node.js 18 en Ubuntu 22.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+Node.js 22 en Ubuntu 24.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+LAMP Stack en Ubuntu 22.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+LOMP Stack en Ubuntu 22.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+LEMP Stack en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+MERN Stack en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Laravel en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Wordpress + Cyberpanel en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Ghost en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 4 GB
+Detalles
+
+Nextcloud en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Odoo en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Moodle en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+OpenVPN en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Directus en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Strapi en Ubuntu 22.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+N8N en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Supabase en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 4 GB
+Detalles
+
+Docker en Ubuntu 24.04
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+Docker en Debian 13
+Mínimo vCPU: 2 / RAM: 2 GB
+Detalles
+
+MariaDB en Ubuntu 22.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+PostgreSQL en Ubuntu 22.04
+Mínimo vCPU: 1 / RAM: 1 GB
+Detalles
+
+MongoDB en Ubuntu 22.04
+Mínimo vCPU: 1 / RAM: 1 GB

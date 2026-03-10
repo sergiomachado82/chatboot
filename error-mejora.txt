@@ -1,0 +1,84 @@
+caso de prueba realizado hoy 11:58 reportar como error, revisar esta conversación documentar error para que no vuelva a repetirse.
+
+
+hola
+
+11:58
+
+Bot
+
+¡Hola! Buen día. ¿Qué necesitás saber sobre nuestros departamentos en Las Grutas?
+
+11:58
+
+estoy buescando para alquiler mañana somos 4 personas
+
+11:58
+
+Bot
+
+¡Perfecto! Para 4 personas tenemos varias opciones disponibles. Solo necesito saber:
+
+**¿Cuántas noches te vas a quedar?**
+
+Con ese dato te confirmo disponibilidad y precio exacto para mañana.
+
+11:58
+
+5 noches
+
+11:58
+
+Bot
+
+Perfecto, 5 noches es una buena estadía. Para poder ayudarte mejor, necesito que me digas:
+
+1. **¿Para cuántas personas?**
+2. **¿Desde qué fecha?** (¿cuándo sería el check-in?)
+
+Con esos datos te muestro los departamentos disponibles y los precios para tu estadía.
+
+
+
+
+
+
+
+Ejemplo de conversación ideal
+Bot: ¡Hola! Buen día. ¿Qué necesitás saber sobre nuestros departamentos en Las Grutas?
+
+Usuario: Estoy buscando para alquiler mañana, somos 4 personas.
+
+Bot: ¡Genial! Para mañana y 4 personas tenemos varias opciones.
+Solo necesito saber: ¿cuántas noches se van a quedar?
+
+Usuario: 5 noches.
+
+Bot: Perfecto, entonces:
+
+Check-in mañana
+
+5 noches de estadía
+
+4 personas
+
+Con esos datos ya puedo mostrarte disponibilidad y precios.
+👉 Para tu grupo, tenemos un departamento de 2 habitaciones a $XX por noche, y otro de 3 habitaciones a $YY por noche.
+¿Querés que te detalle las características de cada uno?
+
+Observá la diferencia
+El bot no vuelve a preguntar por cantidad de personas (ya estaba dicho).
+
+Tampoco repite la fecha (ya se infiere de “mañana”).
+
+Solo pide lo que falta: la cantidad de noches.
+
+Luego confirma los datos en bloque y avanza a la oferta.
+
+Este flujo se logra porque el prompt obliga al bot a:
+
+Revisar historial antes de preguntar.
+
+Preguntar solo lo que falta.
+
+Confirmar datos en conjunto antes de dar opciones.

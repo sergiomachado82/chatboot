@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatboot-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chatboot
+    ports:
+      - "5433:5432"
+    volumes:
+      - chatboot-pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: chatboot-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - chatboot-redis:/data
+
+volumes:
+  chatboot-pgdata:
+  chatboot-redis:

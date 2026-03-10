@@ -1,0 +1,258 @@
+import { useState, useMemo } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useReservasCalendar } from '../../hooks/useReservas';
+import { useComplejos } from '../../hooks/useComplejos';
+import type { Reserva } from '@shared/types/reserva';
+import type { Complejo } from '@shared/types/complejo';
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+const ESTADO_COLORS: Record<string, { bg: string; text: string }> = {
+  pre_reserva: { bg: 'bg-orange-300', text: 'text-orange-900' },
+  confirmada: { bg: 'bg-green-400', text: 'text-green-900' },
+  completada: { bg: 'bg-blue-300', text: 'text-blue-900' },
+};
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function isWeekend(year: number, month: number, day: number): boolean {
+  const dow = new Date(year, month, day).getDay();
+  return dow === 0 || dow === 6;
+}
+
+interface CalendarRow {
+  label: string;
+  habitacion: string;
+  unitIndex: number;
+}
+
+interface ReservaSpan {
+  reserva: Reserva;
+  startDay: number;
+  endDay: number;
+}
+
+function buildRows(complejos: Complejo[]): CalendarRow[] {
+  const rows: CalendarRow[] = [];
+  for (const c of complejos) {
+    if (c.cantidadUnidades > 1) {
+      for (let i = 1; i <= c.cantidadUnidades; i++) {
+        rows.push({ label: `${c.nombre} dpto.${i}`, habitacion: c.nombre, unitIndex: i });
+      }
+    } else {
+      rows.push({ label: c.nombre, habitacion: c.nombre, unitIndex: 1 });
+    }
+  }
+  return rows;
+}
+
+// Distribute reservas across units using greedy assignment
+function distributeReservas(
+  spans: ReservaSpan[],
+  numUnits: number
+): Map<number, ReservaSpan[]> {
+  // unit index (1-based) -> spans assigned to it
+  const units = new Map<number, ReservaSpan[]>();
+  for (let i = 1; i <= numUnits; i++) units.set(i, []);
+
+  // Sort by start day
+  const sorted = [...spans].sort((a, b) => a.startDay - b.startDay);
+
+  for (const span of sorted) {
+    // Find first unit with no overlap
+    let assigned = false;
+    for (let i = 1; i <= numUnits; i++) {
+      const existing = units.get(i)!;
+      const overlaps = existing.some(
+        (e) => span.startDay <= e.endDay && span.endDay >= e.startDay
+      );
+      if (!overlaps) {
+        existing.push(span);
+        assigned = true;
+        break;
+      }
+    }
+    // If all units are full, put in first unit anyway (shouldn't happen normally)
+    if (!assigned) {
+      units.get(1)!.push(span);
+    }
+  }
+
+  return units;
+}
+
+export default function ReservaCalendar() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
+
+  const numDays = daysInMonth(year, month);
+  const from = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const to = `${year}-${String(month + 1).padStart(2, '0')}-${String(numDays).padStart(2, '0')}`;
+
+  const { data: reservas, isLoading } = useReservasCalendar(from, to);
+  const { data: complejos } = useComplejos();
+
+  const activeComplejos = useMemo(
+    () => complejos?.filter((c) => c.activo) ?? [],
+    [complejos]
+  );
+
+  const rows = useMemo(() => buildRows(activeComplejos), [activeComplejos]);
+
+  // Build spans per habitacion
+  const spansByHabitacion = useMemo(() => {
+    const map = new Map<string, ReservaSpan[]>();
+    if (!reservas) return map;
+
+    for (const r of reservas) {
+      if (!r.habitacion) continue;
+      // Parse as local dates to avoid UTC timezone shift
+      const [ey, em, ed] = r.fechaEntrada.slice(0, 10).split('-').map(Number);
+      const [sy, sm, sd] = r.fechaSalida.slice(0, 10).split('-').map(Number);
+      const entrada = new Date(ey, em - 1, ed);
+      const salida = new Date(sy, sm - 1, sd);
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month, numDays + 1);
+
+      const effectiveStart = entrada < monthStart ? monthStart : entrada;
+      const effectiveEnd = salida > monthEnd ? monthEnd : salida;
+
+      const startDay = effectiveStart.getDate();
+      const displayEnd = salida > monthEnd ? numDays : Math.max(startDay, effectiveEnd.getDate() - 1);
+
+      if (!map.has(r.habitacion)) map.set(r.habitacion, []);
+      map.get(r.habitacion)!.push({ reserva: r, startDay, endDay: displayEnd });
+    }
+    return map;
+  }, [reservas, year, month, numDays]);
+
+  // Distribute reservas across units per complejo
+  const unitAssignments = useMemo(() => {
+    const result = new Map<string, Map<number, ReservaSpan[]>>();
+    for (const c of activeComplejos) {
+      const spans = spansByHabitacion.get(c.nombre) ?? [];
+      result.set(c.nombre, distributeReservas(spans, c.cantidadUnidades));
+    }
+    return result;
+  }, [activeComplejos, spansByHabitacion]);
+
+  function prevMonth() {
+    if (month === 0) { setYear(year - 1); setMonth(11); }
+    else setMonth(month - 1);
+  }
+  function nextMonth() {
+    if (month === 11) { setYear(year + 1); setMonth(0); }
+    else setMonth(month + 1);
+  }
+
+  function getReservaForCell(habitacion: string, unitIndex: number, day: number): Reserva | null {
+    const units = unitAssignments.get(habitacion);
+    if (!units) return null;
+    const spans = units.get(unitIndex);
+    if (!spans) return null;
+    for (const s of spans) {
+      if (day >= s.startDay && day <= s.endDay) return s.reserva;
+    }
+    return null;
+  }
+
+  const days = Array.from({ length: numDays }, (_, i) => i + 1);
+
+  return (
+    <div className="p-6">
+      {/* Navigation */}
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded">
+          <ChevronLeft size={20} />
+        </button>
+        <h2 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
+          {MONTH_NAMES[month]} {year}
+        </h2>
+        <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded">
+          <ChevronRight size={20} />
+        </button>
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-4 mb-3 text-xs">
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-300" /> Pre-reserva</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-400" /> Confirmada</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-300" /> Completada</span>
+      </div>
+
+      {isLoading && <p className="text-gray-400 text-sm mb-2">Cargando...</p>}
+
+      {/* Grid */}
+      <div className="overflow-x-auto bg-white rounded-lg shadow">
+        <table className="border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-10 bg-gray-100 px-3 py-2 text-left text-gray-600 font-medium border-r min-w-[160px]">
+                Departamento
+              </th>
+              {days.map((d) => (
+                <th
+                  key={d}
+                  className={`px-1 py-2 text-center font-medium min-w-[28px] ${
+                    isWeekend(year, month, d) ? 'bg-gray-200 text-gray-500' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {d}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={`${row.habitacion}-${row.unitIndex}`} className="border-b">
+                <td className="sticky left-0 z-10 bg-white px-3 py-2 font-medium text-gray-700 border-r whitespace-nowrap">
+                  {row.label}
+                </td>
+                {days.map((d) => {
+                  const r = getReservaForCell(row.habitacion, row.unitIndex, d);
+                  const colors = r ? ESTADO_COLORS[r.estado] : null;
+                  const nombre = r
+                    ? r.nombreHuesped ?? r.huesped?.nombre ?? ''
+                    : '';
+                  const tooltip = r
+                    ? `${nombre}\n${new Date(r.fechaEntrada).toLocaleDateString('es-AR')} - ${new Date(r.fechaSalida).toLocaleDateString('es-AR')}`
+                    : '';
+                  return (
+                    <td
+                      key={d}
+                      className={`px-0 py-0 text-center border-l ${
+                        isWeekend(year, month, d) ? 'bg-gray-50' : ''
+                      }`}
+                    >
+                      {r ? (
+                        <div
+                          className={`w-full h-7 ${colors!.bg} ${colors!.text} flex items-center justify-center cursor-default`}
+                          title={tooltip}
+                        />
+                      ) : (
+                        <div className="w-full h-7" />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={numDays + 1} className="px-4 py-8 text-center text-gray-400">
+                  No hay departamentos activos
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

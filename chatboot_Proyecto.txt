@@ -1,0 +1,2432 @@
+DOCUMENTACIÓN TÉCNICA: CHATBOT DE ALOJAMIENTOS
+Arquitectura Completa con WhatsApp Business + PostgreSQL + Panel Web
+1. ARQUITECTURA DEL SISTEMA
+plain
+Copy
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLIENTE                                    │
+│                    WhatsApp App del Huésped                             │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    META CLOUD API (WhatsApp Business)                   │
+│  • Webhook para mensajes entrantes                                      │
+│  • Templates de mensajes aprobados                                      │
+│  • Rate limiting: 80 msg/segundo                                        │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BACKEND (Node.js/Python)                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │
+│  │   Webhook    │  │  Motor NLP   │  │  Lógica de   │  │   API de    │ │
+│  │  Controller  │  │  (Intent clf)│  │   Negocio    │  │  WhatsApp   │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                 ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│   POSTGRESQL     │  │   REDIS (Cache)  │  │  GOOGLE DRIVE    │
+│  (Datos maestros)│  │  (Sesiones/Colas)│  │  (Fotos/Docs)    │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PANEL WEB DE AGENTES (React/Vue)                     │
+│  • Dashboard en tiempo real                                             │
+│  • Intervención manual de conversaciones                                │
+│  • Gestión de reservas                                                  │
+│  • Analytics y reportes                                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+2. ESQUEMA DE BASE DE DATOS (POSTGRESQL)
+sql
+Copy
+-- EXTENSIONES REQUERIDAS
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- Búsqueda fuzzy
+
+-- TABLA: HUÉSPEDES (Contactos de WhatsApp)
+CREATE TABLE huespedes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    wa_id VARCHAR(20) UNIQUE NOT NULL, -- ID de WhatsApp (ej: 549116661234)
+    nombre VARCHAR(100),
+    telefono VARCHAR(20) NOT NULL,
+    email VARCHAR(100),
+    idioma_preferido VARCHAR(10) DEFAULT 'es',
+    pais VARCHAR(50),
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    es_vip BOOLEAN DEFAULT FALSE,
+    notas TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: CONVERSACIONES (Chats activos/archivados)
+CREATE TABLE conversaciones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    huesped_id UUID REFERENCES huespedes(id) ON DELETE CASCADE,
+    wa_id VARCHAR(20) NOT NULL,
+    
+    -- Estado del chat
+    estado VARCHAR(20) DEFAULT 'bot' CHECK (estado IN ('bot', 'espera_humano', 'humano_activo', 'cerrado')),
+    prioridad VARCHAR(10) DEFAULT 'media' CHECK (prioridad IN ('baja', 'media', 'alta', 'urgente')),
+    
+    -- Control de intervención
+    agente_asignado UUID REFERENCES agentes(id),
+    fecha_escalamiento TIMESTAMP,
+    motivo_escalamiento TEXT,
+    
+    -- Contexto para el bot
+    contexto_actual JSONB DEFAULT '{}', -- Última intención, datos recolectados, etc.
+    datos_reserva_temp JSONB, -- Datos en proceso de reserva
+    
+    -- Métricas
+    mensajes_totales INTEGER DEFAULT 0,
+    mensajes_bot INTEGER DEFAULT 0,
+    mensajes_humano INTEGER DEFAULT 0,
+    ultima_actividad TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_cierre TIMESTAMP,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: MENSAJES (Historial completo)
+CREATE TABLE mensajes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversacion_id UUID REFERENCES conversaciones(id) ON DELETE CASCADE,
+    
+    -- Datos del mensaje
+    wa_message_id VARCHAR(100), -- ID de WhatsApp para tracking
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('texto', 'imagen', 'documento', 'ubicacion', 'boton', 'template')),
+    contenido TEXT NOT NULL,
+    media_url TEXT, -- URL si es imagen/documento
+    
+    -- Dirección
+    direccion VARCHAR(10) NOT NULL CHECK (direccion IN ('entrante', 'saliente')),
+    
+    -- Autoría
+    origen VARCHAR(20) NOT NULL CHECK (origen IN ('huesped', 'bot', 'agente', 'sistema')),
+    agente_id UUID REFERENCES agentes(id), -- NULL si es bot
+    
+    -- Metadata de procesamiento
+    intencion_detectada VARCHAR(50),
+    confianza_nlp DECIMAL(3,2),
+    procesado BOOLEAN DEFAULT FALSE,
+    
+    -- Para handoff
+    requiere_atencion BOOLEAN DEFAULT FALSE,
+    leido_por_agente BOOLEAN DEFAULT FALSE,
+    fecha_lectura TIMESTAMP,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: AGENTES (Equipo humano)
+CREATE TABLE agentes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255),
+    rol VARCHAR(20) DEFAULT 'agente' CHECK (rol IN ('agente', 'supervisor', 'admin')),
+    esta_activo BOOLEAN DEFAULT TRUE,
+    en_linea BOOLEAN DEFAULT FALSE,
+    max_conversaciones INTEGER DEFAULT 5,
+    horario_trabajo JSONB, -- { "lunes": {"inicio": "09:00", "fin": "18:00"} }
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: RESERVAS
+CREATE TABLE reservas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversacion_id UUID REFERENCES conversaciones(id),
+    huesped_id UUID REFERENCES huespedes(id),
+    
+    -- Datos de la estadía
+    fecha_entrada DATE NOT NULL,
+    fecha_salida DATE NOT NULL,
+    noches_totales INTEGER GENERATED ALWAYS AS (fecha_salida - fecha_entrada) STORED,
+    cantidad_huespedes INTEGER NOT NULL,
+    habitacion_tipo VARCHAR(50),
+    
+    -- Precios
+    precio_noche DECIMAL(10,2),
+    precio_total DECIMAL(10,2),
+    moneda VARCHAR(3) DEFAULT 'USD',
+    
+    -- Estados
+    estado VARCHAR(20) DEFAULT 'pre_reserva' CHECK (estado IN ('pre_reserva', 'pendiente_pago', 'confirmada', 'cancelada', 'completada')),
+    fuente VARCHAR(20) DEFAULT 'whatsapp_bot',
+    
+    -- Referencias externas
+    google_calendar_event_id VARCHAR(255),
+    pago_referencia VARCHAR(100),
+    
+    notas_internas TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: INVENTARIO (Disponibilidad)
+CREATE TABLE inventario (
+    fecha DATE PRIMARY KEY,
+    habitaciones_disponibles INTEGER DEFAULT 1,
+    habitaciones_ocupadas INTEGER DEFAULT 0,
+    precio_base DECIMAL(10,2) NOT NULL,
+    precio_oferta DECIMAL(10,2),
+    esta_bloqueado BOOLEAN DEFAULT FALSE,
+    notas TEXT
+);
+
+-- TABLA: TEMPLATES DE WHATSAPP (Aprobados por Meta)
+CREATE TABLE wa_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(100) NOT NULL, -- Ej: "bienvenida", "confirmacion_reserva"
+    template_id_meta VARCHAR(100) UNIQUE NOT NULL,
+    categoria VARCHAR(50), -- MARKETING, UTILITY, AUTHENTICATION
+    idioma VARCHAR(10),
+    parametros JSONB, -- { "1": "nombre_huesped", "2": "fecha_entrada" }
+    contenido_ejemplo TEXT,
+    esta_activo BOOLEAN DEFAULT TRUE
+);
+
+-- TABLA: AUDITORÍA (Logs de sistema)
+CREATE TABLE auditoria (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tabla_afectada VARCHAR(50),
+    registro_id UUID,
+    accion VARCHAR(20), -- INSERT, UPDATE, DELETE
+    datos_anteriores JSONB,
+    datos_nuevos JSONB,
+    agente_id UUID,
+    ip_address INET,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ÍNDICES CRÍTICOS PARA PERFORMANCE
+CREATE INDEX idx_conversaciones_estado ON conversaciones(estado, prioridad);
+CREATE INDEX idx_conversaciones_agente ON conversaciones(agente_asignado, estado);
+CREATE INDEX idx_mensajes_conversacion ON mensajes(conversacion_id, created_at DESC);
+CREATE INDEX idx_mensajes_no_leidos ON mensajes(conversacion_id, leido_por_agente) WHERE leido_por_agente = FALSE;
+CREATE INDEX idx_huespedes_wa ON huespedes(wa_id);
+CREATE INDEX idx_reservas_fechas ON reservas(fecha_entrada, fecha_salida, estado);
+
+-- TRIGGER PARA ACTUALIZAR updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_conversaciones_updated_at BEFORE UPDATE ON conversaciones 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+3. INTEGRACIÓN TÉCNICA WHATSAPP BUSINESS API
+3.1 CONFIGURACIÓN REQUERIDA
+Prerrequisitos:
+Cuenta de Meta Business verificada
+Número de teléfono empresarial (no personal)
+Aprobación de templates de mensajes
+Certificado SSL para webhooks
+Endpoints críticos:
+JavaScript
+Copy
+// CONFIGURACIÓN WEBHOOK (Node.js/Express)
+const express = require('express');
+const crypto = require('crypto');
+const { Pool } = require('pg');
+const Redis = require('ioredis');
+
+const app = express();
+const pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
+const redis = new Redis(process.env.REDIS_URL);
+
+// VERIFICACIÓN DEL WEBHOOK (Meta lo llama para validar)
+app.get('/webhook/whatsapp', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    
+    if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFY_TOKEN) {
+        console.log('Webhook verificado');
+        res.status(200).send(challenge);
+    } else {
+        res.sendStatus(403);
+    }
+});
+
+// RECEPCIÓN DE MENSAJES
+app.post('/webhook/whatsapp', express.json(), async (req, res) => {
+    // Verificar firma de Meta para seguridad
+    const signature = req.headers['x-hub-signature-256'];
+    const expected = crypto.createHmac('sha256', process.env.WEBHOOK_SECRET)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+    
+    if (signature !== `sha256=${expected}`) {
+        return res.sendStatus(401);
+    }
+
+    res.sendStatus(200); // Responder rápido a Meta
+    
+    // Procesar mensajes asíncronamente
+    for (const entry of req.body.entry) {
+        for (const change of entry.changes) {
+            if (change.value.messages) {
+                for (const message of change.value.messages) {
+                    await procesarMensajeEntrante(message);
+                }
+            }
+        }
+    }
+});
+
+// FUNCIÓN PRINCIPAL DE PROCESAMIENTO
+async function procesarMensajeEntrante(waMessage) {
+    const waId = waMessage.from; // Número del huésped
+    const messageId = waMessage.id;
+    
+    // 1. Buscar o crear huésped
+    let huesped = await pgPool.query(
+        'SELECT * FROM huespedes WHERE wa_id = $1',
+        [waId]
+    );
+    
+    if (huesped.rows.length === 0) {
+        huesped = await pgPool.query(
+            `INSERT INTO huespedes (wa_id, telefono) 
+             VALUES ($1, $2) RETURNING *`,
+            [waId, waId]
+        );
+    }
+    const huespedId = huesped.rows[0].id;
+    
+    // 2. Buscar conversación activa o crear nueva
+    let conversacion = await pgPool.query(
+        `SELECT * FROM conversaciones 
+         WHERE huesped_id = $1 AND estado != 'cerrado'
+         ORDER BY created_at DESC LIMIT 1`,
+        [huespedId]
+    );
+    
+    if (conversacion.rows.length === 0) {
+        conversacion = await pgPool.query(
+            `INSERT INTO conversaciones (huesped_id, wa_id, estado) 
+             VALUES ($1, $2, 'bot') RETURNING *`,
+            [huespedId, waId]
+        );
+    }
+    const conversacionId = conversacion.rows[0].id;
+    
+    // 3. Guardar mensaje entrante
+    const contenido = waMessage.text?.body || 
+                     (waMessage.image ? '[Imagen]' : 
+                     waMessage.location ? '[Ubicación]' : '[Contenido no soportado]');
+    
+    await pgPool.query(
+        `INSERT INTO mensajes (conversacion_id, wa_message_id, tipo, contenido, 
+                               direccion, origen, procesado)
+         VALUES ($1, $2, $3, $4, 'entrante', 'huesped', false)`,
+        [conversacionId, messageId, 
+         waMessage.type === 'text' ? 'texto' : waMessage.type, 
+         contenido]
+    );
+    
+    // 4. Publicar en Redis para procesamiento por el bot o notificación a agentes
+    await redis.publish('nuevo_mensaje', JSON.stringify({
+        conversacionId,
+        huespedId,
+        waId,
+        contenido,
+        estadoConversacion: conversacion.rows[0].estado,
+        agenteAsignado: conversacion.rows[0].agente_asignado
+    }));
+    
+    // 5. Si está en modo humano, notificar al agente vía WebSocket
+    if (conversacion.rows[0].estado === 'humano_activo') {
+        await notificarAgente(conversacion.rows[0].agente_asignado, {
+            tipo: 'nuevo_mensaje',
+            conversacionId,
+            contenido,
+            timestamp: new Date()
+        });
+    }
+}
+
+// ENVIAR MENSAJE A WHATSAPP (API de Meta)
+async function enviarWhatsApp(waId, contenido, tipo = 'texto', options = {}) {
+    const url = `https://graph.facebook.com/v18.0/${process.env.WA_PHONE_ID}/messages`;
+    
+    let body = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: waId
+    };
+    
+    if (tipo === 'texto') {
+        body.type = 'text';
+        body.text = { body: contenido, preview_url: true };
+    } else if (tipo === 'template') {
+        body.type = 'template';
+        body.template = {
+            name: options.templateName,
+            language: { code: options.idioma || 'es_AR' },
+            components: options.parametros || []
+        };
+    } else if (tipo === 'imagen') {
+        body.type = 'image';
+        body.image = { link: options.url, caption: contenido };
+    }
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${process.env.WA_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Error WhatsApp API: ${JSON.stringify(error)}`);
+    }
+    
+    return await response.json();
+}
+3.2 GESTIÓN DE RATE LIMITS Y ERRORES
+JavaScript
+Copy
+// SISTEMA DE COLAS CON BULL/REDIS (para manejar rate limits)
+const Queue = require('bull');
+
+const mensajesQueue = new Queue('envio whatsapp', process.env.REDIS_URL);
+
+// PROCESADOR DE COLA (max 80 msg/segundo según tier de Meta)
+mensajesQueue.process(5, async (job) => { // 5 workers concurrentes
+    const { waId, contenido, tipo, options, conversacionId } = job.data;
+    
+    try {
+        const result = await enviarWhatsApp(waId, contenido, tipo, options);
+        
+        // Guardar en BD como mensaje saliente
+        await pgPool.query(
+            `INSERT INTO mensajes (conversacion_id, tipo, contenido, 
+                                   direccion, origen, wa_message_id)
+             VALUES ($1, $2, $3, 'saliente', $4, $5)`,
+            [conversacionId, tipo, contenido, 
+             options.origen || 'bot', result.messages[0].id]
+        );
+        
+        return { success: true, messageId: result.messages[0].id };
+        
+    } catch (error) {
+        // Retry con backoff exponencial
+        if (job.attemptsMade < 3) {
+            throw error; // Reintentar
+        }
+        // Guardar como fallido para revisión manual
+        await pgPool.query(
+            `INSERT INTO mensajes_fallidos (conversacion_id, contenido, error, reintentos)
+             VALUES ($1, $2, $3, $4)`,
+            [conversacionId, contenido, error.message, job.attemptsMade]
+        );
+        throw error;
+    }
+});
+
+// RATE LIMITING: Delay entre jobs
+mensajesQueue.on('completed', () => {
+    // Esperar 12.5ms entre mensajes (80 msg/segundo = 1 cada 12.5ms)
+    return new Promise(resolve => setTimeout(resolve, 12.5));
+});
+4. PANEL WEB DE INTERVENCIÓN HUMANA
+4.1 ARQUITECTURA DEL FRONTEND
+JavaScript
+Copy
+// STACK RECOMENDADO: React + Socket.io + TailwindCSS
+
+// ESTRUCTURA DE COMPONENTES
+src/
+├── components/
+│   ├── Layout/
+│   │   ├── Sidebar.jsx          # Navegación entre secciones
+│   │   └── Header.jsx           # Perfil de agente, estado (online/away)
+│   ├── Chat/
+│   │   ├── ChatList.jsx         # Lista de conversaciones (izquierda)
+│   │   ├── ChatWindow.jsx       # Ventana de mensajes (centro)
+│   │   ├── MessageBubble.jsx    # Burbuja de mensaje individual
+│   │   ├── ChatInput.jsx        # Input para responder
+│   │   └── ChatHeader.jsx       # Info del huésped, botones de acción
+│   ├── Intervencion/
+│   │   ├── TakeOverButton.jsx   # Botón "Tomar control"
+│   │   ├── ReturnToBot.jsx      # Devolver conversación al bot
+│   │   └── EscalationModal.jsx  # Modal para motivo de escalamiento
+│   └── Reservas/
+│       ├── ReservaForm.jsx      # Crear/editar reserva manual
+│       └── CalendarioView.jsx   # Vista de disponibilidad
+├── hooks/
+│   ├── useSocket.js             # Conexión WebSocket en tiempo real
+│   ├── useConversaciones.js     # Fetch y estado de conversaciones
+│   └── useWhatsapp.js           # Acciones específicas de WA
+└── context/
+    ├── AuthContext.jsx          # Autenticación del agente
+    └── ConversacionesContext.jsx # Estado global de chats
+4.2 FUNCIONALIDADES CLAVE DEL PANEL
+JavaScript
+Copy
+// HOOK PRINCIPAL DE GESTIÓN DE CONVERSACIONES
+const useConversaciones = () => {
+    const [conversaciones, setConversaciones] = useState([]);
+    const [activa, setActiva] = useState(null);
+    const socket = useSocket();
+
+    useEffect(() => {
+        // Cargar conversaciones iniciales
+        fetchConversaciones();
+        
+        // Escuchar actualizaciones en tiempo real
+        socket.on('nueva_conversacion', (conv) => {
+            setConversaciones(prev => [conv, ...prev]);
+            playNotificationSound();
+        });
+        
+        socket.on('nuevo_mensaje', ({ conversacionId, mensaje }) => {
+            setConversaciones(prev => prev.map(c => 
+                c.id === conversacionId 
+                    ? { ...c, ultimo_mensaje: mensaje, no_leidos: c.no_leidos + 1 }
+                    : c
+            ));
+            
+            if (activa?.id === conversacionId) {
+                // Auto-scroll y marcar como leído
+                marcarComoLeida(conversacionId);
+            }
+        });
+        
+        socket.on('agente_asignado', ({ conversacionId, agente }) => {
+            setConversaciones(prev => prev.map(c => 
+                c.id === conversacionId ? { ...c, agente_asignado: agente } : c
+            ));
+        });
+    }, [socket]);
+
+    // TOMAR CONTROL DE UNA CONVERSACIÓN
+    const tomarControl = async (conversacionId) => {
+        try {
+            await api.post(`/conversaciones/${conversacionId}/tomar-control`);
+            
+            // Notificar a otros agentes que esta conversación está ocupada
+            socket.emit('agente_toma_control', {
+                conversacionId,
+                agenteId: auth.user.id
+            });
+            
+            // Actualizar estado local
+            setConversaciones(prev => prev.map(c => 
+                c.id === conversacionId 
+                    ? { ...c, estado: 'humano_activo', agente_asignado: auth.user.id }
+                    : c
+            ));
+            
+            setActiva(conversaciones.find(c => c.id === conversacionId));
+            
+        } catch (error) {
+            toast.error('No se pudo tomar el control. Otra agente ya la tiene.');
+        }
+    };
+
+    // ENVIAR MENSAJE DESDE EL PANEL (aparece en WhatsApp del huésped)
+    const enviarMensaje = async (conversacionId, contenido, tipo = 'texto') => {
+        // Optimistic UI
+        const tempId = Date.now();
+        const nuevoMensaje = {
+            id: tempId,
+            contenido,
+            direccion: 'saliente',
+            origen: 'agente',
+            agente_id: auth.user.id,
+            created_at: new Date().toISOString(),
+            pending: true
+        };
+        
+        setActiva(prev => ({
+            ...prev,
+            mensajes: [...prev.mensajes, nuevoMensaje]
+        }));
+        
+        try {
+            const { data } = await api.post(`/conversaciones/${conversacionId}/mensajes`, {
+                contenido,
+                tipo,
+                origen: 'agente'
+            });
+            
+            // Reemplazar mensaje temporal con el real (con ID de WhatsApp)
+            setActiva(prev => ({
+                ...prev,
+                mensajes: prev.mensajes.map(m => 
+                    m.id === tempId ? { ...data, pending: false } : m
+                )
+            }));
+            
+        } catch (error) {
+            // Marcar como error
+            setActiva(prev => ({
+                ...prev,
+                mensajes: prev.mensajes.map(m => 
+                    m.id === tempId ? { ...m, error: true } : m
+                )
+            }));
+        }
+    };
+
+    // DEVOLVER AL BOT
+    const devolverABot = async (conversacionId, notas = '') => {
+        await api.post(`/conversaciones/${conversacionId}/devolver-bot`, { notas });
+        
+        setConversaciones(prev => prev.filter(c => c.id !== conversacionId));
+        if (activa?.id === conversacionId) setActiva(null);
+    };
+
+    return {
+        conversaciones,
+        activa,
+        setActiva,
+        tomarControl,
+        enviarMensaje,
+        devolverABot,
+        cargando
+    };
+};
+4.3 VISTA PRINCIPAL DEL PANEL
+jsx
+Copy
+// COMPONENTE PRINCIPAL: Dashboard.jsx
+const Dashboard = () => {
+    const { conversaciones, activa, tomarControl, enviarMensaje } = useConversaciones();
+    
+    // Filtrar por estado
+    const enEspera = conversaciones.filter(c => c.estado === 'espera_humano');
+    const activasBot = conversaciones.filter(c => c.estado === 'bot');
+    const misChats = conversaciones.filter(c => 
+        c.estado === 'humano_activo' && c.agente_asignado === auth.user.id
+    );
+
+    return (
+        <div className="flex h-screen bg-gray-100">
+            {/* SIDEBAR: Lista de conversaciones */}
+            <div className="w-80 bg-white border-r flex flex-col">
+                <div className="p-4 border-b">
+                    <h2 className="font-bold text-lg">Conversaciones</h2>
+                    
+                    {/* Tabs de filtro */}
+                    <div className="flex gap-2 mt-2">
+                        <Badge color="red" count={enEspera.length}>
+                            <Button size="small">Espera</Button>
+                        </Badge>
+                        <Badge color="blue" count={misChats.length}>
+                            <Button size="small">Mías</Button>
+                        </Badge>
+                    </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto">
+                    {enEspera.map(conv => (
+                        <ChatListItem 
+                            key={conv.id}
+                            conversacion={conv}
+                            urgente={conv.prioridad === 'urgente'}
+                            onClick={() => tomarControl(conv.id)}
+                            tiempoEspera={calcularTiempoEspera(conv.fecha_escalamiento)}
+                        />
+                    ))}
+                </div>
+            </div>
+            
+            {/* ÁREA PRINCIPAL: Chat activo o vista vacía */}
+            <div className="flex-1 flex flex-col">
+                {activa ? (
+                    <>
+                        <ChatHeader 
+                            huesped={activa.huesped}
+                            estado={activa.estado}
+                            onCerrar={() => devolverABot(activa.id)}
+                            onVerReserva={() => openReservaModal(activa.huesped_id)}
+                        />
+                        
+                        <ChatWindow 
+                            mensajes={activa.mensajes}
+                            tipo="humano" // Identifica burbujas del agente vs huésped vs bot
+                        />
+                        
+                        <ChatInput 
+                            onEnviar={(texto) => enviarMensaje(activa.id, texto)}
+                            onEnviarImagen={handleImagen}
+                            onUsarTemplate={openTemplateSelector}
+                            disabled={activa.estado !== 'humano_activo'}
+                        />
+                    </>
+                ) : (
+                    <EmptyState 
+                        icon={<MessageOutlined />}
+                        text="Selecciona una conversación para atender"
+                    />
+                )}
+            </div>
+            
+            {/* SIDEBAR DERECHA: Info del huésped y acciones rápidas */}
+            {activa && (
+                <div className="w-72 bg-white border-l p-4">
+                    <HuespedCard huesped={activa.huesped} />
+                    
+                    <Divider />
+                    
+                    <ResumenReserva 
+                        datos={activa.datos_reserva_temp}
+                        onConfirmar={confirmarReserva}
+                        onModificar={openEditModal}
+                    />
+                    
+                    <Divider />
+                    
+                    <AccionesRapidas>
+                        <Button onClick={() => enviarTemplate('confirmacion')}>
+                            Enviar confirmación
+                        </Button>
+                        <Button onClick={() => enviarUbicacion()}>
+                            Enviar ubicación
+                        </Button>
+                        <Button danger onClick={escalarASupervisor}>
+                            Escalar a supervisor
+                        </Button>
+                    </AccionesRapidas>
+                </div>
+            )}
+        </div>
+    );
+};
+5. BACKEND: API Y WEBSOCKETS
+Python
+Copy
+# FastAPI (Python) o Express (Node.js) - Ejemplo en Python por robustez
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+import asyncio
+import json
+
+app = FastAPI()
+
+# GESTIÓN DE CONEXIONES WEBSOCKET (Agentes conectados)
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}  # agente_id -> websocket
+    
+    async def connect(self, websocket: WebSocket, agente_id: str):
+        await websocket.accept()
+        self.active_connections[agente_id] = websocket
+        # Marcar agente como en línea
+        await db.execute(
+            "UPDATE agentes SET en_linea = true WHERE id = :id",
+            {"id": agente_id}
+        )
+    
+    def disconnect(self, agente_id: str):
+        del self.active_connections[agente_id]
+        # Marcar como offline
+        asyncio.create_task(
+            db.execute(
+                "UPDATE agentes SET en_linea = false WHERE id = :id",
+                {"id": agente_id}
+            )
+        )
+    
+    async def send_to_agent(self, agente_id: str, message: dict):
+        if agente_id in self.active_connections:
+            await self.active_connections[agente_id].send_json(message)
+    
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.values():
+            await connection.send_json(message)
+
+manager = ConnectionManager()
+
+# ENDPOINT: Tomar control de conversación
+@app.post("/conversaciones/{conv_id}/tomar-control")
+async def tomar_control(
+    conv_id: str,
+    agente: Agente = Depends(get_current_agente),
+    db: Session = Depends(get_db)
+):
+    # Verificar que no esté ya tomada
+    conv = db.query(Conversacion).filter(Conversacion.id == conv_id).first()
+    
+    if conv.estado == 'humano_activo' and conv.agente_asignado != agente.id:
+        raise HTTPException(400, "Conversación ya está siendo atendida")
+    
+    if conv.estado == 'cerrado':
+        raise HTTPException(400, "Conversación cerrada")
+    
+    # Actualizar estado
+    conv.estado = 'humano_activo'
+    conv.agente_asignado = agente.id
+    conv.fecha_escalamiento = None  # Ya no está en espera
+    
+    # Notificar al huésped por WhatsApp
+    await enviar_whatsapp(
+        conv.wa_id,
+        f"Te estoy atendiendo personalmente. Soy {agente.nombre}, ¿en qué puedo ayudarte?",
+        tipo='texto'
+    )
+    
+    # Guardar mensaje de sistema
+    mensaje_sistema = Mensaje(
+        conversacion_id=conv_id,
+        tipo='texto',
+        contenido=f'Agente {agente.nombre} tomó el control',
+        direccion='saliente',
+        origen='sistema'
+    )
+    db.add(mensaje_sistema)
+    db.commit()
+    
+    # Notificar a otros agentes que esta conversación ya no está disponible
+    await manager.broadcast({
+        'tipo': 'conversacion_tomada',
+        'conversacion_id': conv_id,
+        'agente': {'id': agente.id, 'nombre': agente.nombre}
+    })
+    
+    return {'status': 'ok', 'conversacion': conv}
+
+# ENDPOINT: Enviar mensaje desde panel (llega a WhatsApp)
+@app.post("/conversaciones/{conv_id}/mensajes")
+async def enviar_mensaje_agente(
+    conv_id: str,
+    data: MensajeCreate,
+    agente: Agente = Depends(get_current_agente),
+    db: Session = Depends(get_db)
+):
+    conv = db.query(Conversacion).filter(Conversacion.id == conv_id).first()
+    
+    if conv.agente_asignado != agente.id:
+        raise HTTPException(403, "No tienes asignada esta conversación")
+    
+    # Enviar a WhatsApp Business API
+    wa_response = await enviar_whatsapp_api(
+        to=conv.wa_id,
+        contenido=data.contenido,
+        tipo=data.tipo
+    )
+    
+    # Guardar en BD
+    mensaje = Mensaje(
+        conversacion_id=conv_id,
+        wa_message_id=wa_response['messages'][0]['id'],
+        tipo=data.tipo,
+        contenido=data.contenido,
+        direccion='saliente',
+        origen='agente',
+        agente_id=agente.id
+    )
+    db.add(mensaje)
+    
+    # Actualizar contadores
+    conv.mensajes_humano += 1
+    conv.ultima_actividad = datetime.now()
+    db.commit()
+    
+    return mensaje
+
+# WEBSOCKET PARA TIEMPO REAL
+@app.websocket("/ws/agente/{agente_id}")
+async def websocket_endpoint(websocket: WebSocket, agente_id: str):
+    await manager.connect(websocket, agente_id)
+    try:
+        while True:
+            # Recibir pings o acciones del agente
+            data = await websocket.receive_json()
+            
+            if data['accion'] == 'typing':
+                # Notificar al huésped que el agente está escribiendo (opcional)
+                pass
+            
+    except WebSocketDisconnect:
+        manager.disconnect(agente_id)
+
+# SISTEMA DE DISTRIBUCIÓN AUTOMÁTICA (Round Robin)
+async def distribuir_conversacion(conversacion_id: str):
+    """Asigna automáticamente a un agente disponible"""
+    
+    agente = await db.fetch_one("""
+        SELECT id, nombre FROM agentes 
+        WHERE en_linea = true 
+        AND (SELECT COUNT(*) FROM conversaciones 
+             WHERE agente_asignado = agentes.id 
+             AND estado = 'humano_activo') < max_conversaciones
+        ORDER BY ultima_asignacion ASC NULLS FIRST
+        LIMIT 1
+    """)
+    
+    if agente:
+        await db.execute("""
+            UPDATE conversaciones 
+            SET agente_asignado = :agente_id, estado = 'humano_activo'
+            WHERE id = :conv_id
+        """, {"agente_id": agente['id'], "conv_id": conversacion_id})
+        
+        await manager.send_to_agent(agente['id'], {
+            'tipo': 'nueva_asignacion',
+            'conversacion_id': conversacion_id,
+            'mensaje': 'Nueva conversación asignada automáticamente'
+        })
+        
+        return True
+    return False
+6. ANÁLISIS DE FACTIBILIDAD Y MEJOR SOLUCIÓN TÉCNICA
+6.1 COMPARATIVA DE OPCIONES
+Table
+Copy
+Aspecto	Opción A: Meta Cloud API Directa	Opción B: Proveedor Intermediario (Twilio, 360dialog)	Opción C: WhatsApp Business Platform On-Premises
+Costo mensual	$0 (solo costo por conversación)	$50-150/mes + costos por msg	$3,000+ (servidores dedicados)
+Setup inicial	Complejo (verificación Meta)	Simple	Muy complejo
+Rate limits	80 msg/seg	Similar o mejor	Ilimitado
+Templates	Aprobación obligatoria	Misma restricción	Misma restricción
+Soporte técnico	Documentación/foros	Soporte dedicado	Soporte enterprise
+Escalabilidad	Alta	Media	Muy alta
+Recomendación	✅ MEJOR OPCIÓN	Para equipos sin devs senior	Grandes empresas
+6.2 RECOMENDACIÓN FINAL: STACK ÓPTIMO
+plain
+Copy
+┌─────────────────────────────────────────────────────────────────┐
+│                    STACK TECNOLÓGICO RECOMENDADO                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  INFRAESTRUCTURA                                                │
+│  ├── VPS: DigitalOcean/AWS (2 vCPU, 4GB RAM inicial)           │
+│  ├── PostgreSQL: Managed DB (DigitalOcean/AWS RDS)             │
+│  └── Redis: Managed Redis (para colas y sesiones)              │
+│                                                                 │
+│  BACKEND (Node.js recomendado por ecosistema WhatsApp)         │
+│  ├── Framework: Express.js o NestJS                            │
+│  ├── ORM: Prisma o TypeORM                                     │
+│  ├── Validación: Zod o Joi                                     │
+│  ├── Colas: Bull (Redis) para envío de mensajes                │
+│  └── Testing: Jest + Supertest                                 │
+│                                                                 │
+│  FRONTEND                                                       │
+│  ├── React 18 + TypeScript                                     │
+│  ├── Estado: Zustand o Redux Toolkit                           │
+│  ├── UI: TailwindCSS + HeadlessUI o Ant Design                 │
+│  ├── Tiempo real: Socket.io-client                             │
+│  └── Build: Vite                                               │
+│                                                                 │
+│  INTEGRACIONES                                                  │
+│  ├── WhatsApp: Meta Cloud API (oficial)                        │
+│  ├── Calendario: Google Calendar API                           │
+│  ├── Almacenamiento: Google Drive API o AWS S3                 │
+│  └── Notificaciones: Email (SendGrid) + Slack Webhooks         │
+│                                                                 │
+│  DEVOPS                                                         │
+│  ├── Container: Docker + Docker Compose                        │
+│  ├── CI/CD: GitHub Actions                                     │
+│  ├── Monitoreo: Sentry (errores) + UptimeRobot                 │
+│  └── Logs: Winston (app) + Papertrail/LogDNA                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+6.3 ESTIMACIÓN DE COSTOS MENSUALES (MVP)
+Table
+Copy
+Componente	Costo estimado (USD)
+VPS (2vCPU/4GB)	$24
+PostgreSQL Managed (1GB)	$15
+Redis Managed	$15
+Meta WhatsApp API	~$0.005-0.08 por conversación*
+Dominio + SSL	$12/año
+Sentry (plan hobby)	$0
+TOTAL FIJO	~$54/mes
+VARIABLE (1,000 conversaciones/mes)	~$50-80
+*Conversaciones: 24h de mensajería libre por sesión iniciada por usuario. Templates pagos solo si el bot inicia.
+6.4 CRONOGRAMA DE IMPLEMENTACIÓN
+Table
+Copy
+Fase	Duración	Entregables
+Fase 0: Setup	1 semana	• Cuenta Meta Business verificada
+• Número de teléfono aprobado
+• Infraestructura cloud desplegada
+• BD PostgreSQL configurada
+Fase 1: Core WhatsApp	2 semanas	• Webhook funcionando
+• Guardado de mensajes en BD
+• Respuestas básicas automatizadas
+• Templates aprobados por Meta
+Fase 2: Lógica de Negocio	2 semanas	• Consulta de disponibilidad
+• Cálculo de precios
+• Flujo de pre-reserva
+• Integración Google Calendar
+Fase 3: Panel Web	3 semanas	• Autenticación de agentes
+• Vista de conversaciones
+• Sistema de handoff
+• Envío de mensajes desde panel
+Fase 4: Testing & Deploy	1 semana	• Tests de integración
+• Pruebas con usuarios reales
+• Optimización de performance
+• Documentación final
+TOTAL	9 semanas	MVP productivo
+6.5 RIESGOS Y MITIGACIÓN
+Table
+Copy
+Riesgo	Probabilidad	Impacto	Mitigación
+Rechazo de templates por Meta	Media	Alto	• Enviar para aprobación temprano
+• Usar categoría UTILITY inicialmente
+• Tener plan B de mensajes de texto
+Rate limiting en alta temporada	Media	Medio	• Implementar colas con retry
+• Monitoreo de cuota
+• Escalamiento progresivo
+Fallo de API de WhatsApp	Baja	Alto	• Fallback a email/SMS
+• Cola de mensajes pendientes
+• Página de estado pública
+Datos inconsistentes (doble reserva)	Baja	Crítico	• Transacciones SQL estrictas
+• Locks pesimistas en fechas
+• Validación final antes de confirmar
+7. CHECKLIST DE IMPLEMENTACIÓN
+Markdown
+Copy
+Code
+Preview
+### Pre-desarrollo
+- [ ] Registrar empresa en Meta Business Manager
+- [ ] Verificar dominio y cuenta bancaria
+- [ ] Solicitar número de teléfono empresarial
+- [ ] Diseñar y enviar templates de mensajes
+- [ ] Crear cuenta de desarrollador Meta
+
+### Desarrollo Backend
+- [ ] Configurar webhook y verificación
+- [ ] Implementar recepción de mensajes
+- [ ] Crear esquema PostgreSQL
+- [ ] Desarrollar lógica de negocio (disponibilidad, precios)
+- [ ] Implementar colas de envío
+- [ ] Crear API REST para panel
+
+### Desarrollo Frontend
+- [ ] Diseñar interfaz de chat (similar a WhatsApp Web)
+- [ ] Implementar autenticación JWT
+- [ ] Conectar WebSockets para tiempo real
+- [ ] Crear vistas de reservas y calendario
+- [ ] Implementar sistema de handoff
+
+### Testing
+- [ ] Pruebas unitarias (cobertura >70%)
+- [ ] Pruebas de integración con sandbox de Meta
+- [ ] Pruebas de carga (simular 100 conversaciones simultáneas)
+- [ ] Pruebas de usuario con equipo real
+
+### Producción
+- [ ] Configurar dominio y SSL
+- [ ] Desplegar en VPS cloud
+- [ ] Configurar monitoreo y alertas
+- [ ] Crear backups automáticos de BD
+- [ ] Documentar procedimientos de emergencia
+¿Necesitas que profundice en alguna sección específica, como el diagrama ER detallado, el código del webhook de Meta, o la configuración de Docker para el despliegue?
+txt
+Actúa como un arquitecto de chatbot.txt
+
+40.97 KB
+
+revisar adjunto si algo mas se precisa generar un nuevo documento con modificaciones
+Edit
+Copy
+Share
+He revisado el documento adjunto. Es una documentación técnica completa para un chatbot de alojamientos con WhatsApp Business, PostgreSQL y panel web, pero contiene fragmentos de código duplicados y desordenados (aparece el hook useConversaciones dos veces, el dashboard dos veces, y secciones mezcladas).
+Aquí te presento el documento corregido y mejorado, consolidado y listo para usar:
+DOCUMENTACIÓN TÉCNICA: CHATBOT DE ALOJAMIENTOS
+Arquitectura Completa con WhatsApp Business + PostgreSQL + Panel Web
+Versión: 2.0
+Estado: Lista para implementación
+Última actualización: Febrero 2025
+TABLA DE CONTENIDOS
+Resumen Ejecutivo
+Arquitectura del Sistema
+Base de Datos (PostgreSQL)
+Integración WhatsApp Business API
+Panel Web de Agentes
+Backend y WebSockets
+Análisis de Factibilidad
+Plan de Implementación
+Checklist de Despliegue
+1. RESUMEN EJECUTIVO
+Alcance del Proyecto
+Sistema completo de atención al cliente para alojamientos turísticos que permite:
+Automatización: Respuestas automáticas vía WhatsApp 24/7
+Gestión de reservas: Consulta de disponibilidad y pre-reservas
+Intervención humana: Panel web para que agentes tomen control de conversaciones
+Persistencia: Todas las interacciones guardadas en PostgreSQL
+Tecnologías Principales
+Table
+Copy
+Componente	Tecnología	Justificación
+Mensajería	WhatsApp Business API (Meta)	Canal preferido por usuarios, alta apertura
+Base de datos	PostgreSQL 15	ACID compliance, JSONB para flexibilidad
+Backend	Node.js + Express	Ecosistema maduro para WhatsApp
+Frontend	React 18 + TypeScript	Componentización, tipado seguro
+Tiempo real	Socket.io	WebSockets bidireccionales
+Colas	Redis + Bull	Rate limiting de Meta, reintentos
+2. ARQUITECTURA DEL SISTEMA
+plain
+Copy
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLIENTE                                    │
+│                    WhatsApp App del Huésped                             │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    META CLOUD API (WhatsApp Business)                   │
+│  • Webhook HTTPS para mensajes entrantes                                │
+│  • Templates de mensajes pre-aprobados                                  │
+│  • Rate limiting: 80 mensajes/segundo                                   │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BACKEND (Node.js/Express)                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │
+│  │   Webhook    │  │  Motor NLP   │  │  Lógica de   │  │   API de    │ │
+│  │  Controller  │  │  (Intent clf)│  │   Negocio    │  │  WhatsApp   │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
+│  ┌──────────────┐  ┌──────────────┐                                     │
+│  │   Colas      │  │  WebSocket   │                                     │
+│  │  (Bull/Redis)│  │   Manager    │                                     │
+│  └──────────────┘  └──────────────┘                                     │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                 ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│   POSTGRESQL     │  │   REDIS (Cache)  │  │  GOOGLE DRIVE    │
+│  (Datos maestros)│  │  (Sesiones/Colas)│  │  (Fotos/Docs)    │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PANEL WEB DE AGENTES (React)                         │
+│  • Dashboard en tiempo real                                             │
+│  • Intervención manual de conversaciones                                │
+│  • Gestión de reservas y calendario                                     │
+│  • Analytics y reportes                                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+3. BASE DE DATOS (POSTGRESQL)
+3.1 Esquema Completo
+sql
+Copy
+-- EXTENSIONES REQUERIDAS
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- Búsqueda fuzzy de texto
+
+-- TABLA: HUÉSPEDES (Contactos de WhatsApp)
+CREATE TABLE huespedes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    wa_id VARCHAR(20) UNIQUE NOT NULL, -- ID de WhatsApp (ej: 549116661234)
+    nombre VARCHAR(100),
+    telefono VARCHAR(20) NOT NULL,
+    email VARCHAR(100),
+    idioma_preferido VARCHAR(10) DEFAULT 'es',
+    pais VARCHAR(50),
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    es_vip BOOLEAN DEFAULT FALSE,
+    notas TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: AGENTES (Equipo humano)
+CREATE TABLE agentes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    rol VARCHAR(20) DEFAULT 'agente' CHECK (rol IN ('agente', 'supervisor', 'admin')),
+    esta_activo BOOLEAN DEFAULT TRUE,
+    en_linea BOOLEAN DEFAULT FALSE,
+    max_conversaciones INTEGER DEFAULT 5,
+    ultima_asignacion TIMESTAMP,
+    horario_trabajo JSONB DEFAULT '{"lunes":{"inicio":"09:00","fin":"18:00"}}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: CONVERSACIONES (Chats activos/archivados)
+CREATE TABLE conversaciones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    huesped_id UUID REFERENCES huespedes(id) ON DELETE CASCADE,
+    wa_id VARCHAR(20) NOT NULL,
+    
+    -- Estado del chat: bot | espera_humano | humano_activo | cerrado
+    estado VARCHAR(20) DEFAULT 'bot',
+    prioridad VARCHAR(10) DEFAULT 'media' CHECK (prioridad IN ('baja', 'media', 'alta', 'urgente')),
+    
+    -- Control de intervención humana
+    agente_asignado UUID REFERENCES agentes(id),
+    fecha_escalamiento TIMESTAMP,
+    motivo_escalamiento TEXT,
+    
+    -- Contexto para el bot (última intención, datos recolectados, etc.)
+    contexto_actual JSONB DEFAULT '{}',
+    datos_reserva_temp JSONB,
+    
+    -- Métricas
+    mensajes_totales INTEGER DEFAULT 0,
+    mensajes_bot INTEGER DEFAULT 0,
+    mensajes_humano INTEGER DEFAULT 0,
+    ultima_actividad TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_cierre TIMESTAMP,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: MENSAJES (Historial completo)
+CREATE TABLE mensajes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversacion_id UUID REFERENCES conversaciones(id) ON DELETE CASCADE,
+    
+    -- Datos del mensaje
+    wa_message_id VARCHAR(100), -- ID de WhatsApp para tracking de entrega
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('texto', 'imagen', 'documento', 'ubicacion', 'boton', 'template')),
+    contenido TEXT NOT NULL,
+    media_url TEXT,
+    
+    -- Dirección y autoría
+    direccion VARCHAR(10) NOT NULL CHECK (direccion IN ('entrante', 'saliente')),
+    origen VARCHAR(20) NOT NULL CHECK (origen IN ('huesped', 'bot', 'agente', 'sistema')),
+    agente_id UUID REFERENCES agentes(id),
+    
+    -- Metadata de procesamiento
+    intencion_detectada VARCHAR(50),
+    confianza_nlp DECIMAL(3,2),
+    procesado BOOLEAN DEFAULT FALSE,
+    
+    -- Gestión de lectura
+    requiere_atencion BOOLEAN DEFAULT FALSE,
+    leido_por_agente BOOLEAN DEFAULT FALSE,
+    fecha_lectura TIMESTAMP,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: RESERVAS
+CREATE TABLE reservas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversacion_id UUID REFERENCES conversaciones(id),
+    huesped_id UUID REFERENCES huespedes(id),
+    
+    -- Datos de la estadía
+    fecha_entrada DATE NOT NULL,
+    fecha_salida DATE NOT NULL,
+    noches_totales INTEGER GENERATED ALWAYS AS (fecha_salida - fecha_entrada) STORED,
+    cantidad_huespedes INTEGER NOT NULL,
+    habitacion_tipo VARCHAR(50),
+    
+    -- Precios
+    precio_noche DECIMAL(10,2),
+    precio_total DECIMAL(10,2),
+    moneda VARCHAR(3) DEFAULT 'USD',
+    
+    -- Estados: pre_reserva | pendiente_pago | confirmada | cancelada | completada
+    estado VARCHAR(20) DEFAULT 'pre_reserva',
+    fuente VARCHAR(20) DEFAULT 'whatsapp_bot',
+    
+    -- Referencias externas
+    google_calendar_event_id VARCHAR(255),
+    pago_referencia VARCHAR(100),
+    
+    notas_internas TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA: INVENTARIO (Disponibilidad diaria)
+CREATE TABLE inventario (
+    fecha DATE PRIMARY KEY,
+    habitaciones_disponibles INTEGER DEFAULT 1,
+    habitaciones_ocupadas INTEGER DEFAULT 0,
+    precio_base DECIMAL(10,2) NOT NULL,
+    precio_oferta DECIMAL(10,2),
+    esta_bloqueado BOOLEAN DEFAULT FALSE,
+    notas TEXT
+);
+
+-- TABLA: TEMPLATES DE WHATSAPP (Aprobados por Meta)
+CREATE TABLE wa_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(100) NOT NULL,
+    template_id_meta VARCHAR(100) UNIQUE NOT NULL,
+    categoria VARCHAR(50), -- MARKETING, UTILITY, AUTHENTICATION
+    idioma VARCHAR(10),
+    parametros JSONB,
+    contenido_ejemplo TEXT,
+    esta_activo BOOLEAN DEFAULT TRUE
+);
+
+-- TABLA: AUDITORÍA (Logs de sistema)
+CREATE TABLE auditoria (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tabla_afectada VARCHAR(50),
+    registro_id UUID,
+    accion VARCHAR(20),
+    datos_anteriores JSONB,
+    datos_nuevos JSONB,
+    agente_id UUID,
+    ip_address INET,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ÍNDICES CRÍTICOS PARA PERFORMANCE
+CREATE INDEX idx_conversaciones_estado ON conversaciones(estado, prioridad, created_at DESC);
+CREATE INDEX idx_conversaciones_agente ON conversaciones(agente_asignado, estado);
+CREATE INDEX idx_conversaciones_huesped ON conversaciones(huesped_id, created_at DESC);
+CREATE INDEX idx_mensajes_conversacion ON mensajes(conversacion_id, created_at DESC);
+CREATE INDEX idx_mensajes_no_leidos ON mensajes(conversacion_id, leido_por_agente) WHERE leido_por_agente = FALSE;
+CREATE INDEX idx_huespedes_wa ON huespedes(wa_id);
+CREATE INDEX idx_reservas_fechas ON reservas(fecha_entrada, fecha_salida, estado);
+CREATE INDEX idx_reservas_huesped ON reservas(huesped_id, created_at DESC);
+
+-- TRIGGER PARA ACTUALIZAR updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_conversaciones_updated_at BEFORE UPDATE ON conversaciones 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_huespedes_updated_at BEFORE UPDATE ON huespedes 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_reservas_updated_at BEFORE UPDATE ON reservas 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+3.2 Diagrama Entidad-Relación
+plain
+Copy
+┌─────────────┐       ┌─────────────────┐       ┌─────────────┐
+│  huespedes  │◄──────┤  conversaciones │──────►│   agentes   │
+└─────────────┘       └────────┬────────┘       └─────────────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │   mensajes  │
+                        └─────────────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │   reservas  │
+                        └─────────────┘
+4. INTEGRACIÓN WHATSAPP BUSINESS API
+4.1 Configuración Requerida
+Prerrequisitos:
+Cuenta de Meta Business verificada
+Número de teléfono empresarial (no personal)
+Aprobación de templates de mensajes
+Certificado SSL válido para webhooks
+Dominio con HTTPS obligatorio
+4.2 Implementación del Webhook (Node.js)
+JavaScript
+Copy
+// server.js - Configuración principal
+const express = require('express');
+const crypto = require('crypto');
+const { Pool } = require('pg');
+const Redis = require('ioredis');
+const Queue = require('bull');
+
+const app = express();
+app.use(express.json());
+
+// Conexiones a servicios
+const pgPool = new Pool({ 
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+const redis = new Redis(process.env.REDIS_URL);
+
+// Cola para envío de mensajes (rate limiting de Meta)
+const mensajesQueue = new Queue('envio whatsapp', process.env.REDIS_URL);
+
+// ==========================================
+// VERIFICACIÓN DEL WEBHOOK (Meta lo valida)
+// ==========================================
+app.get('/webhook/whatsapp', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    
+    if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFY_TOKEN) {
+        console.log('✅ Webhook verificado por Meta');
+        res.status(200).send(challenge);
+    } else {
+        console.error('❌ Fallo de verificación del webhook');
+        res.sendStatus(403);
+    }
+});
+
+// ==========================================
+// RECEPCIÓN DE MENSAJES (POST)
+// ==========================================
+app.post('/webhook/whatsapp', async (req, res) => {
+    // Verificar firma de seguridad de Meta
+    const signature = req.headers['x-hub-signature-256'];
+    const expected = crypto
+        .createHmac('sha256', process.env.WEBHOOK_SECRET)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+    
+    if (signature !== `sha256=${expected}`) {
+        console.error('❌ Firma inválida');
+        return res.sendStatus(401);
+    }
+
+    // Responder rápido a Meta (evita reintentos)
+    res.sendStatus(200);
+    
+    // Procesar mensajes asíncronamente
+    try {
+        for (const entry of req.body.entry || []) {
+            for (const change of entry.changes || []) {
+                if (change.value?.messages) {
+                    for (const message of change.value.messages) {
+                        await procesarMensajeEntrante(message);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error procesando mensajes:', error);
+    }
+});
+
+// ==========================================
+// FUNCIÓN PRINCIPAL DE PROCESAMIENTO
+// ==========================================
+async function procesarMensajeEntrante(waMessage) {
+    const waId = waMessage.from; // Número del huésped
+    const messageId = waMessage.id;
+    
+    // 1. Buscar o crear huésped
+    let huespedResult = await pgPool.query(
+        'SELECT * FROM huespedes WHERE wa_id = $1',
+        [waId]
+    );
+    
+    let huesped;
+    if (huespedResult.rows.length === 0) {
+        // Nuevo huésped
+        huespedResult = await pgPool.query(
+            `INSERT INTO huespedes (wa_id, telefono, nombre) 
+             VALUES ($1, $2, $3) RETURNING *`,
+            [waId, waId, waMessage.contacts?.[0]?.profile?.name || null]
+        );
+        huesped = huespedResult.rows[0];
+        console.log(`👤 Nuevo huésped registrado: ${waId}`);
+    } else {
+        huesped = huespedResult.rows[0];
+    }
+    
+    // 2. Buscar conversación activa o crear nueva
+    let convResult = await pgPool.query(
+        `SELECT * FROM conversaciones 
+         WHERE huesped_id = $1 AND estado != 'cerrado'
+         ORDER BY created_at DESC LIMIT 1`,
+        [huesped.id]
+    );
+    
+    let conversacion;
+    if (convResult.rows.length === 0) {
+        convResult = await pgPool.query(
+            `INSERT INTO conversaciones (huesped_id, wa_id, estado, contexto_actual) 
+             VALUES ($1, $2, 'bot', '{"etapa": "saludo"}') RETURNING *`,
+            [huesped.id, waId]
+        );
+        conversacion = convResult.rows[0];
+    } else {
+        conversacion = convResult.rows[0];
+    }
+    
+    // 3. Extraer contenido según tipo de mensaje
+    let contenido = '';
+    let tipo = 'texto';
+    
+    if (waMessage.type === 'text') {
+        contenido = waMessage.text.body;
+    } else if (waMessage.type === 'image') {
+        contenido = '[Imagen recibida]';
+        tipo = 'imagen';
+    } else if (waMessage.type === 'location') {
+        contenido = `[Ubicación: ${waMessage.location.latitude}, ${waMessage.location.longitude}]`;
+        tipo = 'ubicacion';
+    } else if (waMessage.type === 'document') {
+        contenido = '[Documento recibido]';
+        tipo = 'documento';
+    } else {
+        contenido = `[Mensaje tipo: ${waMessage.type}]`;
+    }
+    
+    // 4. Guardar mensaje en BD
+    const mensajeResult = await pgPool.query(
+        `INSERT INTO mensajes (conversacion_id, wa_message_id, tipo, contenido, 
+                               direccion, origen, procesado, requiere_atencion)
+         VALUES ($1, $2, $3, $4, 'entrante', 'huesped', false, $5) RETURNING *`,
+        [conversacion.id, messageId, tipo, contenido, 
+         conversacion.estado === 'humano_activo' ? true : false]
+    );
+    
+    // 5. Actualizar métricas de conversación
+    await pgPool.query(
+        `UPDATE conversaciones 
+         SET mensajes_totales = mensajes_totales + 1,
+             ultima_actividad = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [conversacion.id]
+    );
+    
+    // 6. Publicar en Redis para procesamiento
+    await redis.publish('nuevo_mensaje', JSON.stringify({
+        conversacionId: conversacion.id,
+        huespedId: huesped.id,
+        waId: waId,
+        contenido: contenido,
+        tipo: tipo,
+        estadoConversacion: conversacion.estado,
+        agenteAsignado: conversacion.agente_asignado,
+        timestamp: new Date().toISOString()
+    }));
+    
+    // 7. Si está en modo humano, notificar al agente vía WebSocket
+    if (conversacion.estado === 'humano_activo' && conversacion.agente_asignado) {
+        await notificarAgente(conversacion.agente_asignado, {
+            tipo: 'nuevo_mensaje',
+            conversacionId: conversacion.id,
+            mensajeId: mensajeResult.rows[0].id,
+            contenido: contenido,
+            tipo: tipo,
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    // 8. Si está en modo bot, encolar para procesamiento NLP
+    if (conversacion.estado === 'bot') {
+        await redis.lpush('cola_procesamiento_bot', JSON.stringify({
+            conversacionId: conversacion.id,
+            mensajeId: mensajeResult.rows[0].id,
+            contenido: contenido,
+            contexto: conversacion.contexto_actual
+        }));
+    }
+}
+
+// ==========================================
+// ENVÍO DE MENSAJES A WHATSAPP
+// ==========================================
+async function enviarWhatsApp(waId, contenido, tipo = 'texto', options = {}) {
+    const url = `https://graph.facebook.com/v18.0/${process.env.WA_PHONE_ID}/messages`;
+    
+    let body = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: waId
+    };
+    
+    if (tipo === 'texto') {
+        body.type = 'text';
+        body.text = { body: contenido, preview_url: true };
+    } else if (tipo === 'template') {
+        body.type = 'template';
+        body.template = {
+            name: options.templateName,
+            language: { code: options.idioma || 'es_AR' },
+            components: options.parametros || []
+        };
+    } else if (tipo === 'imagen') {
+        body.type = 'image';
+        body.image = { link: options.url, caption: contenido };
+    } else if (tipo === 'documento') {
+        body.type = 'document';
+        body.document = { link: options.url, caption: contenido };
+    }
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${process.env.WA_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Error WhatsApp API: ${JSON.stringify(error)}`);
+    }
+    
+    return await response.json();
+}
+
+// Worker de cola para rate limiting
+mensajesQueue.process(3, async (job) => { // 3 workers concurrentes
+    const { waId, contenido, tipo, options, conversacionId, origen } = job.data;
+    
+    try {
+        const result = await enviarWhatsApp(waId, contenido, tipo, options);
+        
+        // Guardar en BD como mensaje saliente
+        await pgPool.query(
+            `INSERT INTO mensajes (conversacion_id, tipo, contenido, 
+                                   direccion, origen, wa_message_id, agente_id)
+             VALUES ($1, $2, $3, 'saliente', $4, $5, $6)`,
+            [conversacionId, tipo, contenido, origen || 'bot', 
+             result.messages[0].id, options.agenteId || null]
+        );
+        
+        return { success: true, messageId: result.messages[0].id };
+        
+    } catch (error) {
+        if (job.attemptsMade < 3) {
+            throw error; // Reintentar con backoff
+        }
+        // Guardar como fallido
+        await pgPool.query(
+            `INSERT INTO mensajes_fallidos (conversacion_id, contenido, error, reintentos)
+             VALUES ($1, $2, $3, $4)`,
+            [conversacionId, contenido, error.message, job.attemptsMade]
+        );
+        throw error;
+    }
+});
+
+// Rate limiting: delay entre jobs
+mensajesQueue.on('completed', () => {
+    return new Promise(resolve => setTimeout(resolve, 12.5)); // 80 msg/segundo
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Servidor webhook escuchando en puerto ${PORT}`);
+});
+5. PANEL WEB DE AGENTES
+5.1 Arquitectura Frontend
+plain
+Copy
+src/
+├── components/
+│   ├── Layout/
+│   │   ├── Sidebar.tsx          # Navegación entre secciones
+│   │   ├── Header.tsx           # Perfil de agente, estado online
+│   │   └── NotificationBell.tsx # Alertas de nuevas conversaciones
+│   ├── Chat/
+│   │   ├── ChatList.tsx         # Lista de conversaciones (sidebar izq)
+│   │   ├── ChatListItem.tsx     # Item individual de conversación
+│   │   ├── ChatWindow.tsx       # Ventana de mensajes (centro)
+│   │   ├── MessageBubble.tsx    # Burbuja de mensaje individual
+│   │   ├── ChatInput.tsx        # Input para responder
+│   │   └── ChatHeader.tsx       # Info del huésped, botones de acción
+│   ├── Intervencion/
+│   │   ├── TakeOverButton.tsx   # Botón "Tomar control"
+│   │   ├── ReturnToBotButton.tsx # Devolver conversación al bot
+│   │   └── EscalationModal.tsx  # Modal para motivo de escalamiento
+│   ├── Reservas/
+│   │   ├── ReservaForm.tsx      # Crear/editar reserva manual
+│   │   ├── CalendarioView.tsx   # Vista de disponibilidad
+│   │   └── DisponibilidadChecker.tsx # Verificar fechas disponibles
+│   └── Common/
+│       ├── LoadingSpinner.tsx
+│       ├── ErrorBoundary.tsx
+│       └── EmptyState.tsx
+├── hooks/
+│   ├── useSocket.ts             # Conexión WebSocket
+│   ├── useConversaciones.ts     # Fetch y estado de conversaciones
+│   ├── useAuth.ts               # Autenticación del agente
+│   └── useReservas.ts           # Gestión de reservas
+├── context/
+│   ├── AuthContext.tsx
+│   ├── ConversacionesContext.tsx
+│   └── SocketContext.tsx
+├── services/
+│   ├── api.ts                   # Cliente HTTP (axios)
+│   └── whatsapp.ts              # Helpers para templates WA
+└── types/
+    ├── index.ts                 # Interfaces TypeScript
+    └── enums.ts                 # Enums (estados, prioridades)
+5.2 Hook Principal: useConversaciones
+TypeScript
+Copy
+// hooks/useConversaciones.ts
+import { useState, useEffect, useCallback } from 'react';
+import { useSocket } from './useSocket';
+import { api } from '../services/api';
+import { Conversacion, Mensaje, Agente } from '../types';
+
+interface UseConversacionesReturn {
+    conversaciones: Conversacion[];
+    activa: Conversacion | null;
+    setActiva: (conv: Conversacion | null) => void;
+    tomarControl: (conversacionId: string) => Promise<void>;
+    enviarMensaje: (conversacionId: string, contenido: string, tipo?: string) => Promise<void>;
+    devolverABot: (conversacionId: string, notas?: string) => Promise<void>;
+    cargando: boolean;
+    error: string | null;
+}
+
+export const useConversaciones = (): UseConversacionesReturn => {
+    const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
+    const [activa, setActiva] = useState<Conversacion | null>(null);
+    const [cargando, setCargando] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const socket = useSocket();
+
+    // Cargar conversaciones iniciales
+    useEffect(() => {
+        const fetchConversaciones = async () => {
+            try {
+                setCargando(true);
+                const { data } = await api.get('/conversaciones');
+                setConversaciones(data);
+            } catch (err) {
+                setError('Error cargando conversaciones');
+                console.error(err);
+            } finally {
+                setCargando(false);
+            }
+        };
+        fetchConversaciones();
+    }, []);
+
+    // Escuchar eventos de socket
+    useEffect(() => {
+        if (!socket) return;
+
+        socket.on('nueva_conversacion', (conv: Conversacion) => {
+            setConversaciones(prev => [conv, ...prev]);
+            // Notificación sonora
+            new Audio('/notification.mp3').play().catch(() => {});
+        });
+
+        socket.on('nuevo_mensaje', ({ conversacionId, mensaje }: { 
+            conversacionId: string; 
+            mensaje: Mensaje 
+        }) => {
+            setConversaciones(prev => prev.map(c => 
+                c.id === conversacionId 
+                    ? { 
+                        ...c, 
+                        ultimo_mensaje: mensaje, 
+                        no_leidos: c.id === activa?.id ? 0 : (c.no_leidos || 0) + 1 
+                    }
+                    : c
+            ));
+
+            if (activa?.id === conversacionId) {
+                setActiva(prev => prev ? {
+                    ...prev,
+                    mensajes: [...(prev.mensajes || []), mensaje]
+                } : null);
+                marcarComoLeida(conversacionId);
+            }
+        });
+
+        socket.on('agente_asignado', ({ conversacionId, agente }: {
+            conversacionId: string;
+            agente: Agente;
+        }) => {
+            setConversaciones(prev => prev.map(c => 
+                c.id === conversacionId ? { ...c, agente_asignado: agente } : c
+            ));
+        });
+
+        socket.on('conversacion_tomada', ({ conversacionId, agente }: {
+            conversacionId: string;
+            agente: Agente;
+        }) => {
+            // Remover de la lista si otro agente la tomó
+            setConversaciones(prev => prev.filter(c => c.id !== conversacionId));
+            if (activa?.id === conversacionId) {
+                setActiva(null);
+            }
+        });
+
+        return () => {
+            socket.off('nueva_conversacion');
+            socket.off('nuevo_mensaje');
+            socket.off('agente_asignado');
+            socket.off('conversacion_tomada');
+        };
+    }, [socket, activa]);
+
+    const marcarComoLeida = async (conversacionId: string) => {
+        try {
+            await api.post(`/conversaciones/${conversacionId}/marcar-leida`);
+        } catch (err) {
+            console.error('Error marcando como leída:', err);
+        }
+    };
+
+    const tomarControl = useCallback(async (conversacionId: string) => {
+        try {
+            await api.post(`/conversaciones/${conversacionId}/tomar-control`);
+            
+            socket?.emit('agente_toma_control', {
+                conversacionId,
+                agenteId: localStorage.getItem('agente_id')
+            });
+            
+            setConversaciones(prev => prev.map(c => 
+                c.id === conversacionId 
+                    ? { ...c, estado: 'humano_activo', agente_asignado: { id: localStorage.getItem('agente_id') } as Agente }
+                    : c
+            ));
+            
+            const conv = conversaciones.find(c => c.id === conversacionId);
+            if (conv) setActiva(conv);
+            
+        } catch (error: any) {
+            if (error.response?.status === 400) {
+                alert('Esta conversación ya está siendo atendida por otro agente');
+            }
+            throw error;
+        }
+    }, [socket, conversaciones]);
+
+    const enviarMensaje = useCallback(async (
+        conversacionId: string, 
+        contenido: string, 
+        tipo: string = 'texto'
+    ) => {
+        // Optimistic UI
+        const tempId = `temp-${Date.now()}`;
+        const nuevoMensaje: Mensaje = {
+            id: tempId,
+            contenido,
+            tipo,
+            direccion: 'saliente',
+            origen: 'agente',
+            agente_id: localStorage.getItem('agente_id') || undefined,
+            created_at: new Date().toISOString(),
+            pending: true
+        };
+        
+        setActiva(prev => prev ? {
+            ...prev,
+            mensajes: [...(prev.mensajes || []), nuevoMensaje]
+        } : null);
+
+        try {
+            const { data } = await api.post(`/conversaciones/${conversacionId}/mensajes`, {
+                contenido,
+                tipo,
+                origen: 'agente'
+            });
+            
+            setActiva(prev => prev ? {
+                ...prev,
+                mensajes: prev.mensajes?.map(m => 
+                    m.id === tempId ? { ...data, pending: false } : m
+                )
+            } : null);
+            
+        } catch (error) {
+            setActiva(prev => prev ? {
+                ...prev,
+                mensajes: prev.mensajes?.map(m => 
+                    m.id === tempId ? { ...m, error: true } : m
+                )
+            } : null);
+            throw error;
+        }
+    }, []);
+
+    const devolverABot = useCallback(async (conversacionId: string, notas: string = '') => {
+        try {
+            await api.post(`/conversaciones/${conversacionId}/devolver-bot`, { notas });
+            
+            setConversaciones(prev => prev.filter(c => c.id !== conversacionId));
+            if (activa?.id === conversacionId) setActiva(null);
+            
+        } catch (error) {
+            console.error('Error devolviendo al bot:', error);
+            throw error;
+        }
+    }, [activa]);
+
+    return {
+        conversaciones,
+        activa,
+        setActiva,
+        tomarControl,
+        enviarMensaje,
+        devolverABot,
+        cargando,
+        error
+    };
+};
+5.3 Componente Principal: Dashboard
+tsx
+Copy
+// components/Dashboard.tsx
+import React from 'react';
+import { useConversaciones } from '../hooks/useConversaciones';
+import { useAuth } from '../hooks/useAuth';
+import { ChatList } from './Chat/ChatList';
+import { ChatWindow } from './Chat/ChatWindow';
+import { ChatInput } from './Chat/ChatInput';
+import { ChatHeader } from './Chat/ChatHeader';
+import { HuespedCard } from './Huesped/HuespedCard';
+import { ResumenReserva } from './Reservas/ResumenReserva';
+import { EmptyState } from './Common/EmptyState';
+import { Badge, Button, Divider } from 'antd';
+import { MessageOutlined, UserOutlined } from '@ant-design/icons';
+
+export const Dashboard: React.FC = () => {
+    const { 
+        conversaciones, 
+        activa, 
+        setActiva, 
+        tomarControl, 
+        enviarMensaje, 
+        devolverABot,
+        cargando 
+    } = useConversaciones();
+    const { agente } = useAuth();
+
+    const enEspera = conversaciones.filter(c => c.estado === 'espera_humano');
+    const misChats = conversaciones.filter(c => 
+        c.estado === 'humano_activo' && c.agente_asignado?.id === agente?.id
+    );
+    const activasBot = conversaciones.filter(c => c.estado === 'bot');
+
+    const calcularTiempoEspera = (fechaEscalamiento?: string): string => {
+        if (!fechaEscalamiento) return '';
+        const minutos = Math.floor((Date.now() - new Date(fechaEscalamiento).getTime()) / 60000);
+        if (minutos < 1) return 'Ahora';
+        if (minutos < 60) return `${minutos}m`;
+        return `${Math.floor(minutos / 60)}h ${minutos % 60}m`;
+    };
+
+    return (
+        <div className="flex h-screen bg-gray-100">
+            {/* SIDEBAR IZQUIERDA: Lista de conversaciones */}
+            <div className="w-80 bg-white border-r flex flex-col shadow-sm">
+                <div className="p-4 border-b bg-white">
+                    <h2 className="font-bold text-lg text-gray-800">Conversaciones</h2>
+                    
+                    <div className="flex gap-2 mt-3">
+                        <Badge count={enEspera.length} color="red" overflowCount={99}>
+                            <Button size="small" type={enEspera.length > 0 ? "primary" : "default"} danger>
+                                Espera
+                            </Button>
+                        </Badge>
+                        <Badge count={misChats.length} color="blue" overflowCount={99}>
+                            <Button size="small" type="primary">
+                                Mías
+                            </Button>
+                        </Badge>
+                        <Badge count={activasBot.length} color="green" overflowCount={999}>
+                            <Button size="small">Bot</Button>
+                        </Badge>
+                    </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto">
+                    {cargando ? (
+                        <div className="p-4 text-center text-gray-500">Cargando...</div>
+                    ) : (
+                        <>
+                            {enEspera.length > 0 && (
+                                <div className="bg-red-50">
+                                    <div className="px-3 py-2 text-xs font-semibold text-red-600 uppercase">
+                                        En espera ({enEspera.length})
+                                    </div>
+                                    {enEspera.map(conv => (
+                                        <ChatListItem 
+                                            key={conv.id}
+                                            conversacion={conv}
+                                            urgente={conv.prioridad === 'urgente'}
+                                            tiempoEspera={calcularTiempoEspera(conv.fecha_escalamiento)}
+                                            onClick={() => tomarControl(conv.id)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            
+                            {misChats.map(conv => (
+                                <ChatListItem 
+                                    key={conv.id}
+                                    conversacion={conv}
+                                    activa={activa?.id === conv.id}
+                                    onClick={() => setActiva(conv)}
+                                />
+                            ))}
+                        </>
+                    )}
+                </div>
+            </div>
+            
+            {/* ÁREA CENTRAL: Chat activo */}
+            <div className="flex-1 flex flex-col bg-gray-50">
+                {activa ? (
+                    <>
+                        <ChatHeader 
+                            conversacion={activa}
+                            onCerrar={() => devolverABot(activa.id)}
+                            onVerReserva={() => window.open(`/reservas?huesped=${activa.huesped_id}`, '_blank')}
+                        />
+                        
+                        <div className="flex-1 overflow-hidden">
+                            <ChatWindow 
+                                mensajes={activa.mensajes || []}
+                                tipo="humano"
+                            />
+                        </div>
+                        
+                        <ChatInput 
+                            onEnviar={(texto) => enviarMensaje(activa.id, texto)}
+                            onEnviarImagen={(file) => {/* TODO */}}
+                            onUsarTemplate={() => {/* TODO */}}
+                            disabled={activa.estado !== 'humano_activo'}
+                            placeholder={activa.estado === 'humano_activo' 
+                                ? "Escribe un mensaje..." 
+                                : "Conversación en modo bot"}
+                        />
+                    </>
+                ) : (
+                    <EmptyState 
+                        icon={<MessageOutlined style={{ fontSize: 48 }} />}
+                        title="Ninguna conversación seleccionada"
+                        description="Selecciona una conversación de la lista para atender al huésped"
+                    />
+                )}
+            </div>
+            
+            {/* SIDEBAR DERECHA: Info del huésped */}
+            {activa && (
+                <div className="w-80 bg-white border-l flex flex-col shadow-sm">
+                    <div className="p-4 border-b">
+                        <h3 className="font-semibold text-gray-800">Información del Huésped</h3>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4">
+                        <HuespedCard huesped={activa.huesped} />
+                        
+                        <Divider />
+                        
+                        <ResumenReserva 
+                            datos={activa.datos_reserva_temp}
+                            onConfirmar={() => {/* TODO */}}
+                            onModificar={() => {/* TODO */}}
+                        />
+                        
+                        <Divider />
+                        
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-600 uppercase">Acciones Rápidas</h4>
+                            <Button block onClick={() => enviarMensaje(activa.id, 'Confirmación enviada', 'template')}>
+                                Enviar confirmación
+                            </Button>
+                            <Button block onClick={() => enviarMensaje(activa.id, 'Ubicación', 'ubicacion')}>
+                                Enviar ubicación
+                            </Button>
+                            <Button block danger onClick={() => {/* TODO */}}>
+                                Escalar a supervisor
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+6. BACKEND Y WEBSOCKETS
+6.1 API REST y WebSockets (Node.js + Socket.io)
+JavaScript
+Copy
+// routes/conversaciones.js
+const express = require('express');
+const router = express.Router();
+const { Pool } = require('pg');
+const { authenticateToken } = require('../middleware/auth');
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// GET /conversaciones - Listar conversaciones del agente
+router.get('/', authenticateToken, async (req, res) => {
+    try {
+        const { estado, asignadas_a_mi } = req.query;
+        let query = `
+            SELECT c.*, h.nombre as huesped_nombre, h.telefono as huesped_telefono,
+                   m.contenido as ultimo_mensaje, m.created_at as ultimo_mensaje_fecha
+            FROM conversaciones c
+            JOIN huespedes h ON c.huesped_id = h.id
+            LEFT JOIN LATERAL (
+                SELECT contenido, created_at 
+                FROM mensajes 
+                WHERE conversacion_id = c.id 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            ) m ON true
+            WHERE c.estado != 'cerrado'
+        `;
+        
+        const params = [];
+        if (asignadas_a_mi === 'true') {
+            query += ` AND c.agente_asignado = $${params.length + 1}`;
+            params.push(req.user.id);
+        }
+        if (estado) {
+            query += ` AND c.estado = $${params.length + 1}`;
+            params.push(estado);
+        }
+        
+        query += ` ORDER BY c.prioridad DESC, c.ultima_actividad DESC`;
+        
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error listando conversaciones:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+// POST /conversaciones/:id/tomar-control
+router.post('/:id/tomar-control', authenticateToken, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // Verificar que no esté ya tomada
+        const checkResult = await client.query(
+            'SELECT estado, agente_asignado FROM conversaciones WHERE id = $1 FOR UPDATE',
+            [req.params.id]
+        );
+        
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Conversación no encontrada' });
+        }
+        
+        const conv = checkResult.rows[0];
+        
+        if (conv.estado === 'humano_activo' && conv.agente_asignado !== req.user.id) {
+            return res.status(400).json({ error: 'Conversación ya está siendo atendida' });
+        }
+        
+        if (conv.estado === 'cerrado') {
+            return res.status(400).json({ error: 'Conversación cerrada' });
+        }
+        
+        // Actualizar estado
+        await client.query(
+            `UPDATE conversaciones 
+             SET estado = 'humano_activo', 
+                 agente_asignado = $1, 
+                 fecha_escalamiento = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [req.user.id, req.params.id]
+        );
+        
+        // Notificar al huésped por WhatsApp
+        const { enviarWhatsApp } = require('../services/whatsapp');
+        const huespedResult = await client.query(
+            'SELECT wa_id FROM huespedes h JOIN conversaciones c ON c.huesped_id = h.id WHERE c.id = $1',
+            [req.params.id]
+        );
+        
+        await enviarWhatsApp(
+            huespedResult.rows[0].wa_id,
+            `Te estoy atendiendo personalmente. Soy ${req.user.nombre}, ¿en qué puedo ayudarte?`,
+            'texto'
+        );
+        
+        // Guardar mensaje de sistema
+        await client.query(
+            `INSERT INTO mensajes (conversacion_id, tipo, contenido, direccion, origen)
+             VALUES ($1, 'texto', $2, 'saliente', 'sistema')`,
+            [req.params.id, `Agente ${req.user.nombre} tomó el control de la conversación`]
+        );
+        
+        await client.query('COMMIT');
+        
+        // Notificar a otros agentes vía WebSocket
+        const { io } = require('../server');
+        io.emit('conversacion_tomada', {
+            conversacion_id: req.params.id,
+            agente: { id: req.user.id, nombre: req.user.nombre }
+        });
+        
+        res.json({ success: true, message: 'Control tomado exitosamente' });
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error tomando control:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    } finally {
+        client.release();
+    }
+});
+
+// POST /conversaciones/:id/mensajes - Enviar mensaje desde panel
+router.post('/:id/mensajes', authenticateToken, async (req, res) => {
+    const { contenido, tipo = 'texto' } = req.body;
+    
+    try {
+        // Verificar que el agente tenga asignada esta conversación
+        const convResult = await pool.query(
+            'SELECT c.*, h.wa_id FROM conversaciones c JOIN huespedes h ON c.huesped_id = h.id WHERE c.id = $1',
+            [req.params.id]
+        );
+        
+        if (convResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Conversación no encontrada' });
+        }
+        
+        const conv = convResult.rows[0];
+        
+        if (conv.agente_asignado !== req.user.id) {
+            return res.status(403).json({ error: 'No tienes asignada esta conversación' });
+        }
+        
+        // Enviar a WhatsApp
+        const { enviarWhatsApp } = require('../services/whatsapp');
+        const waResponse = await enviarWhatsApp(conv.wa_id, contenido, tipo);
+        
+        // Guardar en BD
+        const mensajeResult = await pool.query(
+            `INSERT INTO mensajes (conversacion_id, wa_message_id, tipo, contenido, 
+                                   direccion, origen, agente_id)
+             VALUES ($1, $2, $3, $4, 'saliente', 'agente', $5)
+             RETURNING *`,
+            [req.params.id, waResponse.messages[0].id, tipo, contenido, req.user.id]
+        );
+        
+        // Actualizar contadores de conversación
+        await pool.query(
+            `UPDATE conversaciones 
+             SET mensajes_humano = mensajes_humano + 1,
+                 ultima_actividad = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [req.params.id]
+        );
+        
+        res.json(mensajeResult.rows[0]);
+        
+    } catch (error) {
+        console.error('Error enviando mensaje:', error);
+        res.status(500).json({ error: 'Error enviando mensaje' });
+    }
+});
+
+// POST /conversaciones/:id/devolver-bot
+router.post('/:id/devolver-bot', authenticateToken, async (req, res) => {
+    const { notas } = req.body;
+    
+    try {
+        await pool.query(
+            `UPDATE conversaciones 
+             SET estado = 'bot',
+                 agente_asignado = NULL,
+                 contexto_actual = contexto_actual || '{"retomada_por_bot": true}'::jsonb,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1 AND agente_asignado = $2`,
+            [req.params.id, req.user.id]
+        );
+        
+        // Guardar notas si las hay
+        if (notas) {
+            await pool.query(
+                `INSERT INTO mensajes (conversacion_id, tipo, contenido, direccion, origen)
+                 VALUES ($1, 'texto', $2, 'saliente', 'sistema')`,
+                [req.params.id, `Notas de agente: ${notas}`]
+            );
+        }
+        
+        res.json({ success: true });
+        
+    } catch (error) {
+        console.error('Error devolviendo al bot:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+module.exports = router;
+6.2 Configuración de WebSockets
+JavaScript
+Copy
+// server.js (fragmento de configuración Socket.io)
+const http = require('http');
+const { Server } = require('socket.io');
+const express = require('express');
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: process.env.FRONTEND_URL,
+        methods: ['GET', 'POST']
+    }
+});
+
+// Middleware de autenticación para sockets
+io.use(async (socket, next) => {
+    const token = socket.handshake.auth.token;
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        socket.agenteId = decoded.id;
+        socket.agenteNombre = decoded.nombre;
+        next();
+    } catch (err) {
+        next(new Error('Autenticación fallida'));
+    }
+});
+
+io.on('connection', (socket) => {
+    console.log(`Agente conectado: ${socket.agenteNombre} (${socket.agenteId})`);
+    
+    // Unirse a sala personal para recibir notificaciones directas
+    socket.join(`agente_${socket.agenteId}`);
+    
+    // Marcar como en línea
+    pool.query('UPDATE agentes SET en_linea = true WHERE id = $1', [socket.agenteId]);
+    
+    socket.on('disconnect', () => {
+        console.log(`Agente desconectado: ${socket.agenteNombre}`);
+        pool.query('UPDATE agentes SET en_linea = false WHERE id = $1', [socket.agenteId]);
+    });
+    
+    // Evento: Agente toma control de conversación
+    socket.on('agente_toma_control', (data) => {
+        socket.broadcast.emit('conversacion_tomada', {
+            conversacion_id: data.conversacionId,
+            agente: { id: socket.agenteId, nombre: socket.agenteNombre }
+        });
+    });
+    
+    // Evento: Agente está escribiendo
+    socket.on('typing', (data) => {
+        socket.to(`conversacion_${data.conversacionId}`).emit('agente_typing', {
+            agente: socket.agenteNombre
+        });
+    });
+});
+
+// Función helper para notificar a agentes
+async function notificarAgente(agenteId, data) {
+    io.to(`agente_${agenteId}`).emit('notificacion', data);
+}
+
+// Exportar io para usar en rutas
+module.exports = { io, notificarAgente, server };
+7. ANÁLISIS DE FACTIBILIDAD
+7.1 Comparativa de Opciones WhatsApp
+Table
+Copy
+Aspecto	Meta Cloud API Directa	Proveedor Intermediario (Twilio)	On-Premises
+Costo mensual	$0 + $0.005-0.08/conversación	$50-150 + costos por mensaje	$3,000+
+Setup	Complejo (verificación Meta)	Simple	Muy complejo
+Rate limits	80 msg/seg	Similar	Ilimitado
+Templates	Aprobación obligatoria 24-48h	Misma restricción	Misma restricción
+Soporte	Documentación/foros	Soporte dedicado	Enterprise
+Recomendación	✅ MEJOR OPCIÓN	Sin devs senior	Grandes empresas
+7.2 Stack Tecnológico Recomendado
+plain
+Copy
+┌─────────────────────────────────────────────────────────┐
+│                    INFRAESTRUCTURA                      │
+├─────────────────────────────────────────────────────────┤
+│ VPS: DigitalOcean Droplet (2 vCPU/4GB RAM)    $24/mes  │
+│ PostgreSQL: Managed Database (1GB)            $15/mes  │
+│ Redis: Managed Redis                          $15/mes  │
+│ Dominio + SSL (Let's Encrypt)                 $0/año   │
+├─────────────────────────────────────────────────────────┤
+│                    BACKEND                              │
+├─────────────────────────────────────────────────────────┤
+│ Runtime: Node.js 20 LTS                                 │
+│ Framework: Express.js 4.x                               │
+│ ORM: Prisma (type-safe, migraciones automáticas)        │
+│ Validación: Zod (schemas TypeScript)                    │
+│ Colas: Bull + Redis (rate limiting WhatsApp)            │
+│ Testing: Jest + Supertest                               │
+├─────────────────────────────────────────────────────────┤
+│                    FRONTEND                             │
+├─────────────────────────────────────────────────────────┤
+│ Framework: React 18 + TypeScript 5                      │
+│ Build Tool: Vite (rápido, HMR)                          │
+│ Estado: Zustand (ligero, TypeScript-friendly)           │
+│ UI: Ant Design 5 (componentes empresariales)            │
+│ WebSockets: Socket.io-client                            │
+├─────────────────────────────────────────────────────────┤
+│                    DEVOPS                               │
+├─────────────────────────────────────────────────────────┤
+│ Container: Docker + Docker Compose                      │
+│ CI/CD: GitHub Actions                                   │
+│ Monitoreo: Sentry (errores) + UptimeRobot (uptime)      │
+│ Logs: Winston → Papertrail                              │
+└─────────────────────────────────────────────────────────┘
+7.3 Estimación de Costos (MVP)
+Table
+Copy
+Componente	Costo Mensual (USD)
+VPS (2vCPU/4GB)	$24
+PostgreSQL Managed	$15
+Redis Managed	$15
+Meta WhatsApp API	~$0.05 × conversaciones
+Sentry (Hobby)	$0
+TOTAL FIJO	~$54/mes
+VARIABLE (1,000 conversaciones)	~$50
+8. PLAN DE IMPLEMENTACIÓN
+8.1 Cronograma de 9 Semanas
+Table
+Copy
+Semana	Fase	Entregables Clave
+1	Setup	Cuenta Meta verificada, infraestructura cloud, BD configurada
+2-3	Core WhatsApp	Webhook funcionando, recepción/envío de mensajes, templates aprobados
+4-5	Lógica de Negocio	Disponibilidad, precios, flujo de pre-reserva, Google Calendar
+6-8	Panel Web	Autenticación, chat en tiempo real, sistema de handoff
+9	Testing & Deploy	Tests integración, pruebas usuarios, documentación
+8.2 Hitos de Validación
+Semana 3: Primer mensaje end-to-end (WhatsApp → BD → Respuesta automática)
+Semana 5: Primera pre-reserva generada automáticamente
+Semana 7: Primer handoff humano exitoso (bot → agente → respuesta)
+Semana 9: MVP en producción con usuarios reales (beta cerrada)
+9. CHECKLIST DE DESPLIEGUE
+Pre-lanzamiento
+[ ] Cuenta Meta Business verificada con documentación legal
+[ ] Número de teléfono empresarial configurado (no personal)
+[ ] Templates de WhatsApp aprobados (saludo, confirmación, escalamiento)
+[ ] Dominio con SSL válido (Let's Encrypt o comercial)
+[ ] Política de privacidad publicada en sitio web
+Seguridad
+[ ] Variables de entorno en .env (nunca en código)
+[ ] JWT_SECRET con mínimo 256 bits de entropía
+[ ] Rate limiting en API (100 req/min por IP)
+[ ] Validación de firma de webhooks de Meta
+[ ] Backups automáticos diarios de PostgreSQL
+Monitoreo
+[ ] Sentry configurado para errores de frontend y backend
+[ ] Alertas UptimeRobot para caídas del servidor
+[ ] Dashboard de métricas: conversaciones/hr, tiempo de respuesta, CSAT
+Documentación
+[ ] Guía de troubleshooting para agentes
+[ ] Procedimiento de escalamiento de emergencias
+[ ] Runbook: Cómo derivar todo a humano en caso de fallo crítico
+NOTAS DE IMPLEMENTACIÓN
+Mejoras respecto a la versión anterior:
+Eliminación de duplicados: Consolidado el hook useConversaciones y componente Dashboard que aparecían dos veces
+TypeScript: Agregado tipado estricto en todo el frontend
+Transacciones SQL: Uso de BEGIN/COMMIT/ROLLBACK en operaciones críticas (tomar control)
+Optimistic UI: Actualización inmediata de la interfaz antes de confirmar servidor
+Rate limiting: Implementación de colas Bull para respetar límites de Meta
+Seguridad: Verificación de firmas en webhooks y autenticación JWT en sockets
+Próximos pasos sugeridos:
+Definir los templates de WhatsApp específicos para tu alojamiento
+Crear cuenta de desarrollador en Meta y comenzar proceso de verificación
+Configurar repositorio Git con estructura de carpetas propuesta
+Definir flujo conversacional detallado (diagrama de estados del bot)

@@ -1,0 +1,261 @@
+You are a senior QA engineer and backend architect specialized in AI conversational systems.
+
+You are testing a WhatsApp chatbot system for tourist accommodation bookings.
+
+Your job is to:
+
+1. Generate realistic conversation simulations with guests.
+2. Detect logical errors in the bot responses.
+3. Identify backend issues that could cause the behavior.
+4. Propose specific fixes in the TypeScript backend code.
+
+The system architecture and behavior are described below.
+
+You must act as BOTH:
+- the guest
+- the bot
+- the QA reviewer
+
+For every scenario you generate you must output:
+
+1. USER MESSAGE
+2. EXPECTED BOT RESPONSE
+3. POSSIBLE ACTUAL BOT RESPONSE (buggy behavior)
+4. ROOT CAUSE ANALYSIS
+5. BACKEND CODE FIX SUGGESTION
+
+---
+
+SYSTEM DESCRIPTION
+
+This system is a WhatsApp chatbot for accommodation booking.
+
+Key features:
+
+- Guest conversations via WhatsApp
+- Intent classification via Claude
+- Entity extraction (dates, guests, apartment)
+- Availability checking via database
+- Reservation flow with human validation
+- Conversation state machine
+- Entity memory across messages
+
+Backend stack:
+
+- Express
+- TypeScript
+- Prisma
+- PostgreSQL
+- Redis
+- Claude API
+
+Important backend services:
+
+- botEngine.ts
+- inventarioService.ts
+- reservaService.ts
+- webhookProcessor.ts
+- claudeService.ts
+
+The bot performs the following pipeline:
+
+1 Incoming message
+2 Intent classification
+3 Entity extraction
+4 Accumulated entity merge
+5 Availability calculation
+6 Context building
+7 Claude response generation
+
+---
+
+CRITICAL RULES THE BOT MUST FOLLOW
+
+The bot must NEVER:
+
+- invent prices
+- invent availability
+- confirm a reservation
+- invent number of guests
+- offer apartments exceeding capacity
+- send image URLs in text
+- ask again for known information
+
+The bot must:
+
+- remember entities across conversation
+- only ask for missing information
+- respect minimum stay rules
+- respect apartment capacity
+- provide prices only from inventory data
+- escalate to human on complaints
+
+---
+
+DATA MODEL
+
+Entities extracted from messages:
+
+fecha_entrada
+fecha_salida
+num_personas
+habitacion
+
+Conversation states:
+
+bot
+espera_humano
+humano_activo
+cerrado
+
+Reservation states:
+
+pre_reserva
+confirmada
+cancelada
+completada
+
+Only:
+
+pre_reserva
+confirmada
+
+should block availability.
+
+completed reservations MUST NOT block inventory.
+
+---
+
+APARTMENTS
+
+Pewmafe
+Luminar Mono
+Luminar 2Amb
+LG
+
+Each apartment has:
+
+capacity per unit
+seasonal pricing
+availability per date
+
+Inventory table:
+
+fecha
+habitacion
+disponible
+precio
+
+Unique constraint:
+(fecha + habitacion)
+
+---
+
+TESTING TASK
+
+Generate at least **30 conversation scenarios** that test:
+
+1 greeting flows
+2 missing data flows
+3 entity accumulation
+4 availability queries
+5 specific apartment requests
+6 incorrect entity extraction
+7 capacity violations
+8 minimum stay violations
+9 overlapping reservations
+10 completed reservations not blocking availability
+11 asking for human
+12 reservation flow
+13 payment flow
+14 user sending partial information
+15 users changing dates mid conversation
+16 asking for photos
+17 asking about the area
+18 long conversations (10+ messages)
+
+---
+
+IMPORTANT
+
+When testing availability you must simulate situations like:
+
+- completed reservations overlapping
+- only one apartment checked
+- multi-apartment availability
+- partial inventory availability
+
+Detect logical issues like:
+
+- false "not available"
+- wrong capacity suggestions
+- re-asking known information
+- wrong price calculation
+- incorrect state transitions
+
+---
+
+OUTPUT FORMAT
+
+For each scenario:
+
+SCENARIO TITLE
+
+Conversation Simulation:
+
+Guest:
+message
+
+Bot Expected:
+correct response
+
+Bot Bug Example:
+possible wrong response
+
+Bug Analysis:
+technical explanation
+
+Suggested Backend Fix:
+TypeScript code snippet
+
+---
+
+Also produce a final section:
+
+SYSTEM WEAKNESSES DISCOVERED
+
+List architectural weaknesses in:
+
+- entity memory
+- availability logic
+- reservation flow
+- state machine
+- Claude prompting
+- inventory design
+
+Provide concrete refactoring suggestions.
+
+---
+
+Goal:
+
+Find logical issues that traditional unit tests would not detect.
+Focus on real conversational edge cases.
+
+
+
+Convert the discovered issues into automated integration tests.
+
+Generate:
+
+- Jest tests
+- conversation simulations
+- mocked Claude responses
+- mocked Prisma queries
+
+Target files:
+
+botEngine.test.ts
+inventarioService.test.ts
+reservationFlow.test.ts
+conversationMemory.test.ts

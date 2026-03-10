@@ -1,0 +1,155 @@
+
+ver error simulación 12.19
+
+
+hola
+
+12:19
+
+bot ¡Hola! Buen día. ¿Qué necesitás saber sobre nuestros departamentos en Las Grutas?
+
+12:19
+
+quiero consultar para mañana somos 2 personas buscamos cerca de la playa
+
+12:20
+
+bot: ¡Perfecto! Somos 2 personas y buscan cerca de la playa para mañana.
+
+Para poder verificar la disponibilidad, necesito saber: **¿Cuántas noches se van a quedar?**
+
+12:20
+
+5 noches
+
+Bot
+
+¡Perfecto! Para poder ayudarte con la disponibilidad y el precio para **5 noches**, necesito que me confirmes:
+
+1. **¿Para qué fechas?** (fecha de entrada y salida)
+2. **¿Para cuántas personas?**
+
+Con esos datos te paso las opciones disponibles y los precios exactos.
+
+
+errores: 
+1) ¡Perfecto! Somos 2 personas y buscan cerca de la playa para mañana. --> error gramática somos seria son.
+2) bot vuelve a preguntar *¿Para qué fechas?** (fecha de entrada y salida) . ya informo fecha de entrada mañana y tiene cuantas noches 5 entonces bot debería asumir esas respuestas y calcular las fechas.
+3) error bot vuelve a preguntar cuantas personas , cuando se havia informado que es para 2 personas, pierde contexto no tiene memoria error gravisimo ya reportado en muichas ocaciones anteriores .
+accion necesito revises en detalle y soluciones de forma definitiva este error básico validar el siguiente plan de acccion: 
+
+
+Con esto tu bot deja de pedir fechas o personas cuando ya las tiene.
+
+🧠 1. Prompt maestro corregido (versión robusta)
+Este prompt está diseñado para Claude Sonnet y funciona perfecto con tu arquitectura actual.
+Copialo en tu claudeService.ts o donde armes el systemPrompt.
+Sos un asistente para reservas de departamentos en Las Grutas. Tu tarea es ayudar al huésped a consultar disponibilidad, precios y avanzar hacia una pre-reserva.
+
+REGLAS CRÍTICAS:
+1. Nunca pidas información que ya esté presente en `known_entities`.
+2. Si el usuario aporta una nueva entidad, combinála con las existentes. No borres ni ignores lo previo.
+3. Si el usuario dice algo que contradice una entidad previa, asumí que la nueva información es la correcta.
+4. Si el usuario menciona “mañana”, “pasado”, “este finde”, interpretalo como fecha relativa usando la fecha actual del sistema.
+5. Si ya tenés fechaEntrada y noches → calculá fechaSalida.
+6. Si ya tenés fechaEntrada y fechaSalida → no pidas noches.
+7. Si ya tenés numHuespedes → no vuelvas a pedirlo.
+8. Nunca inventes disponibilidad ni precios. Eso lo hace el backend.
+9. Nunca confirmes reservas. Solo podés avanzar hasta pre-reserva.
+10. Si falta solo 1 dato, pedí solo ese dato. No repitas todo el formulario.
+
+FORMATO DE RESPUESTA:
+- `intent`: intención detectada
+- `entities`: solo las nuevas entidades detectadas
+- `message`: texto para el huésped
+
+
+Este prompt evita exactamente el problema que viste.
+
+🧩 2. Algoritmo de merge de entidades (el que necesitás)
+Este es el error que hoy te rompe el flujo: estás sobrescribiendo entidades en vez de fusionarlas.
+Usá este merge:
+function mergeEntities(prev, next) {
+  const merged = { ...prev };
+
+  for (const key of Object.keys(next)) {
+    const value = next[key];
+
+    // Si viene null o undefined, ignorar (Claude a veces manda null)
+    if (value === null || value === undefined) continue;
+
+    // Si es una contradicción, reemplazar por la nueva
+    merged[key] = value;
+  }
+
+  return merged;
+}
+
+
+Y en tu botEngine:
+conversation.entities = mergeEntities(conversation.entities, newEntities);
+
+
+Esto garantiza:
+- No se borran entidades previas
+- No se pisa con null
+- Se actualiza si el usuario corrige algo
+- Se mantiene memoria conversacional real
+
+📅 3. Cálculo automático de fechas relativas
+Agregá esta función:
+function resolveRelativeDates(entities, now = new Date()) {
+  if (entities.fechaEntrada === "mañana") {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    entities.fechaEntrada = d.toISOString().slice(0, 10);
+  }
+
+  if (entities.fechaEntrada && entities.noches && !entities.fechaSalida) {
+    const d = new Date(entities.fechaEntrada);
+    d.setDate(d.getDate() + entities.noches);
+    entities.fechaSalida = d.toISOString().slice(0, 10);
+  }
+
+  return entities;
+}
+
+
+Esto resuelve tu caso exacto:
+- Usuario: “mañana”
+- Usuario: “5 noches”
+→ El bot calcula salida automáticamente.
+
+🧪 4. Test conversacional para evitar regresiones
+Agregalo a testBotMemory.ts:
+it("no debe pedir datos que ya tiene", async () => {
+  const convo = new TestConversation();
+
+  await convo.user("quiero consultar para mañana somos 2 personas");
+  await convo.bot(); // procesa
+
+  await convo.user("5 noches");
+  const reply = await convo.bot();
+
+  expect(reply.message).not.toMatch(/cuántas personas/i);
+  expect(reply.message).not.toMatch(/para qué fechas/i);
+  expect(reply.entities.fechaEntrada).toBeDefined();
+  expect(reply.entities.fechaSalida).toBeDefined();
+});
+
+
+Si este test falla, sabés que el bot volvió a romperse.
+
+🎯 Resultado final esperado
+Con estas mejoras, ante:
+Usuario:
+“quiero consultar para mañana somos 2 personas”
+Usuario:
+“5 noches”
+El bot debería responder:
+Perfecto, entonces serían 5 noches, entrando mañana y saliendo el [fecha calculada], para 2 personas.
+¿Querés que revise disponibilidad cerca de la playa?
+
+Sin repetir nada.
+
+

@@ -1,0 +1,165 @@
+Estos son los 4 riesgos principales que detecté.
+
+GAP 1 — Falta de idempotencia fuerte en mensajes WhatsApp
+
+Los webhooks de WhatsApp repiten eventos frecuentemente.
+
+Tu sistema usa waMessageId único (bien), pero no veo en la documentación confirmación clara de:
+
+deduplicación en webhookProcessor
+
+Si no haces esto:
+
+puede pasar:
+
+mensaje recibido x2
+bot responde x2
+
+Impacto:
+
+conversaciones duplicadas
+
+reservas duplicadas
+
+Necesitas algo como:
+
+if (exists message with waMessageId) {
+  return
+}
+
+en webhookProcessor.
+
+GAP 2 — Concurrencia en reservas
+
+El flujo actual:
+
+1 usuario pregunta
+bot dice disponible
+usuario reserva
+
+Pero si dos usuarios preguntan al mismo tiempo:
+
+User A → disponible
+User B → disponible
+A reserva
+B reserva
+
+Si no haces lock transaccional en:
+
+inventarioService.checkAvailability
+reservaService.createReserva
+
+podrías tener doble booking.
+
+La solución:
+
+SERIALIZABLE transaction
+o
+SELECT FOR UPDATE
+GAP 3 — Entity memory frágil
+
+La documentación menciona problemas de entidades:
+
+num_noches
+
+noches
+
+cantidad_noches
+
+que Claude puede devolver. 
+
+DOCUMENTACION
+
+Eso indica que la memoria conversacional depende demasiado del LLM.
+
+Para producción conviene:
+
+normalizar entidades:
+
+normalizeEntities()
+
+ejemplo:
+
+num_noches → calcular fecha_salida
+personas → num_personas
+GAP 4 — Falta de control de costo del LLM
+
+Cada mensaje usa:
+
+claude-haiku (clasificación)
+claude-sonnet (respuesta)
+
+Esto está bien, pero no veo:
+
+cache
+
+rate limit por conversación
+
+guardrails de tokens
+
+Si un usuario spamea el bot, podrías tener costo innecesario.
+
+4. Cambios recomendados
+
+Te los ordeno por prioridad.
+
+PRIORIDAD ALTA (antes de producción)
+1️⃣ deduplicación fuerte de mensajes
+
+En webhookProcessor
+
+unique waMessageId
+2️⃣ lock transaccional en reservas
+
+En reservaService.
+
+3️⃣ timeout de Claude
+
+Si Claude tarda 10s, WhatsApp queda colgado.
+
+Agregar:
+
+timeout 3s
+fallback local
+4️⃣ fallback si inventario falla
+
+Si la DB falla:
+
+el bot debería decir:
+
+Estoy teniendo problemas para consultar disponibilidad,
+¿querés que un agente te ayude?
+PRIORIDAD MEDIA
+5️⃣ métricas del bot
+
+Agregar tracking de:
+
+intents
+errores
+escalaciones
+conversiones
+6️⃣ logs de conversación IA
+
+Guardar:
+
+prompt
+response
+entities
+intent
+
+Esto es clave para debugging.
+
+7️⃣ limitador por usuario
+
+Ejemplo:
+
+10 mensajes / minuto
+
+para evitar spam.
+
+PRIORIDAD BAJA
+8️⃣ cache de contexto
+
+accommodationContext.ts
+
+no debería reconstruirse siempre.

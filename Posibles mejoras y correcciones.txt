@@ -1,0 +1,77 @@
+🔧 Posibles mejoras y correcciones (las que realmente suman)
+Estas son mejoras que te dan robustez, escalabilidad y mantenibilidad. No son críticas, pero sí valiosas.
+
+🟦 1. Falta un módulo de “Conversational Analytics”
+Hoy tenés logs y tests, pero no un panel para:
+- Intenciones más frecuentes
+- Tasa de escalado a humano
+- Tasa de finalización por el bot
+- Mensajes por conversación
+- Tiempo promedio hasta pre-reserva
+- Embudo de reserva (drop-off por paso)
+Esto te permitiría optimizar el bot con datos reales.
+
+🟦 2. El botEngine podría beneficiarse de un “Context Manager” separado
+Hoy el botEngine hace:
+- Acumulación de entidades
+- Construcción de contexto
+- Validación de capacidad
+- Validación de estadía mínima
+- Llamada a Claude
+Podrías extraer:
+contextBuilder/
+  - buildKnownData()
+  - buildMissingData()
+  - buildAvailability()
+  - buildCapacityAnalysis()
+  - buildMinimumStay()
+
+
+Esto reduce complejidad cognitiva y facilita testing granular.
+
+🟦 3. Falta un mecanismo de “Conversación caducada”
+Hoy una conversación queda abierta hasta que:
+- El bot la cierra
+- El agente la cierra
+Pero no hay:
+- Auto-cierre por inactividad (ej: 48h)
+- Auto-reapertura, seguimiento en caso que el potencial huésped no reservo ni vuelve a escribir después de 2 días si no reserva en un segundo intento de contacto entonces dar por cerrado.
+ 
+
+
+🟦 5. Falta un módulo de “Rate Limits por huésped”
+Tenés rate limit por IP, pero no por:
+- Número de WhatsApp
+- Cantidad de mensajes por minuto
+- Prevención de loops (usuario manda 20 audios seguidos)
+Esto protege costos de IA y evita abuso.
+
+🟦 6. El simulador podría registrar conversaciones para reproducirlas
+Hoy el simulador es excelente, pero podría:
+- Guardar conversaciones de prueba
+- Reproducirlas
+- Comparar respuestas actuales vs respuestas esperadas
+- Detectar regresiones del bot
+Esto te da un “test conversacional” automatizado.
+
+🟦 7. El panel podría mostrar “estado del bot”
+Ejemplo:
+- Claude API: OK / Error
+- WhatsApp API: OK / Error
+- Redis: OK / Error
+- Sheets: OK / Error
+- Latencia promedio del bot, etc..
+Esto ayuda muchísimo en operación real.
+
+
+
+🧠 Correcciones menores (pero útiles)
+✔️ 1. En el ER, “cantUnid” debería ser “cantidadUnidades” para consistencia
+“cantUnid” aparece en Complejo
+
+✔️ 2. En el frontend, faltaría un “loading state” más claro en ChatWindow
+Evita confusión cuando se cargan mensajes.
+✔️ 3. En el bot, podrías agregar validación de fechas invertidas
+Ej: entrada > salida.
+✔️ 4. En el webhook, podrías loguear el tipo de mensaje (audio, imagen, etc.)
+Ayuda en debugging.
