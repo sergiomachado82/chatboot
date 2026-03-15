@@ -29,7 +29,12 @@ const app = express();
 const allowedOrigins = env.ALLOWED_ORIGINS;
 
 // Global middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
+}));
 app.use(cors({
   origin: allowedOrigins === '*' ? true : allowedOrigins.split(',').map(o => o.trim()),
   credentials: true,
