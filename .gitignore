@@ -1,7 +1,10 @@
 node_modules
 dist
 .env
+.env.production
 *.log
 .DS_Store
 server/node_modules
 server/dist
+nginx/active.conf
+backups/

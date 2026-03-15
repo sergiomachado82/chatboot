@@ -1,0 +1,14 @@
+node_modules
+server/node_modules
+dist
+server/dist
+.git
+.gitignore
+*.md
+!shared/**
+.env.production
+.env.local
+docker-compose.yml
+docker-compose.prod.yml
+Dockerfile
+.dockerignore

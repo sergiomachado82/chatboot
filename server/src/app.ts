@@ -1,4 +1,6 @@
 import express, { Router } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import cors from 'cors';
 import { requestId } from './middleware/requestId.js';
@@ -61,6 +63,23 @@ protectedRouter.use(complejosRouter);
 protectedRouter.use(whatsappProfileRouter);
 protectedRouter.use(botConfigRouter);
 app.use('/api', protectedRouter);
+
+// In production, serve built frontend files (Vite output)
+if (env.NODE_ENV === 'production') {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const staticPath = path.resolve(__dirname, '../../dist');
+
+  app.use(express.static(staticPath));
+
+  // SPA fallback: non-API GET requests serve index.html
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
+      res.sendFile(path.join(staticPath, 'index.html'));
+    } else {
+      next();
+    }
+  });
+}
 
 // Error handler
 app.use(errorHandler);
