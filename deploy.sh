@@ -20,6 +20,12 @@ log() { echo -e "${GREEN}[CHATBOOT]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
+# Helper: docker compose con env-file
+dc() { docker compose -f docker-compose.prod.yml --env-file .env.production "$@"; }
+
+# Helper: leer variable de .env.production sin source
+env_get() { grep "^${1}=" .env.production 2>/dev/null | head -1 | cut -d= -f2-; }
+
 # ============================================
 # 1. SETUP INICIAL (una sola vez)
 # ============================================
@@ -92,33 +98,31 @@ cmd_deploy() {
         error "Cambia POSTGRES_PASSWORD en .env.production antes de deployar"
     fi
 
-    # Cargar variables de entorno
-    source .env.production
+    # Leer dominio
+    local DOMAIN=$(env_get DOMAIN)
 
     # Verificar si ya hay certificado SSL
-    if [ -d "/etc/letsencrypt/live/${DOMAIN:-nodominio}" ] || \
-       docker compose -f docker-compose.prod.yml exec certbot test -d "/etc/letsencrypt/live/${DOMAIN:-nodominio}" 2>/dev/null; then
+    if docker volume inspect chatboot_certbot-etc &>/dev/null && \
+       dc run --rm --entrypoint "" certbot test -d "/etc/letsencrypt/live/${DOMAIN:-nodominio}" 2>/dev/null; then
         log "Certificado SSL encontrado, usando config HTTPS..."
-        cp nginx/default.conf nginx/active.conf
+        sed "s/TUDOMINIO.com/${DOMAIN}/g" nginx/default.conf > nginx/active.conf
     else
         log "Sin certificado SSL, usando config HTTP temporalmente..."
         cp nginx/http-only.conf nginx/active.conf
         warn "Despues del deploy, ejecuta: bash deploy.sh ssl"
     fi
 
-    # Usar active.conf como la config de nginx
-    # Actualizar docker-compose para montar active.conf
     log "Construyendo imagenes..."
-    docker compose -f docker-compose.prod.yml build --no-cache
+    dc build --no-cache
 
     log "Iniciando servicios..."
-    docker compose -f docker-compose.prod.yml up -d
+    dc up -d
 
     log "Esperando que los servicios esten listos..."
     sleep 10
 
     # Verificar health
-    if docker compose -f docker-compose.prod.yml exec app wget -q --spider http://localhost:5050/api/health 2>/dev/null; then
+    if dc exec app wget -q --spider http://localhost:5050/api/health 2>/dev/null; then
         log "App esta corriendo correctamente!"
     else
         warn "La app puede estar iniciando todavia. Revisa los logs:"
@@ -126,7 +130,9 @@ cmd_deploy() {
     fi
 
     log "=== Deploy completo ==="
-    if [ ! -d "/etc/letsencrypt/live/${DOMAIN:-nodominio}" ]; then
+    if [ ! -f nginx/active.conf ] || grep -q "listen 443" nginx/active.conf 2>/dev/null; then
+        :
+    else
         warn "Falta configurar SSL. Ejecuta: bash deploy.sh ssl"
     fi
 }
@@ -141,7 +147,8 @@ cmd_ssl() {
         error "No existe .env.production"
     fi
 
-    source .env.production
+    local DOMAIN=$(env_get DOMAIN)
+    local EMAIL=$(env_get EMAIL)
 
     if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "TUDOMINIO.com" ]; then
         error "Configura DOMAIN en .env.production"
@@ -154,13 +161,13 @@ cmd_ssl() {
     # Asegurar que nginx esta corriendo con HTTP
     log "Verificando que nginx este corriendo..."
     cp nginx/http-only.conf nginx/active.conf
-    docker compose -f docker-compose.prod.yml up -d nginx
+    dc up -d nginx
 
     sleep 5
 
     # Obtener certificado
     log "Obteniendo certificado SSL para ${DOMAIN}..."
-    docker compose -f docker-compose.prod.yml run --rm certbot certonly \
+    dc run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --email "$EMAIL" \
@@ -176,14 +183,14 @@ cmd_ssl() {
         sed "s/TUDOMINIO.com/${DOMAIN}/g" nginx/default.conf > nginx/active.conf
 
         # Reiniciar nginx con HTTPS
-        docker compose -f docker-compose.prod.yml restart nginx
+        dc restart nginx
 
         log "=== SSL configurado! ==="
         log "Tu app esta disponible en: https://${DOMAIN}"
 
         # Configurar renovacion automatica
         log "Configurando renovacion automatica de SSL..."
-        (crontab -l 2>/dev/null; echo "0 3 * * * cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml run --rm certbot renew --quiet && docker compose -f docker-compose.prod.yml restart nginx") | crontab -
+        (crontab -l 2>/dev/null; echo "0 3 * * * cd ${PROJECT_DIR} && docker compose -f docker-compose.prod.yml --env-file .env.production run --rm certbot renew --quiet && docker compose -f docker-compose.prod.yml --env-file .env.production restart nginx") | crontab -
         log "Cron job agregado para renovar SSL cada dia a las 3am"
     else
         error "Fallo al obtener certificado SSL. Verifica que el dominio apunte a este servidor."
@@ -195,8 +202,8 @@ cmd_ssl() {
 # ============================================
 cmd_renew() {
     log "Renovando certificado SSL..."
-    docker compose -f docker-compose.prod.yml run --rm certbot renew
-    docker compose -f docker-compose.prod.yml restart nginx
+    dc run --rm certbot renew
+    dc restart nginx
     log "Renovacion completada"
 }
 
@@ -206,9 +213,9 @@ cmd_renew() {
 cmd_logs() {
     local service="${1:-}"
     if [ -n "$service" ]; then
-        docker compose -f docker-compose.prod.yml logs -f "$service"
+        dc logs -f "$service"
     else
-        docker compose -f docker-compose.prod.yml logs -f
+        dc logs -f
     fi
 }
 
@@ -219,10 +226,10 @@ cmd_restart() {
     local service="${1:-}"
     if [ -n "$service" ]; then
         log "Reiniciando ${service}..."
-        docker compose -f docker-compose.prod.yml restart "$service"
+        dc restart "$service"
     else
         log "Reiniciando todos los servicios..."
-        docker compose -f docker-compose.prod.yml restart
+        dc restart
     fi
     log "Reinicio completado"
 }
@@ -236,11 +243,12 @@ cmd_backup() {
     local BACKUP_DIR="${PROJECT_DIR}/backups"
     mkdir -p "$BACKUP_DIR"
 
+    local PG_USER=$(env_get POSTGRES_USER)
+    local PG_DB=$(env_get POSTGRES_DB)
     local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     local BACKUP_FILE="${BACKUP_DIR}/chatboot_${TIMESTAMP}.sql.gz"
 
-    docker compose -f docker-compose.prod.yml exec -T postgres \
-        pg_dump -U "${POSTGRES_USER:-chatboot}" "${POSTGRES_DB:-chatboot}" | gzip > "$BACKUP_FILE"
+    dc exec -T postgres pg_dump -U "${PG_USER:-chatboot}" "${PG_DB:-chatboot}" | gzip > "$BACKUP_FILE"
 
     if [ $? -eq 0 ]; then
         log "Backup creado: ${BACKUP_FILE}"
@@ -259,7 +267,7 @@ cmd_backup() {
 # ============================================
 cmd_status() {
     log "Estado de los servicios:"
-    docker compose -f docker-compose.prod.yml ps
+    dc ps
 }
 
 # ============================================
@@ -267,7 +275,7 @@ cmd_status() {
 # ============================================
 cmd_stop() {
     log "Deteniendo todos los servicios..."
-    docker compose -f docker-compose.prod.yml down
+    dc down
     log "Servicios detenidos"
 }
 
@@ -281,10 +289,10 @@ cmd_update() {
     git pull origin main
 
     log "Reconstruyendo imagen..."
-    docker compose -f docker-compose.prod.yml build --no-cache app
+    dc build --no-cache app
 
     log "Reiniciando app..."
-    docker compose -f docker-compose.prod.yml up -d app
+    dc up -d app
 
     sleep 10
 
