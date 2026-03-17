@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { logout, getStoredAgente } from '../../api/authApi';
-import { MessageCircle, Calendar, Building2, Smartphone, Bot } from 'lucide-react';
+import { MessageCircle, Calendar, Building2, Smartphone, Bot, Menu, X } from 'lucide-react';
 
 type View = 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot';
 
@@ -9,65 +9,79 @@ interface HeaderProps {
   onViewChange: (view: View) => void;
 }
 
+const NAV_ITEMS: { view: View; icon: typeof MessageCircle; label: string }[] = [
+  { view: 'chat', icon: MessageCircle, label: 'Chat' },
+  { view: 'reservas', icon: Calendar, label: 'Reservas' },
+  { view: 'complejos', icon: Building2, label: 'Complejos' },
+  { view: 'whatsapp', icon: Smartphone, label: 'WhatsApp' },
+  { view: 'bot', icon: Bot, label: 'Bot' },
+];
+
 export default function Header({ view, onViewChange }: HeaderProps) {
   const agente = getStoredAgente();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
+
+  function handleNav(v: View) {
+    onViewChange(v);
+    setMenuOpen(false);
+  }
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-2 flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <h1 className="text-lg font-bold text-gray-800">Chatbot Alojamiento</h1>
-        <nav className="flex gap-1">
-          <button
-            onClick={() => onViewChange('chat')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium ${
-              view === 'chat' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <MessageCircle size={16} />
-            Chat
-          </button>
-          <button
-            onClick={() => onViewChange('reservas')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium ${
-              view === 'reservas' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Calendar size={16} />
-            Reservas
-          </button>
-          <button
-            onClick={() => onViewChange('complejos')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium ${
-              view === 'complejos' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Building2 size={16} />
-            Complejos
-          </button>
-          <button
-            onClick={() => onViewChange('whatsapp')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium ${
-              view === 'whatsapp' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Smartphone size={16} />
-            WhatsApp
-          </button>
-          <button
-            onClick={() => onViewChange('bot')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium ${
-              view === 'bot' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Bot size={16} />
-            Bot
-          </button>
+    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-2 flex items-center justify-between relative">
+      <div className="flex items-center gap-3 md:gap-6">
+        <h1 className="text-base md:text-lg font-bold text-gray-800 whitespace-nowrap">Chatbot</h1>
+
+        {/* Desktop nav */}
+        <nav className="hidden md:flex gap-1">
+          {NAV_ITEMS.map(({ view: v, icon: Icon, label }) => (
+            <button
+              key={v}
+              onClick={() => handleNav(v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium ${
+                view === v ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Mobile: icon buttons for top 3, hamburger for rest */}
+        <nav className="flex md:hidden gap-0.5">
+          {NAV_ITEMS.map(({ view: v, icon: Icon, label }) => (
+            <button
+              key={v}
+              onClick={() => handleNav(v)}
+              className={`p-2 rounded-md ${
+                view === v ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+              title={label}
+              aria-label={label}
+            >
+              <Icon size={18} />
+            </button>
+          ))}
         </nav>
       </div>
-      <div className="flex items-center gap-4">
+
+      <div className="flex items-center gap-2 md:gap-4">
         <HealthIndicator />
-        <span className="text-sm text-gray-500">{agente?.nombre ?? agente?.email}</span>
-        <button onClick={logout} className="text-sm text-red-600 hover:underline">
+        <span className="hidden sm:inline text-sm text-gray-500 truncate max-w-[120px]">{agente?.nombre ?? agente?.email}</span>
+        <button onClick={logout} className="text-sm text-red-600 hover:underline whitespace-nowrap">
           Salir
         </button>
       </div>
@@ -126,7 +140,7 @@ function HealthIndicator() {
         aria-expanded={showDetail}
       >
         <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-        Estado
+        <span className="hidden sm:inline">Estado</span>
       </button>
 
       {showDetail && health && (

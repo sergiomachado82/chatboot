@@ -71,6 +71,108 @@ function reservaToForm(r: Reserva): FormData {
   };
 }
 
+/* ─── Mobile card for a single reserva ─── */
+function ReservaCard({
+  r,
+  onEdit,
+  onEstadoChange,
+  isPending,
+}: {
+  r: Reserva;
+  onEdit: () => void;
+  onEstadoChange: (id: string, estado: string) => void;
+  isPending: boolean;
+}) {
+  const nombre = r.nombreHuesped ?? r.huesped?.nombre ?? r.huesped?.waId ?? '-';
+  const dias = calcDias(r.fechaEntrada, r.fechaSalida);
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4 space-y-2">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-medium text-sm text-gray-900">{nombre}</p>
+          <p className="text-xs text-gray-500">{r.habitacion ?? 'Sin asignar'}</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Badge color={estadoColor(r.estado)}>{estadoLabel(r.estado)}</Badge>
+          <button
+            onClick={onEdit}
+            className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+            title="Editar"
+          >
+            <Pencil size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <div>
+          <span className="text-gray-400">IN</span>
+          <p className="text-gray-700">{fmtDate(r.fechaEntrada)}</p>
+        </div>
+        <div>
+          <span className="text-gray-400">OUT</span>
+          <p className="text-gray-700">{fmtDate(r.fechaSalida)}</p>
+        </div>
+        <div>
+          <span className="text-gray-400">Dias</span>
+          <p className="text-gray-700">{dias}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <div>
+          <span className="text-gray-400">Total</span>
+          <p className="text-gray-700 font-medium">{fmtMoney(r.precioTotal)}</p>
+        </div>
+        <div>
+          <span className="text-gray-400">Sena</span>
+          <p className="text-gray-700">{fmtMoney(r.montoReserva)}</p>
+        </div>
+        <div>
+          <span className="text-gray-400">Saldo</span>
+          <p className="text-gray-700">{fmtMoney(r.saldo)}</p>
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      {r.estado === 'pre_reserva' && (
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => onEstadoChange(r.id, 'confirmada')}
+            disabled={isPending}
+            className="flex-1 text-xs py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+          >
+            Confirmar
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm('Seguro que queres cancelar esta reserva?')) {
+                onEstadoChange(r.id, 'cancelada');
+              }
+            }}
+            disabled={isPending}
+            className="flex-1 text-xs py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+      {r.estado === 'confirmada' && (
+        <div className="pt-1">
+          <button
+            onClick={() => onEstadoChange(r.id, 'completada')}
+            disabled={isPending}
+            className="w-full text-xs py-1.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
+          >
+            Completar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReservaList() {
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [filtro, setFiltro] = useState<string>('');
@@ -204,7 +306,7 @@ export default function ReservaList() {
   if (viewMode === 'calendar') {
     return (
       <div>
-        <div className="flex items-center justify-between px-6 pt-6 pb-0">
+        <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-6 pb-0">
           <h2 className="text-lg font-bold text-gray-800">Reservas</h2>
           <div className="flex items-center gap-2">
             <button
@@ -229,10 +331,11 @@ export default function ReservaList() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-4 md:p-6">
+      {/* Header toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-bold text-gray-800">Reservas</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setViewMode('table')}
@@ -264,14 +367,31 @@ export default function ReservaList() {
             onClick={openCreate}
             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
           >
-            <Plus size={16} /> Nueva Reserva
+            <Plus size={16} /> <span className="hidden sm:inline">Nueva</span> Reserva
           </button>
         </div>
       </div>
 
       {isLoading && <TableSkeleton rows={5} cols={8} />}
 
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
+      {/* Mobile: Card view */}
+      <div className="md:hidden space-y-3">
+        {reservas?.map((r) => (
+          <ReservaCard
+            key={r.id}
+            r={r}
+            onEdit={() => openEdit(r)}
+            onEstadoChange={(id, estado) => updateEstadoMut.mutate({ id, estado })}
+            isPending={updateEstadoMut.isPending}
+          />
+        ))}
+        {reservas?.length === 0 && (
+          <div className="text-center text-gray-400 py-8">No hay reservas</div>
+        )}
+      </div>
+
+      {/* Desktop: Table view */}
+      <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-gray-50 border-b">
             <tr>
@@ -376,9 +496,9 @@ export default function ReservaList() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-white border-t rounded-b-lg">
+        <div className="flex items-center justify-between px-4 py-3 bg-white border-t rounded-b-lg mt-0 md:mt-0">
           <span className="text-xs text-gray-500">
-            Pagina {page} de {totalPages} ({data?.total ?? 0} reservas)
+            Pag {page}/{totalPages} ({data?.total ?? 0})
           </span>
           <div className="flex gap-2">
             <button
@@ -399,12 +519,12 @@ export default function ReservaList() {
         </div>
       )}
 
-      {/* Modal crear/editar */}
+      {/* Modal crear/editar — responsive */}
       {modalOpen && (
-        <div ref={modalRef} tabIndex={-1} className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 outline-none">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-800">
+        <div ref={modalRef} tabIndex={-1} className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 outline-none">
+          <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b sticky top-0 bg-white z-10">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                 {editingId ? 'Editar Reserva' : 'Nueva Reserva'}
               </h3>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar modal">
@@ -412,9 +532,9 @@ export default function ReservaList() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
               {/* Fila 1: Nombre + Telefono */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nombre *</label>
                   <input
@@ -437,7 +557,7 @@ export default function ReservaList() {
               </div>
 
               {/* Fila 2: DTO + Personas */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Departamento</label>
                   <select
@@ -468,9 +588,9 @@ export default function ReservaList() {
               </div>
 
               {/* Fila 3: IN + OUT + Dias */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Fecha Entrada *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Entrada *</label>
                   <input
                     type="date"
                     value={form.fechaEntrada}
@@ -480,7 +600,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Fecha Salida *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Salida *</label>
                   <input
                     type="date"
                     value={form.fechaSalida}
@@ -489,7 +609,7 @@ export default function ReservaList() {
                     required
                   />
                 </div>
-                <div>
+                <div className="hidden sm:block">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Dias</label>
                   <input
                     type="text"
@@ -501,7 +621,7 @@ export default function ReservaList() {
               </div>
 
               {/* Fila 4: Tarifa + Total + Reserva + Saldo */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Tarifa/Noche</label>
                   <input
@@ -527,7 +647,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Reserva (Sena)</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Sena</label>
                   <input
                     type="number"
                     min={0}
@@ -553,19 +673,19 @@ export default function ReservaList() {
               </div>
 
               {/* Fila 5: Origen + Nro Factura + Importe USD + Estado */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Origen de Reserva</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Origen</label>
                   <input
                     type="text"
                     value={form.origenReserva}
                     onChange={(e) => handleChange('origenReserva', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                    placeholder="Booking, WhatsApp..."
+                    placeholder="Booking..."
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Nro Factura</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nro Fact.</label>
                   <input
                     type="text"
                     value={form.nroFactura}
@@ -574,7 +694,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Importe en USD</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">USD</label>
                   <input
                     type="number"
                     min={0}
@@ -629,7 +749,7 @@ export default function ReservaList() {
                   disabled={isSaving}
                   className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {isSaving ? 'Guardando...' : editingId ? 'Guardar Cambios' : 'Crear Reserva'}
+                  {isSaving ? 'Guardando...' : editingId ? 'Guardar' : 'Crear'}
                 </button>
               </div>
             </form>

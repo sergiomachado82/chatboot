@@ -28,17 +28,17 @@ export default function ComplejoList() {
   }
 
   return (
-    <div className="p-6 flex gap-6 h-full overflow-hidden">
+    <div className="p-4 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 h-full overflow-hidden">
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-800">Gestion de Complejos</h2>
+          <h2 className="text-lg font-bold text-gray-800">Complejos</h2>
           <button
             onClick={handleCreate}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             <Plus size={16} />
-            Agregar Departamento
+            <span className="hidden sm:inline">Agregar</span> Depto
           </button>
         </div>
 
@@ -64,8 +64,8 @@ export default function ComplejoList() {
         </div>
       </div>
 
-      {/* Sidebar */}
-      <div className="w-72 flex-shrink-0 overflow-y-auto">
+      {/* Sidebar — hidden on mobile */}
+      <div className="hidden md:block w-72 flex-shrink-0 overflow-y-auto">
         {complejos && <ResumenPanel complejos={complejos} />}
       </div>
 

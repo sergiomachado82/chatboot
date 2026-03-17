@@ -1,0 +1,33 @@
+ => ERROR [build 3/4] RUN npm run build                                                                                                                                                                     8.5s
+------
+ > [build 3/4] RUN npm run build:
+0.996
+0.996 > chatboot-alojamiento@1.0.0 build
+0.996 > tsc -b && vite build
+0.996
+7.296 src/components/chat/ChatList.tsx(30,23): error TS2554: Expected 1 arguments, but got 0.
+7.297 src/components/chat/ChatSearchBar.tsx(16,23): error TS2554: Expected 1 arguments, but got 0.
+7.298 src/components/reservas/ReservaCalendar.tsx(118,32): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+7.298   Type 'undefined' is not assignable to type 'number'.
+7.298 src/components/reservas/ReservaCalendar.tsx(118,36): error TS18048: 'em' is possibly 'undefined'.
+7.300 src/components/reservas/ReservaCalendar.tsx(119,31): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+7.300   Type 'undefined' is not assignable to type 'number'.
+7.300 src/components/reservas/ReservaCalendar.tsx(119,35): error TS18048: 'sm' is possibly 'undefined'.
+7.300 src/components/reservas/ReservaList.tsx(22,19): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+7.300   Type 'undefined' is not assignable to type 'number'.
+7.300 src/components/reservas/ReservaList.tsx(22,22): error TS18048: 'm' is possibly 'undefined'.
+7.300 src/components/reservas/ReservaList.tsx(184,11): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+7.300   Type 'null' is not assignable to type 'string | undefined'.
+7.824 vite.config.ts(4,18): error TS2307: Cannot find module 'path' or its corresponding type declarations.
+7.826 vite.config.ts(10,31): error TS2304: Cannot find name '__dirname'.
+------
+Dockerfile:25
+--------------------
+  23 |
+  24 |     # Build frontend (tsc -b && vite build → output in /app/dist)
+  25 | >>> RUN npm run build
+  26 |
+  27 |     # Generate Prisma client
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c npm run build" did not complete successfully: exit code: 1
+[root@vps-5746364-x ~/chatboot] #

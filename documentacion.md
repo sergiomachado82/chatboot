@@ -17,7 +17,10 @@ Sistema de chatbot para alojamiento turistico que automatiza la atencion al hues
 - Calendario mensual visual de reservas (grilla con filas por departamento/unidad)
 - Simulador de WhatsApp para desarrollo local sin cuenta Meta Business
 - Sincronizacion de reservas con Google Sheets
-- Sincronizacion bidireccional con Booking.com via iCal (export + import)
+- Sincronizacion multi-plataforma via iCal (Booking, Airbnb, VRBO, otros) — multiples feeds por complejo
+- Sincronizacion bidireccional con Google Calendar (push reservas/bloqueos, pull eventos externos como bloqueos)
+- Recuperacion de contrasena via email (SMTP)
+- Logo personalizable del bot
 - Transcripcion de audios via Claude API
 
 **Stack tecnologico:**
@@ -30,7 +33,7 @@ Sistema de chatbot para alojamiento turistico que automatiza la atencion al hues
 | Cache/Colas | Redis 7, Bull (preparado, no activo aun) |
 | Tiempo real | Socket.io 4 |
 | IA | Claude API (Haiku para clasificacion/audio, Sonnet para respuestas) |
-| Integraciones | WhatsApp Cloud API (Meta), Google Sheets API, Booking.com (iCal) |
+| Integraciones | WhatsApp Cloud API (Meta), Google Sheets API, Google Calendar API, iCal multi-plataforma (Booking, Airbnb, VRBO) |
 
 ---
 
@@ -65,7 +68,7 @@ chatboot/
 │   ├── tsconfig.json
 │   ├── .env                      # DATABASE_URL (requerido por Prisma CLI)
 │   ├── prisma/
-│   │   └── schema.prisma         # 12 Modelos: Huesped, Agente, Conversacion, Mensaje, Reserva, Inventario, WaTemplate, Complejo, Tarifa, TarifaEspecial, MediaFile, Bloqueo
+│   │   └── schema.prisma         # 14 Modelos: Huesped, Agente, Conversacion, Mensaje, Reserva, Inventario, WaTemplate, Complejo, Tarifa, TarifaEspecial, MediaFile, Bloqueo, IcalFeed, BotConfig
 │   └── src/
 │       ├── index.ts              # Entry: HTTP server + Socket.io + graceful shutdown
 │       ├── app.ts                # Express app: middleware chain + rutas
@@ -85,18 +88,20 @@ chatboot/
 │       │   └── webhookSignature.ts  # HMAC SHA256 para webhook Meta
 │       ├── routes/
 │       │   ├── health.ts         # GET /api/health
-│       │   ├── auth.ts           # POST /api/auth/login
+│       │   ├── auth.ts           # POST /api/auth/login, forgot-password, reset-password
 │       │   ├── webhook.ts        # GET + POST /api/webhook
 │       │   ├── simulator.ts      # POST /api/simulator/send
 │       │   ├── conversaciones.ts # CRUD + acciones de control
-│       │   ├── complejos.ts      # CRUD + tarifas + tarifas especiales + bloqueos + media
+│       │   ├── complejos.ts      # CRUD + tarifas + tarifas especiales + bloqueos + media + iCal feeds
+│       │   ├── botConfig.ts     # GET/PATCH /api/bot-config (configuracion del bot + logo)
 │       │   ├── reservas.ts       # CRUD + cambio de estado + query por rango de fechas
 │       │   ├── inventario.ts     # Consulta + disponibilidad
 │       │   ├── huespedes.ts      # Lista + detalle + edicion
 │       │   ├── agentes.ts        # CRUD (admin only para crear)
 │       │   └── ical.ts           # GET /api/ical/:complejoId.ics (publico, export iCal)
 │       ├── services/
-│       │   ├── authService.ts         # Login, JWT
+│       │   ├── authService.ts         # Login, JWT, password reset tokens
+│       │   ├── emailService.ts        # Envio de emails SMTP (recuperacion de contrasena)
 │       │   ├── claudeService.ts       # Clasificacion de intents + generacion de respuestas + transcripcion audio
 │       │   ├── botEngine.ts           # Orquestador del bot (acumulacion de entidades, contexto adicional)
 │       │   ├── webhookProcessor.ts    # Procesamiento de mensajes entrantes
@@ -111,8 +116,10 @@ chatboot/
 │       │   ├── sheetsService.ts       # Sync con Google Sheets
 │       │   ├── socketManager.ts       # Socket.io init + emit helpers
 │       │   ├── conversacionCleanup.ts  # Cron job: cierra conversaciones inactivas >48h
-│       │   ├── icalService.ts         # Export iCal + Import/sync desde Booking.com
-│       │   └── icalSyncJob.ts         # Cron job iCal sync cada 30 min
+│       │   ├── icalService.ts         # Export iCal + Import/sync multi-plataforma (Booking, Airbnb, VRBO, etc.)
+│       │   ├── icalSyncJob.ts         # Cron job iCal sync cada 30 min (itera IcalFeed activos)
+│       │   ├── googleCalendarService.ts # Push/pull bidireccional con Google Calendar
+│       │   └── gcalSyncJob.ts         # Cron job Google Calendar sync cada 5 min
 │       ├── scripts/
 │       │   ├── seedAgente.ts          # Crea admin inicial
 │       │   ├── seedInventory.ts       # Seed de inventario (3 anios x departamentos)
@@ -139,9 +146,10 @@ chatboot/
     ├── App.tsx                   # Auth gate + layout principal
     ├── api/
     │   ├── apiClient.ts          # apiFetch con Bearer + 401 handling
-    │   ├── authApi.ts            # login, logout, isAuthenticated
+    │   ├── authApi.ts            # login, logout, isAuthenticated, forgotPassword, resetPassword
+    │   ├── botConfigApi.ts       # GET/PATCH bot config + logo upload
     │   ├── conversacionApi.ts    # CRUD conversaciones + acciones
-    │   ├── complejoApi.ts        # CRUD complejos + tarifas + bloqueos + media
+    │   ├── complejoApi.ts        # CRUD complejos + tarifas + bloqueos + media + iCal feeds
     │   ├── reservaApi.ts         # CRUD reservas + query por rango de fechas
     │   ├── inventarioApi.ts      # Consulta inventario + disponibilidad
     │   ├── huespedApi.ts         # Lista + detalle huespedes
@@ -153,7 +161,11 @@ chatboot/
     │   ├── useReservas.ts        # React Query para reservas + calendario
     │   └── useComplejos.ts       # React Query para complejos
     └── components/
-        ├── auth/LoginPage.tsx
+        ├── auth/
+        │   ├── LoginPage.tsx         # Login + link a recuperar contrasena
+        │   ├── AuthLayout.tsx        # Layout compartido para paginas de auth
+        │   └── ResetPasswordPage.tsx # Flujo de recuperacion de contrasena
+        ├── bot/BotConfigPage.tsx     # Configuracion del bot (nombre, tono, mensajes, logo)
         ├── layout/Header.tsx
         ├── chat/
         │   ├── ChatList.tsx       # Lista con filtros
@@ -166,7 +178,7 @@ chatboot/
         ├── complejos/
         │   ├── ComplejoList.tsx   # Lista/grilla de complejos
         │   ├── ComplejoCard.tsx   # Card individual de complejo
-        │   ├── ComplejoEditModal.tsx # Modal de edicion (6 tabs)
+        │   ├── ComplejoEditModal.tsx # Modal de edicion (7 tabs: Datos, Amenities, Politicas, Tarifas, Reserva, Media, Sync)
         │   ├── TarifaSection.tsx  # Tarifas estacionales + especiales + bloqueos
         │   ├── MediaGallery.tsx   # Galeria de fotos del complejo
         │   ├── MediaUploadForm.tsx # Formulario de subida de media
@@ -326,13 +338,15 @@ Peticion HTTP
 
 ### 3.2 Modelos Prisma
 
-**Complejo** (`complejos`): Departamento/unidad de alojamiento. Campos principales: `nombre` (unico), `aliases` (nombres alternativos), `capacidad` (por unidad), `cantidadUnidades`, `dormitorios`, `banos`, `superficie`, `tipo`, `amenities[]`, `checkIn/checkOut`, `estadiaMinima`, politicas (`mascotas`, `ninos`, `fumar`, `fiestas`), datos bancarios (`titularCuenta`, `banco`, `cbu`, `aliasCbu`, `cuit`, `linkMercadoPago`), `videoTour`, `icalUrl` (URL iCal de Booking.com para sincronizacion), `activo`. Relaciones: tarifas, tarifasEspeciales, media, bloqueos.
+**Complejo** (`complejos`): Departamento/unidad de alojamiento. Campos principales: `nombre` (unico), `aliases` (nombres alternativos), `capacidad` (por unidad), `cantidadUnidades`, `dormitorios`, `banos`, `superficie`, `tipo`, `amenities[]`, `checkIn/checkOut`, `estadiaMinima`, politicas (`mascotas`, `ninos`, `fumar`, `fiestas`), datos bancarios (`titularCuenta`, `banco`, `cbu`, `aliasCbu`, `cuit`, `linkMercadoPago`), `videoTour`, `activo`. Relaciones: tarifas, tarifasEspeciales, media, bloqueos, icalFeeds.
+
+**IcalFeed** (`ical_feeds`): Feed iCal de una plataforma externa asociado a un complejo. Campos: `complejoId`, `plataforma` (booking, airbnb, vrbo, otro), `url`, `etiqueta` (opcional), `activo`, `ultimoSync`. Constraint unico `[complejoId, url]`. Relacion N:1 con Complejo (cascade delete).
 
 **Tarifa** (`tarifas`): Precio por temporada (baja/media/alta) para un complejo. Constraint unico `[complejoId, temporada]`. Campos: `precioNoche`, `estadiaMinima` (opcional).
 
 **TarifaEspecial** (`tarifas_especiales`): Override de precio para un rango de fechas especifico. Tiene prioridad sobre la tarifa estacional. Campos: `fechaInicio`, `fechaFin`, `precioNoche`, `estadiaMinima`, `motivo`, `activo`.
 
-**Bloqueo** (`bloqueos`): Bloqueo de disponibilidad para un complejo (reparaciones, uso personal). Campos: `complejoId`, `fechaInicio`, `fechaFin`, `motivo`. Al crear, marca las fechas como no disponibles en Inventario. Al eliminar, libera las fechas solo si no hay reservas ni otros bloqueos.
+**Bloqueo** (`bloqueos`): Bloqueo de disponibilidad para un complejo (reparaciones, uso personal). Campos: `complejoId`, `fechaInicio`, `fechaFin`, `motivo`, `unidades`, `googleCalEventId` (ID del evento en Google Calendar), `origenGoogle` (true si fue importado desde GCal). Al crear, marca las fechas como no disponibles en Inventario y push a Google Calendar. Al eliminar, libera las fechas solo si no hay reservas ni otros bloqueos, y elimina el evento de GCal.
 
 **Huesped** (`huespedes`): Persona que contacta por WhatsApp. Se identifica por `waId` (numero de telefono WA, unico). Tiene relacion 1:N con conversaciones y reservas.
 
@@ -354,7 +368,8 @@ Peticion HTTP
 - `fechaEntrada`, `fechaSalida`, `numHuespedes`, `habitacion`
 - `tarifaNoche`, `precioTotal` (Decimal), `montoReserva` (sena), `saldo`
 - `estado`: pre_reserva | confirmada | cancelada | completada
-- `origenReserva`: whatsapp | manual | web
+- `origenReserva`: whatsapp | manual | web | booking | airbnb | vrbo | otro
+- `googleCalEventId`: ID del evento en Google Calendar (para sync bidireccional)
 - `nroFactura`, `importeUsd`, `notas`
 
 **Inventario** (`inventario`): Disponibilidad diaria por habitacion. Constraint unico `[fecha, habitacion]` para evitar duplicados. Campos: `fecha`, `habitacion`, `disponible`, `precio`, `notas`.
@@ -415,6 +430,8 @@ Peticion HTTP
 |--------|------|-------------|
 | `GET` | `/api/health` | Estado del servicio, uptime, conectividad DB y Redis |
 | `POST` | `/api/auth/login` | Autenticacion de agentes |
+| `POST` | `/api/auth/forgot-password` | Solicitar email de recuperacion de contrasena |
+| `POST` | `/api/auth/reset-password` | Resetear contrasena con token |
 | `GET` | `/api/webhook` | Verificacion de webhook de Meta |
 | `POST` | `/api/webhook` | Recepcion de mensajes de WhatsApp |
 | `POST` | `/api/simulator/send` | Enviar mensaje simulado (solo en `SIMULATOR_MODE`) |
@@ -503,6 +520,9 @@ Peticion HTTP
 | `GET` | `/api/complejos/:id/bloqueos` | Listar bloqueos de disponibilidad |
 | `POST` | `/api/complejos/:id/bloqueos` | Crear bloqueo (marca fechas no disponibles) |
 | `DELETE` | `/api/complejos/:id/bloqueos/:bloqueoId` | Eliminar bloqueo (libera fechas si es seguro) |
+| `GET` | `/api/complejos/:id/ical-feeds` | Listar feeds iCal del complejo |
+| `POST` | `/api/complejos/:id/ical-feeds` | Crear feed iCal (plataforma, url, etiqueta) |
+| `DELETE` | `/api/complejos/:id/ical-feeds/:feedId` | Eliminar feed iCal |
 | `POST` | `/api/complejos/:id/media` | Agregar archivo multimedia |
 | `DELETE` | `/api/complejos/:id/media/:mediaId` | Eliminar archivo multimedia |
 | `PATCH` | `/api/complejos/:id/media/orden` | Reordenar archivos multimedia |
@@ -1007,16 +1027,49 @@ Orquesta el procesamiento de mensajes entrantes (WhatsApp o simulador). Flujo: `
 | Funcion | Descripcion |
 |---------|-------------|
 | `generateIcal(complejoId)` | Genera string VCALENDAR (RFC 5545) con VEVENTs para reservas activas (pre_reserva, confirmada) y bloqueos del complejo. Formato VALUE=DATE (all-day). No expone datos del huesped. |
-| `syncFromBookingIcal(complejoId, icalUrl)` | Fetch URL iCal de Booking.com, parsea con node-ical. Crea reservas nuevas (origenReserva='booking'), actualiza fechas modificadas, cancela reservas cuyo UID desaparecio del feed. Recalcula disponibilidad para fechas afectadas. |
+| `syncFromIcalFeed(complejoId, icalUrl, plataforma)` | Fetch URL iCal de cualquier plataforma, parsea con node-ical. Crea reservas nuevas con `origenReserva=plataforma` y `nombreHuesped='Reserva {Plataforma}'`, actualiza fechas modificadas, cancela reservas cuyo UID desaparecio del feed. Recalcula disponibilidad. Push a Google Calendar para reservas nuevas (fire-and-forget). |
 
-**UID tracking**: Cada reserva de Booking se identifica por `notas: 'ical-uid:<uid>'`. Esto permite detectar cambios y cancelaciones en syncs posteriores.
+**UID tracking**: Cada reserva importada por iCal se identifica por `notas: 'ical-uid:<uid>'`. Esto permite detectar cambios y cancelaciones en syncs posteriores. Las reservas existentes se filtran por `origenReserva: plataforma`, lo que permite feeds de multiples plataformas sin interferencia.
 
 ### 8.15 icalSyncJob.ts
 
 | Funcion | Descripcion |
 |---------|-------------|
-| `startIcalSyncJob()` | Inicia cron job: primera ejecucion 10s despues del startup, luego cada 30 minutos. Recorre complejos con `icalUrl` no nulo y ejecuta `syncFromBookingIcal()` para cada uno. |
+| `startIcalSyncJob()` | Inicia cron job: primera ejecucion 10s despues del startup, luego cada 30 minutos. Consulta `IcalFeed` activos con complejo activo y ejecuta `syncFromIcalFeed()` para cada uno. Actualiza `ultimoSync` despues de cada sync exitoso. |
 | `stopIcalSyncJob()` | Detiene el cron job (llamado en graceful shutdown). |
+
+### 8.16 googleCalendarService.ts
+
+Servicio de sincronizacion bidireccional con Google Calendar. Usa la misma Service Account que Google Sheets pero con scope `https://www.googleapis.com/auth/calendar`. Si `GOOGLE_CALENDAR_ID` no esta configurado, todas las funciones retornan silenciosamente sin hacer nada.
+
+**Push (Sistema → Google Calendar):**
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `pushReservaToGCal(reservaId)` | Crea/actualiza/elimina evento en GCal segun estado de la reserva. Summary: `Reserva: {habitacion} - {nombreHuesped}`. Guarda `googleCalEventId` en la reserva. Si la reserva esta cancelada, elimina el evento. Marca eventos con `extendedProperties.private.chatbootManaged = 'true'`. |
+| `pushBloqueoToGCal(bloqueoId)` | Crea evento en GCal para un bloqueo. Skip si `origenGoogle=true` (evita loops). Summary: `Bloqueado: {complejo} - {motivo}`. Guarda `googleCalEventId` en el bloqueo. |
+| `deleteBloqueoFromGCal(googleCalEventId)` | Elimina evento de GCal por su ID. Ignora errores 404/410 (evento ya eliminado). |
+
+**Pull (Google Calendar → Sistema):**
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `syncFromGoogleCalendar()` | Poll incremental con `syncToken` (full sync al restart del server). Solo importa eventos SIN `chatbootManaged` (evita loops). Eventos cancelados → elimina bloqueo correspondiente. Eventos nuevos → crea `Bloqueo` con `origenGoogle: true`. Matchea complejo por nombre/alias en el summary del evento, fallback al primer complejo activo. Recalcula inventario para complejos afectados. |
+
+**Proteccion anti-loop**: Los eventos creados por el sistema llevan `extendedProperties.private.chatbootManaged = 'true'`. Al importar, se ignoran eventos con esta propiedad. Los bloqueos importados desde GCal tienen `origenGoogle: true`, lo que previene que se re-pusheen a GCal.
+
+### 8.17 gcalSyncJob.ts
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `startGCalSyncJob()` | Inicia cron job: primera ejecucion 15s despues del startup, luego cada 5 minutos. Si `GOOGLE_CALENDAR_ID` no esta configurado, no inicia. |
+| `stopGCalSyncJob()` | Detiene el cron job (llamado en graceful shutdown). |
+
+### 8.18 emailService.ts
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `sendResetPasswordEmail(email, token)` | Envia email con link de recuperacion de contrasena via SMTP (Gmail). Requiere `SMTP_USER` y `SMTP_PASS` configurados. |
 
 ---
 
@@ -1153,7 +1206,7 @@ Todas las acciones son en tiempo real: otros agentes conectados ven los cambios 
 
 ### 11.4 Gestion de Complejos
 
-Modal de edicion con 6 tabs:
+Modal de edicion con 7 tabs:
 
 | Tab | Contenido |
 |-----|-----------|
@@ -1163,6 +1216,7 @@ Modal de edicion con 6 tabs:
 | **Tarifas** | Tarifas estacionales (baja/media/alta) + Tarifas especiales (rango de fechas) + Bloqueos de disponibilidad |
 | **Reserva** | Datos bancarios: titular cuenta, CUIT, banco, CBU, alias CBU, link MercadoPago |
 | **Media** | Galeria de fotos/videos: agregar, eliminar, reordenar por drag |
+| **Sync** | Feeds iCal multi-plataforma (agregar/eliminar Booking, Airbnb, VRBO, otro) + URL de exportacion iCal con boton copiar |
 
 ### 11.5 Gestion de Reservas
 
@@ -1298,6 +1352,10 @@ POST https://graph.facebook.com/v21.0/{WA_PHONE_NUMBER_ID}/messages
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | No | `""` | Email de la service account de Google |
 | `GOOGLE_PRIVATE_KEY` | No | `""` | Private key de la service account |
 | `GOOGLE_SHEET_ID` | No | `""` | ID de la hoja de Google Sheets |
+| `GOOGLE_CALENDAR_ID` | No | `""` | ID del calendario de Google (para sync bidireccional) |
+| `SMTP_USER` | No | `""` | Email SMTP para envio de correos (Gmail) |
+| `SMTP_PASS` | No | `""` | Contrasena de aplicacion SMTP |
+| `FRONTEND_URL` | No | `http://localhost:5173` | URL del frontend (para links en emails) |
 | `SIMULATOR_MODE` | No | `true` | Habilita simulador local |
 | `ALLOWED_ORIGINS` | No | `*` | Origenes CORS permitidos (separados por coma) |
 | `RATE_LIMIT_WINDOW_MS` | No | `60000` | Ventana del rate limiter general (ms) |
@@ -1644,14 +1702,16 @@ Estimacion: ~$0.004 por intercambio. 100 conversaciones/dia ≈ **$36/mes**.
 
 ---
 
-### 18.5 Google Cloud — Service Account para Google Sheets API
+### 18.5 Google Cloud — Service Account para Google Sheets y Calendar API
 
 1. Crear proyecto en `https://console.cloud.google.com/`
-2. Habilitar Google Sheets API
+2. Habilitar **Google Sheets API** y **Google Calendar API**
 3. Crear Service Account en IAM
 4. Descargar key JSON
 5. **Compartir la hoja de Google Sheets con el email de la service account como Editor**
-6. Copiar `client_email` y `private_key` del JSON al `.env`
+6. **Para Google Calendar**: Compartir el calendario con el email de la service account con permisos de **"Make changes to events"** (escritura)
+7. Copiar `client_email` y `private_key` del JSON al `.env`
+8. Obtener el Calendar ID: Google Calendar > Settings del calendario > "Integrate calendar" > Calendar ID → ponerlo en `GOOGLE_CALENDAR_ID`
 
 ---
 
@@ -1667,6 +1727,9 @@ Estimacion: ~$0.004 por intercambio. 100 conversaciones/dia ≈ **$36/mes**.
 | Google | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Campo `client_email` del JSON |
 | Google | `GOOGLE_PRIVATE_KEY` | Campo `private_key` del JSON |
 | Google | `GOOGLE_SHEET_ID` | URL de la hoja de Google Sheets |
+| Google | `GOOGLE_CALENDAR_ID` | Settings del calendario > "Integrate calendar" |
+| SMTP | `SMTP_USER` | Email de Gmail para envio de correos |
+| SMTP | `SMTP_PASS` | Contrasena de aplicacion de Gmail |
 
 ---
 
@@ -1693,6 +1756,10 @@ Estimacion: ~$0.004 por intercambio. 100 conversaciones/dia ≈ **$36/mes**.
 | **System User** | Usuario de servicio en Meta Business para tokens permanentes |
 | **Cloud API** | API de WhatsApp alojada por Meta |
 | **Template** | Mensaje pre-aprobado por Meta, requerido fuera de la ventana de 24h |
+| **IcalFeed** | Feed iCal de una plataforma externa (Booking, Airbnb, VRBO) vinculado a un complejo |
+| **syncToken** | Token de Google Calendar API para sincronizacion incremental (solo eventos nuevos/modificados) |
+| **chatbootManaged** | Extended property en eventos GCal que marca eventos creados por el sistema (evita re-importacion) |
+| **origenGoogle** | Flag en Bloqueo que indica que fue importado desde Google Calendar |
 | **Service Account** | Cuenta de servicio de Google Cloud para autenticacion maquina-a-maquina |
 | **MTok** | Millon de tokens — unidad de facturacion de la API de Claude |
 | **Sanitizacion de entidades** | Proceso de filtrar solo las claves reconocidas por el bot (num_personas, fecha_entrada, fecha_salida, habitacion) y descartar las no estandar |
@@ -2388,3 +2455,188 @@ Ubicado en el panel central, entre el ChatHeader y el area de mensajes.
 - **Conversaciones**: Usa `mensajes: { some: { AND: [...filters] } }` — relacion Prisma que filtra conversaciones donde AL MENOS un mensaje cumple TODOS los criterios
 - **Debounce**: 400ms en ambos buscadores para evitar queries excesivos mientras el usuario escribe
 - **Minimo 2 caracteres**: Evita busquedas demasiado amplias que devuelvan todo
+
+---
+
+## 28. Sincronizacion iCal Multi-plataforma (2026-03-17)
+
+### 28.1 Descripcion
+
+Soporte para multiples feeds iCal por complejo. Antes, cada complejo tenia un unico campo `icalUrl` para Booking.com. Ahora se usa un modelo `IcalFeed` que permite agregar feeds de Booking, Airbnb, VRBO u otras plataformas.
+
+### 28.2 Modelo de Datos
+
+**Antes**: `Complejo.icalUrl` (campo nullable en complejos)
+**Ahora**: Modelo separado `IcalFeed` con relacion N:1 a Complejo
+
+```
+Complejo 1───N IcalFeed
+                ├── plataforma: 'booking' | 'airbnb' | 'vrbo' | 'otro'
+                ├── url: URL del feed iCal
+                ├── etiqueta: nombre opcional
+                ├── activo: boolean
+                └── ultimoSync: timestamp del ultimo sync exitoso
+```
+
+Constraint unico en `[complejoId, url]` para evitar duplicados.
+
+### 28.3 Migracion de Datos
+
+La migracion `20260317020000_ical_feeds_and_gcal_sync` realiza:
+1. Crea tabla `ical_feeds`
+2. Inserta registros para todos los complejos que tenian `ical_url` no nulo (como plataforma `booking`)
+3. Elimina la columna `ical_url` de `complejos`
+
+### 28.4 Sync Job Actualizado
+
+- `icalSyncJob.ts` ahora consulta `IcalFeed` activos en vez de `Complejo.icalUrl`
+- Actualiza `ultimoSync` despues de cada sync exitoso
+- Cada feed se procesa independientemente — si uno falla, los demas continuan
+
+### 28.5 Reservas Importadas
+
+Cada plataforma genera reservas con `origenReserva` distinto:
+- Feed de Booking → `origenReserva: 'booking'`, `nombreHuesped: 'Reserva Booking'`
+- Feed de Airbnb → `origenReserva: 'airbnb'`, `nombreHuesped: 'Reserva Airbnb'`
+- Feed de VRBO → `origenReserva: 'vrbo'`, `nombreHuesped: 'Reserva Vrbo'`
+
+Las cancelaciones se detectan por plataforma: solo se cancelan reservas con el mismo `origenReserva` cuyo UID desaparecio del feed correspondiente.
+
+### 28.6 UI — Tab "Sync" en ComplejoEditModal
+
+Nueva tab en el modal de edicion de complejo:
+- Lista de feeds existentes con badge de plataforma, URL truncada, fecha de ultimo sync y boton eliminar
+- Formulario para agregar: select de plataforma + input de URL + boton "Agregar"
+- URL de exportacion iCal read-only con boton "Copiar" (`{origin}/api/ical/{id}.ics`)
+
+---
+
+## 29. Sincronizacion Bidireccional con Google Calendar (2026-03-17)
+
+### 29.1 Descripcion
+
+Sincronizacion bidireccional entre el sistema y un calendario de Google compartido. Permite que:
+- Las reservas y bloqueos creados en el sistema aparezcan en Google Calendar
+- Los eventos creados manualmente en Google Calendar se importen como bloqueos
+
+### 29.2 Configuracion
+
+1. Habilitar Google Calendar API en Google Cloud Console
+2. Compartir el calendario con el email del Service Account (`GOOGLE_SERVICE_ACCOUNT_EMAIL`) con permisos de escritura
+3. Obtener el Calendar ID: Google Calendar > Settings > "Integrate calendar" > Calendar ID
+4. Configurar `GOOGLE_CALENDAR_ID` en `.env` / `.env.production`
+
+Si `GOOGLE_CALENDAR_ID` no esta configurado, toda la funcionalidad de GCal se desactiva silenciosamente.
+
+### 29.3 Push: Sistema → Google Calendar
+
+Se ejecuta como fire-and-forget (no bloquea la operacion principal):
+
+| Accion en el sistema | Efecto en GCal |
+|---------------------|----------------|
+| Crear reserva (manual, bot o iCal) | Crea evento all-day: `Reserva: {habitacion} - {nombreHuesped}` |
+| Actualizar reserva | Actualiza fechas/summary del evento |
+| Cancelar reserva | Elimina el evento de GCal |
+| Crear bloqueo | Crea evento all-day: `Bloqueado: {complejo} - {motivo}` |
+| Eliminar bloqueo | Elimina el evento de GCal |
+
+**Puntos de integracion:**
+- `reservaService.ts` — `createReserva()`, `updateReserva()`, `updateReservaEstado()`
+- `complejos.ts` routes — POST y DELETE de bloqueos
+- `icalService.ts` — reservas importadas por iCal
+
+### 29.4 Pull: Google Calendar → Sistema
+
+Se ejecuta cada 5 minutos via `gcalSyncJob.ts`:
+
+| Accion en GCal | Efecto en el sistema |
+|----------------|---------------------|
+| Crear evento | Crea `Bloqueo` con `origenGoogle: true` |
+| Modificar evento | Actualiza fechas del bloqueo |
+| Eliminar evento | Elimina el bloqueo correspondiente |
+
+### 29.5 Proteccion Anti-loop
+
+Para evitar que un evento pushado al GCal se re-importe como bloqueo:
+1. Eventos creados por el sistema llevan `extendedProperties.private.chatbootManaged = 'true'`
+2. Al importar, se ignoran eventos con esta propiedad
+3. Bloqueos importados desde GCal tienen `origenGoogle: true`, lo que previene que se re-pusheen
+
+### 29.6 Matching de Complejo
+
+Al importar eventos de GCal, el sistema intenta determinar a que complejo pertenece:
+1. Busca el nombre del complejo o sus aliases en el summary del evento (case-insensitive)
+2. Si no encuentra match, usa el primer complejo activo como fallback
+
+### 29.7 Sync Token Incremental
+
+- Primera ejecucion (o despues de restart): full sync de eventos de los ultimos 30 dias
+- Ejecuciones posteriores: sync incremental usando `syncToken` de la API de GCal
+- Si el `syncToken` expira (error 410), se realiza full sync automaticamente
+- El `syncToken` se almacena en memoria (se pierde al restart, lo cual es aceptable)
+
+---
+
+## 30. Recuperacion de Contrasena (2026-03-17)
+
+### 30.1 Flujo
+
+1. Usuario hace click en "Olvide mi contrasena" en la pantalla de login
+2. Ingresa su email → `POST /api/auth/forgot-password`
+3. El sistema genera un token aleatorio, lo guarda en `Agente.resetToken` con expiracion de 1 hora
+4. Envia email con link: `{FRONTEND_URL}/reset-password?token={token}`
+5. Usuario hace click en el link → pantalla de nueva contrasena
+6. Ingresa nueva contrasena → `POST /api/auth/reset-password`
+7. Se valida el token, se actualiza el password hash y se limpian los campos de reset
+
+### 30.2 Seguridad
+
+- Token aleatorio de 32 bytes (hex)
+- Expiracion de 1 hora
+- Respuesta generica "si el email existe, se envio un correo" (no revela existencia del email)
+- Password hasheado con bcrypt (12 rounds)
+
+### 30.3 Configuracion SMTP
+
+Requiere una cuenta de Gmail con "Contrasena de aplicacion":
+1. Habilitar verificacion en 2 pasos en la cuenta de Google
+2. Ir a myaccount.google.com > Seguridad > Contrasenas de aplicacion
+3. Generar contrasena para "Correo" / "Otro"
+4. Configurar `SMTP_USER` y `SMTP_PASS` en `.env`
+
+---
+
+## 31. Configuracion del Bot (BotConfig) (2026-03-17)
+
+### 31.1 Descripcion
+
+Modelo `BotConfig` para personalizar el comportamiento del bot desde el panel de administracion. Incluye soporte para logo.
+
+### 31.2 Campos Configurables
+
+| Campo | Default | Descripcion |
+|-------|---------|-------------|
+| `nombreAgente` | Las Grutas Departamentos | Nombre del asistente |
+| `ubicacion` | Las Grutas, Rio Negro | Ubicacion del alojamiento |
+| `tono` | amable, profesional y cercano | Tono de las respuestas |
+| `idioma` | es_AR | Idioma de las respuestas |
+| `usarEmojis` | false | Usar emojis en respuestas |
+| `longitudRespuesta` | corta | Longitud de respuestas (corta/media/larga) |
+| `autoPreReserva` | true | Crear pre-reserva automaticamente |
+| `modoEnvioFotos` | auto | Modo de envio de fotos |
+| `escalarSiQueja` | true | Escalar a humano si hay queja |
+| `escalarSiPago` | true | Escalar si el huesped habla de pago |
+| `mensajeBienvenida` | ... | Mensaje de bienvenida personalizable |
+| `mensajeDespedida` | ... | Mensaje de despedida |
+| `mensajeFueraHorario` | ... | Mensaje fuera de horario |
+| `mensajeEsperaHumano` | ... | Mensaje al escalar a humano |
+| `horarioInicio/Fin` | null | Horario de atencion (opcional) |
+| `telefonoContacto` | +54 2920 561033 | Telefono de contacto |
+| `logo` | null | URL del logo del bot |
+
+### 31.3 Endpoints
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/bot-config` | Obtener configuracion actual |
+| `PATCH` | `/api/bot-config` | Actualizar configuracion parcialmente |

@@ -1,7 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(winget upgrade:*)"
+      "Bash(winget upgrade:*)",
+      "Bash(npm run dev:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker compose:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(openssl rand:*)",
+      "WebFetch(domain:66.97.40.119)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vite build)",
+      "Bash(npx tsc:*)",
+      "Bash(npx prisma validate:*)"
     ]
   }
 }
