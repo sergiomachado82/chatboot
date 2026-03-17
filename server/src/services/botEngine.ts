@@ -214,26 +214,44 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
   let photosFailed = false;
   if (isPhotoRequest && classification.entities.habitacion) {
     try {
-      const images = await getDepartmentImages(classification.entities.habitacion);
+      const images = await getDepartmentImages(classification.entities.habitacion, 6);
       if (images && images.length > 0) {
-        logger.info({ depto: classification.entities.habitacion, count: images.length }, 'Sending photos directly');
+        const isWebUser = huespedWaId.startsWith('web_');
+        logger.info({ depto: classification.entities.habitacion, count: images.length, isWebUser }, 'Sending photos directly');
 
-        for (const url of images) {
-          await sendImage(huespedWaId, url);
+        if (isWebUser) {
+          // For web users, include photo URLs in text response
+          const photoList = images.map((url, i) => `Foto ${i + 1}: ${url}`).join('\n');
+          const respuesta = `Aca te muestro fotos de ${classification.entities.habitacion}:\n\n${photoList}`;
+          await createMensaje({
+            conversacionId,
+            direccion: 'saliente',
+            origen: 'bot',
+            contenido: respuesta,
+            metadata: {
+              intent: classification.intent,
+              confidence: classification.confidence,
+              entities: classification.entities,
+              photosSent: images.length,
+            },
+          });
+        } else {
+          for (const url of images) {
+            await sendImage(huespedWaId, url);
+          }
+          await createMensaje({
+            conversacionId,
+            direccion: 'saliente',
+            origen: 'bot',
+            contenido: `[${images.length} fotos de ${classification.entities.habitacion}]`,
+            metadata: {
+              intent: classification.intent,
+              confidence: classification.confidence,
+              entities: classification.entities,
+              photosSent: images.length,
+            },
+          });
         }
-
-        await createMensaje({
-          conversacionId,
-          direccion: 'saliente',
-          origen: 'bot',
-          contenido: `[${images.length} fotos de ${classification.entities.habitacion}]`,
-          metadata: {
-            intent: classification.intent,
-            confidence: classification.confidence,
-            entities: classification.entities,
-            photosSent: images.length,
-          },
-        });
         return;
       }
       // No images found — fall through to Claude response

@@ -170,6 +170,10 @@ function buildDetalle(c: ComplejoWithRelations): string {
   if (c.linkMercadoPago) {
     lines.push(`- Link de pago MercadoPago (tarjeta, recargo 8%): ${c.linkMercadoPago}`);
   }
+  if (c.direccion) {
+    const mapsQuery = encodeURIComponent(`${c.direccion}, Rio Negro, Argentina`);
+    lines.push(`- Google Maps: https://www.google.com/maps/search/?api=1&query=${mapsQuery}`);
+  }
   if (c.media.length > 0) {
     lines.push(`- Imagenes principales:`);
     for (const m of c.media) {
@@ -259,7 +263,7 @@ ${POLICIES}${ZONA}${CONTACTO}`;
  * Get image URLs for a department from DB. Returns up to `max` images.
  * Returns null if department not found.
  */
-export async function getDepartmentImages(departamento: string, max = 3): Promise<string[] | null> {
+export async function getDepartmentImages(departamento: string, max = 6): Promise<string[] | null> {
   const complejos = await getActiveComplejos();
   const lower = departamento.toLowerCase();
   const depto = complejos.find(
