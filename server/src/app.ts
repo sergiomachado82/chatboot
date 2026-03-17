@@ -22,6 +22,7 @@ import complejosRouter from './routes/complejos.js';
 import whatsappProfileRouter from './routes/whatsappProfile.js';
 import botConfigRouter from './routes/botConfig.js';
 import icalRouter from './routes/ical.js';
+import webchatRouter from './routes/webchat.js';
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.use('/api', authRouter);
 app.use('/api', webhookRouter);
 app.use('/api', simulatorRouter);
 app.use('/api', icalRouter);
+app.use('/api', webchatRouter);
 
 // Protected routes - all behind auth + rate limit
 const protectedRouter = Router();

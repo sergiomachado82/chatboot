@@ -67,6 +67,12 @@ function extractImages(body: string): { text: string; imageUrls: string[] } {
 }
 
 async function sendText(to: string, body: string) {
+  // Web chat users: response is already saved to DB, no need to send via WhatsApp
+  if (to.startsWith('web_')) {
+    logger.debug({ to }, 'Web chat: skip WhatsApp send');
+    return;
+  }
+
   if (env.SIMULATOR_MODE) {
     logger.debug({ to, body }, 'Simulator: sending text');
     const io = getIO();
@@ -111,6 +117,11 @@ async function sendText(to: string, body: string) {
 }
 
 export async function sendImage(to: string, imageUrl: string, caption?: string) {
+  if (to.startsWith('web_')) {
+    logger.debug({ to }, 'Web chat: skip image send');
+    return;
+  }
+
   if (env.SIMULATOR_MODE) {
     logger.debug({ to, imageUrl }, 'Simulator: sending image');
     const io = getIO();
