@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { login } from '../../api/authApi';
+import { Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
+import { login, forgotPassword } from '../../api/authApi';
+import AuthLayout from './AuthLayout';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -10,6 +12,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,41 +39,130 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     }
   }
 
+  async function handleForgot(e: FormEvent) {
+    e.preventDefault();
+    setForgotError('');
+    setForgotMsg('');
+    setForgotLoading(true);
+    try {
+      const res = await forgotPassword(forgotEmail);
+      setForgotMsg(res.message);
+    } catch (err) {
+      setForgotError(err instanceof Error ? err.message : 'Error al enviar el email');
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">Panel de Agentes</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+    <AuthLayout>
+      <div className="relative overflow-hidden">
+        {/* Login form */}
+        <div
+          className={`transition-all duration-300 ease-in-out ${
+            showForgot
+              ? '-translate-x-full opacity-0 absolute inset-0 pointer-events-none'
+              : 'translate-x-0 opacity-100'
+          }`}
+        >
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="agente@email.com"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Password</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="Tu contraseña"
+                  required
+                />
+              </div>
+            </div>
+            {error && (
+              <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 font-medium shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
+            >
+              {loading ? 'Ingresando...' : (
+                <>Ingresar <ArrowRight size={16} /></>
+              )}
+            </button>
+          </form>
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium"
+            onClick={() => { setShowForgot(true); setForgotMsg(''); setForgotError(''); }}
+            className="mt-4 w-full text-sm text-gray-400 hover:text-blue-600 transition-colors"
           >
-            {loading ? 'Ingresando...' : 'Ingresar'}
+            Olvidé mi contraseña
           </button>
-        </form>
+        </div>
+
+        {/* Forgot password form */}
+        <div
+          className={`transition-all duration-300 ease-in-out ${
+            showForgot
+              ? 'translate-x-0 opacity-100'
+              : 'translate-x-full opacity-0 absolute inset-0 pointer-events-none'
+          }`}
+        >
+          <form onSubmit={handleForgot} className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Ingresá tu email y te enviaremos un enlace para restablecer tu contraseña.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="agente@email.com"
+                  required
+                />
+              </div>
+            </div>
+            {forgotMsg && (
+              <p className="text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">{forgotMsg}</p>
+            )}
+            {forgotError && (
+              <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{forgotError}</p>
+            )}
+            <button
+              type="submit"
+              disabled={forgotLoading}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 font-medium shadow-md shadow-blue-500/20 transition-all"
+            >
+              {forgotLoading ? 'Enviando...' : 'Enviar enlace'}
+            </button>
+          </form>
+          <button
+            onClick={() => setShowForgot(false)}
+            className="mt-4 w-full text-sm text-gray-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-1"
+          >
+            <ArrowLeft size={14} /> Volver al login
+          </button>
+        </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

@@ -12,6 +12,20 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return data;
 }
 
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPasswordApi(token: string, password: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 export function logout(): void {
   disconnectSocket();
   localStorage.removeItem('token');

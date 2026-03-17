@@ -23,15 +23,17 @@ model Huesped {
 }
 
 model Agente {
-  id            String         @id @default(cuid())
-  nombre        String
-  email         String         @unique
-  passwordHash  String         @map("password_hash")
-  rol           String         @default("agente")
-  activo        Boolean        @default(true)
-  online        Boolean        @default(false)
-  creadoEn      DateTime       @default(now()) @map("creado_en")
-  conversaciones Conversacion[]
+  id               String         @id @default(cuid())
+  nombre           String
+  email            String         @unique
+  passwordHash     String         @map("password_hash")
+  rol              String         @default("agente")
+  activo           Boolean        @default(true)
+  online           Boolean        @default(false)
+  resetToken       String?        @map("reset_token")
+  resetTokenExpiry DateTime?      @map("reset_token_expiry")
+  creadoEn         DateTime       @default(now()) @map("creado_en")
+  conversaciones   Conversacion[]
 
   @@map("agentes")
 }
@@ -84,14 +86,15 @@ model Reserva {
   montoReserva    Decimal?     @map("monto_reserva")
   saldo           Decimal?
   estado          String       @default("pre_reserva")
-  origenReserva   String?      @map("origen_reserva")
-  nroFactura      String?      @map("nro_factura")
-  importeUsd      Decimal?     @map("importe_usd")
-  notas           String?
-  creadoEn        DateTime     @default(now()) @map("creado_en")
-  actualizadoEn   DateTime     @updatedAt @map("actualizado_en")
-  huesped         Huesped?     @relation(fields: [huespedId], references: [id])
-  conversacion    Conversacion? @relation(fields: [conversacionId], references: [id])
+  origenReserva     String?      @map("origen_reserva")
+  nroFactura        String?      @map("nro_factura")
+  importeUsd        Decimal?     @map("importe_usd")
+  notas             String?
+  googleCalEventId  String?      @map("google_cal_event_id")
+  creadoEn          DateTime     @default(now()) @map("creado_en")
+  actualizadoEn     DateTime     @updatedAt @map("actualizado_en")
+  huesped           Huesped?     @relation(fields: [huespedId], references: [id])
+  conversacion      Conversacion? @relation(fields: [conversacionId], references: [id])
 
   @@map("reservas")
 }
@@ -140,7 +143,6 @@ model Complejo {
   fumar         Boolean     @default(false)
   fiestas       Boolean     @default(false)
   videoTour     String?     @map("video_tour")
-  icalUrl       String?     @map("ical_url")
   titularCuenta String?     @map("titular_cuenta")
   banco         String?
   cbu           String?
@@ -155,8 +157,24 @@ model Complejo {
   tarifasEspeciales TarifaEspecial[]
   media             MediaFile[]
   bloqueos          Bloqueo[]
+  icalFeeds         IcalFeed[]
 
   @@map("complejos")
+}
+
+model IcalFeed {
+  id          String    @id @default(cuid())
+  complejoId  String    @map("complejo_id")
+  plataforma  String
+  url         String
+  etiqueta    String?
+  activo      Boolean   @default(true)
+  ultimoSync  DateTime? @map("ultimo_sync")
+  creadoEn    DateTime  @default(now()) @map("creado_en")
+  complejo    Complejo  @relation(fields: [complejoId], references: [id], onDelete: Cascade)
+
+  @@unique([complejoId, url])
+  @@map("ical_feeds")
 }
 
 model Tarifa {
@@ -201,14 +219,16 @@ model MediaFile {
 }
 
 model Bloqueo {
-  id          String   @id @default(cuid())
-  complejoId  String   @map("complejo_id")
-  fechaInicio DateTime @map("fecha_inicio")
-  fechaFin    DateTime @map("fecha_fin")
-  motivo      String?
-  unidades    Int      @default(0)
-  creadoEn    DateTime @default(now()) @map("creado_en")
-  complejo    Complejo @relation(fields: [complejoId], references: [id], onDelete: Cascade)
+  id               String   @id @default(cuid())
+  complejoId       String   @map("complejo_id")
+  fechaInicio      DateTime @map("fecha_inicio")
+  fechaFin         DateTime @map("fecha_fin")
+  motivo           String?
+  unidades         Int      @default(0)
+  googleCalEventId String?  @map("google_cal_event_id")
+  origenGoogle     Boolean  @default(false) @map("origen_google")
+  creadoEn         DateTime @default(now()) @map("creado_en")
+  complejo         Complejo @relation(fields: [complejoId], references: [id], onDelete: Cascade)
 
   @@map("bloqueos")
 }
@@ -232,6 +252,7 @@ model BotConfig {
   horarioInicio       String?  @map("horario_inicio")
   horarioFin          String?  @map("horario_fin")
   telefonoContacto    String   @default("+54 2920 561033") @map("telefono_contacto")
+  logo                String?
   creadoEn            DateTime @default(now()) @map("creado_en")
   actualizadoEn       DateTime @updatedAt @map("actualizado_en")
 

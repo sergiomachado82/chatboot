@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { logger } from '../utils/logger.js';
 import { recalcDisponible, dateRange } from './inventarioService.js';
+import { pushReservaToGCal } from './googleCalendarService.js';
 
 // node-ical has no @types — lazy-load via dynamic import
 let icalModule: any = null;
@@ -31,6 +32,10 @@ function toLocalMidnight(d: Date): Date {
   return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /**
  * Generate an iCal VCALENDAR string for a complejo.
  * Includes active reservations and bloqueos as all-day VEVENTs.
@@ -57,7 +62,6 @@ export async function generateIcal(complejoId: string): Promise<string> {
     select: { id: true, fechaInicio: true, fechaFin: true, motivo: true, creadoEn: true },
   });
 
-  const now = new Date();
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -104,10 +108,10 @@ interface IcalEvent {
 }
 
 /**
- * Sync reservations from a Booking.com iCal feed for a complejo.
+ * Sync reservations from an iCal feed for a complejo.
  * Creates new reservas for unknown UIDs, updates changed dates, cancels removed ones.
  */
-export async function syncFromBookingIcal(complejoId: string, icalUrl: string): Promise<{
+export async function syncFromIcalFeed(complejoId: string, icalUrl: string, plataforma: string): Promise<{
   created: number;
   updated: number;
   cancelled: number;
@@ -124,7 +128,7 @@ export async function syncFromBookingIcal(complejoId: string, icalUrl: string): 
     const ical = await getIcal();
     data = await ical.async.fromURL(icalUrl);
   } catch (err) {
-    logger.error({ err, complejoId, icalUrl }, 'Failed to fetch iCal feed');
+    logger.error({ err, complejoId, icalUrl, plataforma }, 'Failed to fetch iCal feed');
     throw err;
   }
 
@@ -147,19 +151,19 @@ export async function syncFromBookingIcal(complejoId: string, icalUrl: string): 
 
   const feedUids = new Set(feedEvents.map((e) => e.uid));
 
-  // Get existing booking reservas for this complejo
-  const existingBooking = await prisma.reserva.findMany({
+  // Get existing reservas for this complejo from this platform
+  const existingReservas = await prisma.reserva.findMany({
     where: {
       habitacion: complejo.nombre,
-      origenReserva: 'booking',
+      origenReserva: plataforma,
       estado: { notIn: ['cancelada', 'cancelado'] },
     },
     select: { id: true, notas: true, fechaEntrada: true, fechaSalida: true },
   });
 
   // Build map: uid -> existing reserva
-  const uidToReserva = new Map<string, typeof existingBooking[0]>();
-  for (const r of existingBooking) {
+  const uidToReserva = new Map<string, typeof existingReservas[0]>();
+  for (const r of existingReservas) {
     if (r.notas) {
       // notas stores the UID like "ical-uid:abc123"
       const match = r.notas.match(/^ical-uid:(.+)$/);
@@ -181,19 +185,24 @@ export async function syncFromBookingIcal(complejoId: string, icalUrl: string): 
 
     if (!existing) {
       // Create new reserva
-      await prisma.reserva.create({
+      const newReserva = await prisma.reserva.create({
         data: {
-          nombreHuesped: 'Reserva Booking',
+          nombreHuesped: `Reserva ${capitalize(plataforma)}`,
           habitacion: complejo.nombre,
           fechaEntrada,
           fechaSalida,
           estado: 'confirmada',
-          origenReserva: 'booking',
+          origenReserva: plataforma,
           notas: `ical-uid:${evt.uid}`,
         },
       });
       affectedDates.push(...dateRange(fechaEntrada, fechaSalida));
       created++;
+
+      // Push to Google Calendar (fire-and-forget)
+      pushReservaToGCal(newReserva.id).catch((err) =>
+        logger.error({ err, reservaId: newReserva.id }, 'GCal push failed for iCal-imported reserva')
+      );
     } else {
       // Check if dates changed
       const existStart = toLocalMidnight(existing.fechaEntrada);
@@ -214,7 +223,7 @@ export async function syncFromBookingIcal(complejoId: string, icalUrl: string): 
     }
   }
 
-  // Cancel reservas whose UID is no longer in the feed (guest cancelled on Booking)
+  // Cancel reservas whose UID is no longer in the feed (guest cancelled)
   for (const [uid, reserva] of uidToReserva) {
     if (!feedUids.has(uid)) {
       await prisma.reserva.update({
@@ -236,7 +245,7 @@ export async function syncFromBookingIcal(complejoId: string, icalUrl: string): 
   }
 
   logger.info(
-    { complejoId, complejo: complejo.nombre, created, updated, cancelled },
+    { complejoId, complejo: complejo.nombre, plataforma, created, updated, cancelled },
     'iCal sync completed',
   );
 

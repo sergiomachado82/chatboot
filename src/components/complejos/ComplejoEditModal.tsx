@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { createComplejo, updateComplejo, deleteComplejo } from '../../api/complejoApi';
-import { X, Plus, Trash2 } from 'lucide-react';
-import type { Complejo, CrearComplejoRequest } from '@shared/types/complejo';
+import { createComplejo, updateComplejo, deleteComplejo, createIcalFeed, deleteIcalFeed } from '../../api/complejoApi';
+import { X, Plus, Trash2, Copy, Check } from 'lucide-react';
+import type { Complejo, CrearComplejoRequest, IcalFeed } from '@shared/types/complejo';
 import TarifaSection from './TarifaSection';
 import MediaGallery from './MediaGallery';
 import { useModalKeyboard } from '../../hooks/useModalKeyboard';
 
-type Tab = 'datos' | 'amenities' | 'politicas' | 'tarifas' | 'media' | 'reserva';
+type Tab = 'datos' | 'amenities' | 'politicas' | 'tarifas' | 'media' | 'reserva' | 'sync';
 
 interface ComplejoEditModalProps {
   complejo: Complejo | null; // null = creating new
@@ -37,7 +37,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
     checkOut: '10:00',
     estadiaMinima: 0,
     videoTour: '',
-    icalUrl: '',
     mascotas: false,
     ninos: true,
     fumar: false,
@@ -53,6 +52,13 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
 
   const [newAmenity, setNewAmenity] = useState('');
   const [amenities, setAmenities] = useState<string[]>([]);
+
+  // iCal feeds state
+  const [feeds, setFeeds] = useState<IcalFeed[]>([]);
+  const [newFeedPlataforma, setNewFeedPlataforma] = useState('booking');
+  const [newFeedUrl, setNewFeedUrl] = useState('');
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (complejo) {
@@ -71,7 +77,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
         checkOut: complejo.checkOut ?? '10:00',
         estadiaMinima: complejo.estadiaMinima ?? 0,
         videoTour: complejo.videoTour ?? '',
-        icalUrl: complejo.icalUrl ?? '',
         mascotas: complejo.mascotas,
         ninos: complejo.ninos,
         fumar: complejo.fumar,
@@ -88,6 +93,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
       initialFormRef.current = JSON.stringify(newForm);
       setAmenities(complejo.amenities);
       initialAmenitiesRef.current = JSON.stringify(complejo.amenities);
+      setFeeds(complejo.icalFeeds ?? []);
     } else {
       initialFormRef.current = JSON.stringify(form);
       initialAmenitiesRef.current = JSON.stringify(amenities);
@@ -126,7 +132,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
         fumar: form.fumar,
         fiestas: form.fiestas,
         videoTour: form.videoTour || undefined,
-        icalUrl: form.icalUrl || undefined,
         titularCuenta: form.titularCuenta || undefined,
         banco: form.banco || undefined,
         cbu: form.cbu || undefined,
@@ -167,6 +172,43 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
     }
   }
 
+  async function handleAddFeed() {
+    if (!complejo || !newFeedUrl.trim()) return;
+    setFeedLoading(true);
+    try {
+      const feed = await createIcalFeed(complejo.id, {
+        plataforma: newFeedPlataforma,
+        url: newFeedUrl.trim(),
+      });
+      setFeeds([...feeds, feed]);
+      setNewFeedUrl('');
+      queryClient.invalidateQueries({ queryKey: ['complejos'] });
+    } catch (err: any) {
+      toast.error(err.message || 'Error al agregar feed');
+    } finally {
+      setFeedLoading(false);
+    }
+  }
+
+  async function handleDeleteFeed(feedId: string) {
+    if (!complejo) return;
+    try {
+      await deleteIcalFeed(complejo.id, feedId);
+      setFeeds(feeds.filter((f) => f.id !== feedId));
+      queryClient.invalidateQueries({ queryKey: ['complejos'] });
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar feed');
+    }
+  }
+
+  function handleCopyIcalUrl() {
+    if (!complejo) return;
+    const url = `${window.location.origin}/api/ical/${complejo.id}.ics`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'datos', label: 'Datos' },
     { key: 'amenities', label: 'Amenities' },
@@ -174,6 +216,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
     { key: 'tarifas', label: 'Tarifas' },
     { key: 'reserva', label: 'Datos Reserva' },
     { key: 'media', label: 'Multimedia' },
+    { key: 'sync', label: 'Sync' },
   ];
 
   return (
@@ -325,15 +368,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
                   value={form.videoTour}
                   onChange={(e) => setForm({ ...form, videoTour: e.target.value })}
                   placeholder="https://youtube.com/..."
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Sincronizar Reservas - URL iCal Booking</label>
-                <input
-                  value={form.icalUrl}
-                  onChange={(e) => setForm({ ...form, icalUrl: e.target.value })}
-                  placeholder="https://admin.booking.com/hotel/hoteladmin/ical.html?t=..."
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1.5"
                 />
               </div>
@@ -511,6 +545,94 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
           )}
           {tab === 'media' && isNew && (
             <p className="text-sm text-gray-400">Guarda el departamento primero para agregar multimedia.</p>
+          )}
+
+          {tab === 'sync' && !isNew && (
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Feeds iCal (importar reservas)</h4>
+                <p className="text-xs text-gray-500 mb-3">Agrega URLs de iCal de Booking, Airbnb, VRBO u otras plataformas para importar reservas automaticamente.</p>
+
+                {/* Existing feeds */}
+                {feeds.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {feeds.map((feed) => (
+                      <div key={feed.id} className="flex items-center gap-2 bg-gray-50 rounded px-3 py-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                          {feed.plataforma}
+                        </span>
+                        <span className="flex-1 text-xs text-gray-600 truncate" title={feed.url}>
+                          {feed.url}
+                        </span>
+                        {feed.ultimoSync && (
+                          <span className="text-xs text-gray-400" title={`Ultimo sync: ${new Date(feed.ultimoSync).toLocaleString()}`}>
+                            {new Date(feed.ultimoSync).toLocaleDateString()}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleDeleteFeed(feed.id)}
+                          className="text-gray-400 hover:text-red-500"
+                          title="Eliminar feed"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new feed */}
+                <div className="flex gap-2">
+                  <select
+                    value={newFeedPlataforma}
+                    onChange={(e) => setNewFeedPlataforma(e.target.value)}
+                    className="text-sm border border-gray-300 rounded px-2 py-1.5"
+                  >
+                    <option value="booking">Booking</option>
+                    <option value="airbnb">Airbnb</option>
+                    <option value="vrbo">VRBO</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                  <input
+                    value={newFeedUrl}
+                    onChange={(e) => setNewFeedUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddFeed()}
+                    placeholder="https://..."
+                    className="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5"
+                  />
+                  <button
+                    onClick={handleAddFeed}
+                    disabled={!newFeedUrl.trim() || feedLoading}
+                    className="flex items-center gap-1 text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Plus size={14} />
+                    Agregar
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Exportar iCal</h4>
+                <p className="text-xs text-gray-500 mb-2">Usa esta URL para exportar las reservas de este complejo a otras plataformas.</p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={`${window.location.origin}/api/ical/${complejo.id}.ics`}
+                    className="flex-1 text-xs bg-gray-50 border border-gray-300 rounded px-2 py-1.5 text-gray-600"
+                  />
+                  <button
+                    onClick={handleCopyIcalUrl}
+                    className="flex items-center gap-1 text-sm px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100"
+                  >
+                    {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                    {copied ? 'Copiado' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {tab === 'sync' && isNew && (
+            <p className="text-sm text-gray-400">Guarda el departamento primero para configurar sincronizacion.</p>
           )}
         </div>
 

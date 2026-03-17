@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Save, AlertTriangle, Info } from 'lucide-react';
-import { getBotConfig, updateBotConfig } from '../../api/botConfigApi';
+import { Save, AlertTriangle, Info, Upload, Trash2, Building2 } from 'lucide-react';
+import { getBotConfig, updateBotConfig, uploadLogo, deleteLogo } from '../../api/botConfigApi';
 import type { BotConfigUpdate } from '../../api/botConfigApi';
 
 export default function BotConfigPage() {
@@ -29,6 +29,8 @@ export default function BotConfigPage() {
   const [horarioInicio, setHorarioInicio] = useState('');
   const [horarioFin, setHorarioFin] = useState('');
   const [telefonoContacto, setTelefonoContacto] = useState('');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (config) {
@@ -49,6 +51,7 @@ export default function BotConfigPage() {
       setHorarioInicio(config.horarioInicio ?? '');
       setHorarioFin(config.horarioFin ?? '');
       setTelefonoContacto(config.telefonoContacto);
+      setLogoPreview((config as Record<string, unknown>).logo as string | null);
     }
   }, [config]);
 
@@ -62,6 +65,49 @@ export default function BotConfigPage() {
       toast.error(err.message || 'Error al actualizar la configuracion');
     },
   });
+
+  const logoUploadMutation = useMutation({
+    mutationFn: (base64: string) => uploadLogo(base64),
+    onSuccess: () => {
+      toast.success('Logo actualizado');
+      queryClient.invalidateQueries({ queryKey: ['bot-config'] });
+    },
+    onError: (err: Error) => toast.error(err.message || 'Error al subir el logo'),
+  });
+
+  const logoDeleteMutation = useMutation({
+    mutationFn: () => deleteLogo(),
+    onSuccess: () => {
+      toast.success('Logo eliminado');
+      setLogoPreview(null);
+      queryClient.invalidateQueries({ queryKey: ['bot-config'] });
+    },
+    onError: (err: Error) => toast.error(err.message || 'Error al eliminar el logo'),
+  });
+
+  function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten archivos de imagen');
+      return;
+    }
+    if (file.size > 500 * 1024) {
+      toast.error('El archivo es demasiado grande (max 500KB)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setLogoPreview(base64);
+      logoUploadMutation.mutate(base64);
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }
 
   function handleSave() {
     mutation.mutate({
@@ -109,6 +155,52 @@ export default function BotConfigPage() {
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-2xl mx-auto space-y-6">
         <h2 className="text-lg font-bold text-gray-800">Configuracion del Agente IA</h2>
+
+        {/* Section 0: Logo */}
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Logo del panel</h3>
+          <p className="text-xs text-gray-500">Se muestra en la pantalla de login y recuperacion de contraseña. Max 500KB, formato PNG/JPG/SVG.</p>
+
+          <div className="flex items-center gap-5">
+            {/* Preview */}
+            <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden flex-shrink-0">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo" className="h-full w-full object-contain p-1" />
+              ) : (
+                <Building2 className="text-gray-300" size={32} />
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                onChange={handleLogoSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={logoUploadMutation.isPending}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Upload size={14} />
+                {logoUploadMutation.isPending ? 'Subiendo...' : 'Subir logo'}
+              </button>
+              {logoPreview && (
+                <button
+                  onClick={() => logoDeleteMutation.mutate()}
+                  disabled={logoDeleteMutation.isPending}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-red-300 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                  {logoDeleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Section 1: Identity */}
         <div className="bg-white rounded-lg shadow p-6 space-y-5">

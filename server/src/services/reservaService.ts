@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { recalcDisponible, dateRange } from './inventarioService.js';
 import { syncReservaToSheet } from './sheetsService.js';
+import { pushReservaToGCal } from './googleCalendarService.js';
 import { logger } from '../utils/logger.js';
 import type { ReservaEstado } from '@shared/types/reserva.js';
 
@@ -93,6 +94,11 @@ export async function createReserva(params: CreateReservaParams) {
     creadoEn: reserva.creadoEn.toISOString(),
   }).catch((err) => logger.error({ err }, 'Sheets sync failed on create'));
 
+  // Sync to Google Calendar (fire-and-forget)
+  pushReservaToGCal(reserva.id).catch((err) =>
+    logger.error({ err }, 'GCal push failed on create')
+  );
+
   return serializeReserva(reserva);
 }
 
@@ -181,6 +187,11 @@ export async function updateReserva(id: string, params: UpdateReservaParams) {
     include: includeHuesped,
   });
 
+  // Sync to Google Calendar (fire-and-forget)
+  pushReservaToGCal(id).catch((err) =>
+    logger.error({ err }, 'GCal push failed on update')
+  );
+
   return serializeReserva(reserva);
 }
 
@@ -219,6 +230,11 @@ export async function updateReservaEstado(id: string, estado: ReservaEstado) {
     notas: updated.notas ?? '',
     creadoEn: updated.creadoEn.toISOString(),
   }).catch((err) => logger.error({ err }, 'Sheets sync failed on update'));
+
+  // Sync to Google Calendar (fire-and-forget)
+  pushReservaToGCal(updated.id).catch((err) =>
+    logger.error({ err }, 'GCal push failed on estado update')
+  );
 
   return serializeReserva(updated);
 }

@@ -4,6 +4,7 @@ import type {
   TarifaEspecial,
   Bloqueo,
   MediaFile,
+  IcalFeed,
   CrearComplejoRequest,
   UpdateComplejoRequest,
   UpsertTarifaRequest,
@@ -11,6 +12,7 @@ import type {
   UpdateTarifaEspecialRequest,
   CrearBloqueoRequest,
   AddMediaRequest,
+  CrearIcalFeedRequest,
 } from '@shared/types/complejo';
 import { apiFetch } from './apiClient';
 
@@ -98,4 +100,16 @@ export async function createBloqueoApi(complejoId: string, data: CrearBloqueoReq
 
 export async function deleteBloqueoApi(complejoId: string, bloqueoId: string): Promise<void> {
   await apiFetch(`/complejos/${complejoId}/bloqueos/${bloqueoId}`, { method: 'DELETE' });
+}
+
+// iCal Feeds
+export async function createIcalFeed(complejoId: string, data: CrearIcalFeedRequest): Promise<IcalFeed> {
+  return apiFetch<IcalFeed>(`/complejos/${complejoId}/ical-feeds`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteIcalFeed(complejoId: string, feedId: string): Promise<void> {
+  await apiFetch(`/complejos/${complejoId}/ical-feeds/${feedId}`, { method: 'DELETE' });
 }

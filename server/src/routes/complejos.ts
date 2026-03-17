@@ -24,6 +24,7 @@ import {
 } from '../services/inventarioSyncService.js';
 import { recalcDisponible, dateRange } from '../services/inventarioService.js';
 import { prisma } from '../lib/prisma.js';
+import { pushBloqueoToGCal, deleteBloqueoFromGCal } from '../services/googleCalendarService.js';
 
 const router = Router();
 
@@ -64,7 +65,6 @@ const createSchema = z.object({
   fumar: z.boolean().optional(),
   fiestas: z.boolean().optional(),
   videoTour: z.string().optional(),
-  icalUrl: z.string().url().optional(),
   titularCuenta: z.string().optional(),
   banco: z.string().optional(),
   cbu: z.string().optional(),
@@ -266,6 +266,11 @@ router.post('/complejos/:id/bloqueos', async (req, res) => {
     await recalcDisponible(complejo.nombre, dates);
   }
 
+  // Push to Google Calendar (fire-and-forget)
+  pushBloqueoToGCal(bloqueo.id).catch((err) =>
+    console.error('GCal push failed for bloqueo', err)
+  );
+
   res.status(201).json(bloqueo);
 });
 
@@ -279,12 +284,69 @@ router.delete('/complejos/:id/bloqueos/:bloqueoId', async (req, res) => {
 
     const bloqueo = await deleteBloqueo(req.params.bloqueoId);
 
+    // Delete from Google Calendar if it was synced
+    if (bloqueo.googleCalEventId) {
+      deleteBloqueoFromGCal(bloqueo.googleCalEventId).catch((err) =>
+        console.error('GCal delete failed for bloqueo', err)
+      );
+    }
+
     // Recalc inventory availability (handles multi-unit correctly)
     const dates = dateRange(new Date(bloqueo.fechaInicio), new Date(bloqueo.fechaFin));
     if (dates.length > 0) {
       await recalcDisponible(complejo.nombre, dates, bloqueo.id);
     }
 
+    res.json({ ok: true });
+  } catch {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
+
+// ICAL FEEDS
+const icalFeedSchema = z.object({
+  plataforma: z.enum(['booking', 'airbnb', 'vrbo', 'otro']),
+  url: z.string().url(),
+  etiqueta: z.string().optional(),
+});
+
+router.get('/complejos/:id/ical-feeds', async (req, res) => {
+  const feeds = await prisma.icalFeed.findMany({
+    where: { complejoId: req.params.id },
+    orderBy: { creadoEn: 'asc' },
+  });
+  res.json(feeds);
+});
+
+router.post('/complejos/:id/ical-feeds', async (req, res) => {
+  const parsed = icalFeedSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  try {
+    const feed = await prisma.icalFeed.create({
+      data: {
+        complejoId: req.params.id,
+        plataforma: parsed.data.plataforma,
+        url: parsed.data.url,
+        etiqueta: parsed.data.etiqueta ?? null,
+      },
+    });
+    res.status(201).json(feed);
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      res.status(409).json({ error: 'Esta URL ya existe para este complejo' });
+      return;
+    }
+    throw err;
+  }
+});
+
+router.delete('/complejos/:id/ical-feeds/:feedId', async (req, res) => {
+  try {
+    await prisma.icalFeed.delete({ where: { id: req.params.feedId } });
     res.json({ ok: true });
   } catch {
     res.status(404).json({ error: 'Not found' });

@@ -33,3 +33,22 @@ export function updateBotConfig(data: BotConfigUpdate) {
     body: JSON.stringify(data),
   });
 }
+
+export async function getPublicLogo(): Promise<string | null> {
+  const res = await fetch('/api/public/logo');
+  const data = await res.json();
+  return data.logo ?? null;
+}
+
+export function uploadLogo(logo: string) {
+  return apiFetch<{ message: string }>('/bot/logo', {
+    method: 'POST',
+    body: JSON.stringify({ logo }),
+  });
+}
+
+export function deleteLogo() {
+  return apiFetch<{ message: string }>('/bot/logo', {
+    method: 'DELETE',
+  });
+}

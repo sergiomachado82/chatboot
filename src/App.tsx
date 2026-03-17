@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { isAuthenticated } from './api/authApi';
 import LoginPage from './components/auth/LoginPage';
+import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import Header from './components/layout/Header';
 import ChatList from './components/chat/ChatList';
 import ChatWindow from './components/chat/ChatWindow';
@@ -19,6 +20,21 @@ export default function App() {
   const [authed, setAuthed] = useState(isAuthenticated());
   const [view, setView] = useState<View>('chat');
   const [selectedConv, setSelectedConv] = useState<Conversacion | null>(null);
+
+  // Handle /reset-password?token=xxx route
+  const urlParams = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get('token');
+  if (window.location.pathname === '/reset-password' && resetToken) {
+    return (
+      <ResetPasswordPage
+        token={resetToken}
+        onBack={() => {
+          window.history.pushState({}, '', '/');
+          window.location.reload();
+        }}
+      />
+    );
+  }
 
   if (!authed) {
     return <LoginPage onLogin={() => setAuthed(true)} />;

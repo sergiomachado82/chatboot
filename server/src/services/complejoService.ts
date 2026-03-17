@@ -6,6 +6,7 @@ const includeRelations = {
   tarifasEspeciales: { orderBy: { fechaInicio: 'asc' as const } },
   media: { orderBy: { orden: 'asc' as const } },
   bloqueos: { orderBy: { fechaInicio: 'asc' as const } },
+  icalFeeds: { orderBy: { creadoEn: 'asc' as const } },
 };
 
 function serializeComplejo(c: any) {
@@ -58,7 +59,6 @@ export async function createComplejo(data: {
   fumar?: boolean;
   fiestas?: boolean;
   videoTour?: string;
-  icalUrl?: string;
   titularCuenta?: string;
   banco?: string;
   cbu?: string;
@@ -87,7 +87,6 @@ export async function createComplejo(data: {
       fumar: data.fumar ?? false,
       fiestas: data.fiestas ?? false,
       videoTour: data.videoTour,
-      icalUrl: data.icalUrl,
       titularCuenta: data.titularCuenta,
       banco: data.banco,
       cbu: data.cbu,
@@ -123,7 +122,6 @@ export async function updateComplejo(
     fumar?: boolean;
     fiestas?: boolean;
     videoTour?: string;
-    icalUrl?: string;
     titularCuenta?: string;
     banco?: string;
     cbu?: string;

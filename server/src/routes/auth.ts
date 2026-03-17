@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { verifyCredentials, generateToken } from '../services/authService.js';
+import { verifyCredentials, generateToken, generateResetToken, resetPassword } from '../services/authService.js';
+import { sendResetEmail } from '../services/emailService.js';
+import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { z } from 'zod';
 
@@ -28,6 +30,65 @@ router.post('/auth/login', async (req, res) => {
 
   const token = generateToken({ id: agente.id, email: agente.email, rol: agente.rol });
   res.json({ token, agente });
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+router.post('/auth/forgot-password', async (req, res) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation error', message: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const { email } = parsed.data;
+
+  try {
+    const token = await generateResetToken(email);
+
+    // Always return success to avoid leaking whether the email exists
+    if (token) {
+      const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+      await sendResetEmail(email, resetUrl);
+      logger.info({ email }, 'Password reset email sent');
+    }
+
+    res.json({ message: 'Si el email existe, recibirás un enlace para restablecer tu contraseña.' });
+  } catch (err) {
+    logger.error({ err, email }, 'Error sending reset email');
+    res.status(500).json({ error: 'Server error', message: 'No se pudo enviar el email. Intenta más tarde.' });
+  }
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+});
+
+router.post('/auth/reset-password', async (req, res) => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation error', message: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const { token, password } = parsed.data;
+
+  try {
+    const success = await resetPassword(token, password);
+
+    if (!success) {
+      res.status(400).json({ error: 'Invalid token', message: 'El enlace es inválido o ha expirado.' });
+      return;
+    }
+
+    res.json({ message: 'Contraseña actualizada correctamente.' });
+  } catch (err) {
+    logger.error({ err }, 'Error resetting password');
+    res.status(500).json({ error: 'Server error', message: 'Error al restablecer la contraseña.' });
+  }
 });
 
 export default router;

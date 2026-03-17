@@ -1,3 +1,14 @@
+export interface IcalFeed {
+  id: string;
+  complejoId: string;
+  plataforma: string;
+  url: string;
+  etiqueta: string | null;
+  activo: boolean;
+  ultimoSync: string | null;
+  creadoEn: string;
+}
+
 export interface Complejo {
   id: string;
   nombre: string;
@@ -19,7 +30,6 @@ export interface Complejo {
   fumar: boolean;
   fiestas: boolean;
   videoTour: string | null;
-  icalUrl: string | null;
   titularCuenta: string | null;
   banco: string | null;
   cbu: string | null;
@@ -34,6 +44,7 @@ export interface Complejo {
   tarifasEspeciales: TarifaEspecial[];
   media: MediaFile[];
   bloqueos: Bloqueo[];
+  icalFeeds: IcalFeed[];
 }
 
 export interface Tarifa {
@@ -118,7 +129,6 @@ export interface CrearComplejoRequest {
   fumar?: boolean;
   fiestas?: boolean;
   videoTour?: string;
-  icalUrl?: string;
   titularCuenta?: string;
   banco?: string;
   cbu?: string;
@@ -141,4 +151,10 @@ export interface AddMediaRequest {
   tipo?: string;
   caption?: string;
   orden?: number;
+}
+
+export interface CrearIcalFeedRequest {
+  plataforma: string;
+  url: string;
+  etiqueta?: string;
 }

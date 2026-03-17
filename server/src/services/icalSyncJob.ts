@@ -1,35 +1,40 @@
 import { prisma } from '../lib/prisma.js';
 import { logger } from '../utils/logger.js';
-import { syncFromBookingIcal } from './icalService.js';
+import { syncFromIcalFeed } from './icalService.js';
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000; // Every 30 minutes
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 /**
- * Iterate all complejos with an icalUrl configured and sync each one.
+ * Iterate all active iCal feeds and sync each one.
  */
 async function runSync(): Promise<void> {
-  const complejos = await prisma.complejo.findMany({
-    where: { icalUrl: { not: null }, activo: true },
-    select: { id: true, nombre: true, icalUrl: true },
+  const feeds = await prisma.icalFeed.findMany({
+    where: { activo: true, complejo: { activo: true } },
+    select: { id: true, complejoId: true, url: true, plataforma: true, complejo: { select: { nombre: true } } },
   });
 
-  if (complejos.length === 0) return;
+  if (feeds.length === 0) return;
 
-  logger.info({ count: complejos.length }, 'Starting iCal sync cycle');
+  logger.info({ count: feeds.length }, 'Starting iCal sync cycle');
 
-  for (const c of complejos) {
+  for (const feed of feeds) {
     try {
-      const result = await syncFromBookingIcal(c.id, c.icalUrl!);
+      const result = await syncFromIcalFeed(feed.complejoId, feed.url, feed.plataforma);
       if (result.created || result.updated || result.cancelled) {
         logger.info(
-          { complejo: c.nombre, ...result },
+          { complejo: feed.complejo.nombre, plataforma: feed.plataforma, ...result },
           'iCal sync changes applied',
         );
       }
+      // Update ultimoSync timestamp
+      await prisma.icalFeed.update({
+        where: { id: feed.id },
+        data: { ultimoSync: new Date() },
+      });
     } catch (err) {
-      logger.error({ err, complejo: c.nombre }, 'iCal sync failed for complejo');
+      logger.error({ err, complejo: feed.complejo.nombre, plataforma: feed.plataforma }, 'iCal sync failed for feed');
     }
   }
 }

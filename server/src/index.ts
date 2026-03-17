@@ -7,6 +7,7 @@ import { initRedis, closeRedis } from './lib/redis.js';
 import { initSocketIO } from './services/socketManager.js';
 import { startCleanupJob, stopCleanupJob } from './services/conversacionCleanup.js';
 import { startIcalSyncJob, stopIcalSyncJob } from './services/icalSyncJob.js';
+import { startGCalSyncJob, stopGCalSyncJob } from './services/gcalSyncJob.js';
 
 const server = http.createServer(app);
 
@@ -19,6 +20,7 @@ async function start() {
   initSocketIO(server);
   startCleanupJob();
   startIcalSyncJob();
+  startGCalSyncJob();
 
   server.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} (${env.NODE_ENV})`);
@@ -33,6 +35,7 @@ async function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down gracefully...`);
   stopCleanupJob();
   stopIcalSyncJob();
+  stopGCalSyncJob();
 
   // Stop accepting new connections, wait for in-flight requests
   server.close(async () => {

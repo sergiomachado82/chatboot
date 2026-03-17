@@ -31,9 +31,14 @@ const envSchema = z.object({
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().default(''),
   GOOGLE_PRIVATE_KEY: z.string().default(''),
   GOOGLE_SHEET_ID: z.string().default(''),
+  GOOGLE_CALENDAR_ID: z.string().default(''),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
+
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
 
   ALLOWED_ORIGINS: z.string().default('*'),
 

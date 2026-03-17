@@ -40,6 +40,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({
+  limit: '1mb',
   verify: (req, _res, buf) => {
     // Store raw body for webhook signature verification
     (req as Record<string, unknown>).rawBody = buf;
@@ -47,6 +48,17 @@ app.use(express.json({
 }));
 app.use(requestId);
 app.use(requestLogger);
+
+// Public logo endpoint (needs to be accessible from login page)
+app.get('/api/public/logo', async (_req, res) => {
+  try {
+    const { getBotConfig } = await import('./services/botConfigService.js');
+    const config = await getBotConfig();
+    res.json({ logo: config.logo ?? null });
+  } catch {
+    res.json({ logo: null });
+  }
+});
 
 // Public routes
 app.use('/api', healthRouter);
