@@ -19,6 +19,7 @@ export interface BotConfig {
   horarioInicio: string | null;
   horarioFin: string | null;
   telefonoContacto: string;
+  titularesVerificados: string[];
 }
 
 export type BotConfigUpdate = Partial<Omit<BotConfig, 'id'>>;

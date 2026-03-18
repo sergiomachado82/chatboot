@@ -263,7 +263,7 @@ ${POLICIES}${ZONA}${CONTACTO}`;
  * Get image URLs for a department from DB. Returns up to `max` images.
  * Returns null if department not found.
  */
-export async function getDepartmentImages(departamento: string, max = 6): Promise<string[] | null> {
+export async function getDepartmentImages(departamento: string, max = 6): Promise<{ url: string; caption: string | null }[] | null> {
   const complejos = await getActiveComplejos();
   const lower = departamento.toLowerCase();
   const depto = complejos.find(
@@ -271,5 +271,5 @@ export async function getDepartmentImages(departamento: string, max = 6): Promis
   );
 
   if (!depto || depto.media.length === 0) return null;
-  return depto.media.slice(0, max).map((m) => m.url);
+  return depto.media.slice(0, max).map((m) => ({ url: m.url, caption: m.caption }));
 }

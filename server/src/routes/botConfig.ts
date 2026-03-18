@@ -24,6 +24,7 @@ const updateSchema = z.object({
   horarioInicio: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   horarioFin: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   telefonoContacto: z.string().min(1).max(50).optional(),
+  titularesVerificados: z.array(z.string().min(1).max(200)).max(20).optional(),
 });
 
 router.get('/bot/config', async (_req, res) => {

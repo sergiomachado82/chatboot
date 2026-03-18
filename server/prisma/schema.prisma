@@ -52,6 +52,7 @@ model Conversacion {
   mensajes        Mensaje[]
   reservas        Reserva[]
 
+  @@index([estado])
   @@map("conversaciones")
 }
 
@@ -96,6 +97,8 @@ model Reserva {
   huesped           Huesped?     @relation(fields: [huespedId], references: [id])
   conversacion      Conversacion? @relation(fields: [conversacionId], references: [id])
 
+  @@index([habitacion, estado])
+  @@index([fechaEntrada, fechaSalida])
   @@map("reservas")
 }
 
@@ -230,6 +233,7 @@ model Bloqueo {
   creadoEn         DateTime @default(now()) @map("creado_en")
   complejo         Complejo @relation(fields: [complejoId], references: [id], onDelete: Cascade)
 
+  @@index([complejoId, fechaInicio, fechaFin])
   @@map("bloqueos")
 }
 
@@ -252,6 +256,7 @@ model BotConfig {
   horarioInicio       String?  @map("horario_inicio")
   horarioFin          String?  @map("horario_fin")
   telefonoContacto    String   @default("+54 2920 561033") @map("telefono_contacto")
+  titularesVerificados String[] @default([]) @map("titulares_verificados")
   logo                String?
   creadoEn            DateTime @default(now()) @map("creado_en")
   actualizadoEn       DateTime @updatedAt @map("actualizado_en")

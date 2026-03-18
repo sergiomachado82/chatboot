@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Save, AlertTriangle, Info, Upload, Trash2, Building2 } from 'lucide-react';
+import { Save, AlertTriangle, Info, Upload, Trash2, Building2, Plus, X } from 'lucide-react';
 import { getBotConfig, updateBotConfig, uploadLogo, deleteLogo } from '../../api/botConfigApi';
 import type { BotConfigUpdate } from '../../api/botConfigApi';
 
@@ -29,6 +29,8 @@ export default function BotConfigPage() {
   const [horarioInicio, setHorarioInicio] = useState('');
   const [horarioFin, setHorarioFin] = useState('');
   const [telefonoContacto, setTelefonoContacto] = useState('');
+  const [titularesVerificados, setTitularesVerificados] = useState<string[]>([]);
+  const [nuevoTitular, setNuevoTitular] = useState('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +53,7 @@ export default function BotConfigPage() {
       setHorarioInicio(config.horarioInicio ?? '');
       setHorarioFin(config.horarioFin ?? '');
       setTelefonoContacto(config.telefonoContacto);
+      setTitularesVerificados(config.titularesVerificados ?? []);
       setLogoPreview((config as Record<string, unknown>).logo as string | null);
     }
   }, [config]);
@@ -128,6 +131,7 @@ export default function BotConfigPage() {
       horarioInicio: horarioInicio || null,
       horarioFin: horarioFin || null,
       telefonoContacto,
+      titularesVerificados,
     });
   }
 
@@ -320,6 +324,57 @@ export default function BotConfigPage() {
               <p className="text-xs text-gray-500">Derivar cuando hay problemas con datos bancarios</p>
             </div>
             <Toggle checked={escalarSiPago} onChange={setEscalarSiPago} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Titulares de cuenta verificados</label>
+            <p className="text-xs text-gray-500 mb-2">
+              Nombres de titulares bancarios autorizados. Si un departamento tiene datos bancarios con un titular que no esta en esta lista, el bot NO mostrara los datos y escalara a un agente.
+            </p>
+            <div className="space-y-2">
+              {titularesVerificados.map((t, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">{t}</span>
+                  <button
+                    type="button"
+                    onClick={() => setTitularesVerificados(prev => prev.filter((_, idx) => idx !== i))}
+                    className="p-1 text-red-400 hover:text-red-600"
+                    title="Eliminar"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={nuevoTitular}
+                  onChange={(e) => setNuevoTitular(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && nuevoTitular.trim()) {
+                      e.preventDefault();
+                      setTitularesVerificados(prev => [...prev, nuevoTitular.trim()]);
+                      setNuevoTitular('');
+                    }
+                  }}
+                  placeholder="Nombre del titular..."
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (nuevoTitular.trim()) {
+                      setTitularesVerificados(prev => [...prev, nuevoTitular.trim()]);
+                      setNuevoTitular('');
+                    }
+                  }}
+                  className="p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  title="Agregar"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
           </div>
 
           <div>

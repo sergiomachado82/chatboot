@@ -217,12 +217,13 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
       const images = await getDepartmentImages(classification.entities.habitacion, 6);
       if (images && images.length > 0) {
         const isWebUser = huespedWaId.startsWith('web_');
-        logger.info({ depto: classification.entities.habitacion, count: images.length, isWebUser }, 'Sending photos directly');
+        const deptoName = classification.entities.habitacion;
+        logger.info({ depto: deptoName, count: images.length, isWebUser }, 'Sending photos directly');
 
         if (isWebUser) {
-          // For web users, include photo URLs in text response
-          const photoList = images.map((url, i) => `Foto ${i + 1}: ${url}`).join('\n');
-          const respuesta = `Aca te muestro fotos de ${classification.entities.habitacion}:\n\n${photoList}`;
+          // For web users, include image URLs in metadata for frontend rendering
+          const imageUrls = images.map((img) => img.url);
+          const respuesta = `Aca te muestro fotos de ${deptoName}:`;
           await createMensaje({
             conversacionId,
             direccion: 'saliente',
@@ -233,17 +234,21 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
               confidence: classification.confidence,
               entities: classification.entities,
               photosSent: images.length,
+              imageUrls,
             },
           });
         } else {
-          for (const url of images) {
-            await sendImage(huespedWaId, url);
+          // WhatsApp users: send each image with its caption
+          for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            const caption = img.caption || `${deptoName} - Foto ${i + 1}`;
+            await sendImage(huespedWaId, img.url, caption);
           }
           await createMensaje({
             conversacionId,
             direccion: 'saliente',
             origen: 'bot',
-            contenido: `[${images.length} fotos de ${classification.entities.habitacion}]`,
+            contenido: `[${images.length} fotos de ${deptoName}]`,
             metadata: {
               intent: classification.intent,
               confidence: classification.confidence,
@@ -265,7 +270,9 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
   // 6. Handle escalation intents
   const shouldEscalateQueja = botConfig.escalarSiQueja && classification.intent === 'queja';
   const shouldEscalateHumano = classification.intent === 'hablar_humano';
-  if (shouldEscalateHumano || shouldEscalateQueja) {
+  const shouldEscalateCancelacion = classification.intent === 'cancelar_reserva';
+  const shouldEscalateModificacion = classification.intent === 'cambiar_reserva';
+  if (shouldEscalateHumano || shouldEscalateQueja || shouldEscalateCancelacion || shouldEscalateModificacion) {
     await updateConversacionEstado(conversacionId, 'espera_humano');
 
     const respuesta = await generateResponse(classification.intent, classification.entities, [
@@ -273,14 +280,19 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
       { role: 'user', content: mensaje },
     ]);
 
+    const systemMessages: Record<string, string> = {
+      queja: 'Conversacion escalada por queja del huesped',
+      hablar_humano: 'Huesped solicito hablar con un agente',
+      cancelar_reserva: 'Huesped solicito cancelar su reserva',
+      cambiar_reserva: 'Huesped solicito modificar su reserva',
+    };
+
     await createMensaje({
       conversacionId,
       tipo: 'system',
       direccion: 'saliente',
       origen: 'sistema',
-      contenido: classification.intent === 'queja'
-        ? 'Conversacion escalada por queja del huesped'
-        : 'Huesped solicito hablar con un agente',
+      contenido: systemMessages[classification.intent] ?? 'Conversacion escalada',
     });
 
     await createMensaje({
@@ -414,6 +426,7 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
     mergedEntities.fecha_entrada = fecha_entrada;
     mergedEntities.fecha_salida = fecha_salida;
     classification.entities = mergedEntities;
+    additionalContext += `NOTA: Las fechas del huesped estaban invertidas. Se corrigieron automaticamente: entrada ${fecha_entrada}, salida ${fecha_salida}. Confirma amablemente con el huesped que esas son las fechas correctas.\n`;
   }
 
   if (fecha_entrada && fecha_salida && !isGenericQuery) {
@@ -509,7 +522,7 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
 
   // Guard: Validate bank data before generating reservation response
   // 3 scenarios: trusted holder → show data, no data → espera_humano, untrusted holder → espera_humano + fraud warning
-  const TRUSTED_HOLDERS = ['sergio machado', 'laura gartland', 'martin machado'];
+  const trustedHolders = (botConfig.titularesVerificados ?? []).map((h: string) => h.toLowerCase().trim());
   let bankDataEscalate = false;
 
   if (classification.intent === 'reservar' && mergedEntities.habitacion) {
@@ -525,7 +538,7 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
       // Scenario 2: No bank data loaded → escalate to human
       additionalContext += `\nADVERTENCIA DATOS BANCARIOS: El departamento "${mergedEntities.habitacion}" NO tiene datos bancarios cargados. ESTA PROHIBIDO inventar CBU, alias, banco o titular. Decile al huesped que un agente lo va a contactar en breve para pasarle los datos de pago y avanzar con la reserva.\n`;
       bankDataEscalate = true;
-    } else if (!TRUSTED_HOLDERS.includes(titular)) {
+    } else if (!trustedHolders.includes(titular)) {
       // Scenario 3: Bank data loaded but untrusted holder → do NOT show, escalate
       logger.warn({ habitacion: mergedEntities.habitacion, titular: deptoData?.titularCuenta }, 'Bank data has untrusted account holder — suppressing');
       additionalContext += `\nADVERTENCIA DATOS BANCARIOS: El departamento "${mergedEntities.habitacion}" tiene datos bancarios pero NO estan verificados. ESTA PROHIBIDO mostrar CBU, alias, banco o titular al huesped. Decile que un agente lo va a contactar en breve para pasarle los datos de pago y avanzar con la reserva.\n`;

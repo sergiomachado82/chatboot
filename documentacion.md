@@ -10,7 +10,7 @@ Sistema de chatbot para alojamiento turistico que automatiza la atencion al hues
 - Clasificacion de intenciones mediante IA (Claude API) con fallback por regex
 - Flujo completo de reservas: consulta de disponibilidad, cotizacion y pre-reserva
 - Flujo de pago con validacion humana (transferencia o MercadoPago)
-- Escalado automatico a agente humano (por queja o solicitud)
+- Escalado automatico a agente humano (por queja, solicitud, cancelacion o modificacion de reserva)
 - Panel web para que agentes vean, intervengan y gestionen conversaciones en tiempo real
 - Gestion de complejos/departamentos con tarifas estacionales y especiales
 - Bloqueos de disponibilidad (mantenimiento, uso personal)
@@ -21,7 +21,12 @@ Sistema de chatbot para alojamiento turistico que automatiza la atencion al hues
 - Sincronizacion bidireccional con Google Calendar (push reservas/bloqueos, pull eventos externos como bloqueos)
 - Recuperacion de contrasena via email (SMTP)
 - Logo personalizable del bot
+- Recepcion y escalado de imagenes de WhatsApp (comprobantes, DNI)
 - Transcripcion de audios via Claude API
+- Endpoint webchat para integracion con landing page (bot sin WhatsApp)
+- Formato optimizado para burbujas de WhatsApp (datos bancarios, listas, ubicacion)
+- Envio de fotos con caption descriptivo (nombre de la imagen o fallback al depto)
+- Compartir ubicacion via Google Maps con vista previa automatica en WhatsApp
 
 **Stack tecnologico:**
 
@@ -76,12 +81,16 @@ chatboot/
 │       ├── lib/
 │       │   ├── prisma.ts         # Singleton PrismaClient
 │       │   └── redis.ts          # Conexion Redis con retry + fallback
-│       ├── utils/logger.ts       # Pino logger (pretty en dev, JSON en prod)
+│       ├── utils/
+│       │   ├── logger.ts         # Pino logger (pretty en dev, JSON en prod)
+│       │   ├── errors.ts         # Clases de error custom (AppError, ValidationError, NotFoundError, UnauthorizedError)
+│       │   ├── asyncHandler.ts   # Wrapper para async route handlers (catch → next)
+│       │   └── dateUtils.ts      # Utilidades de fecha Argentina timezone (getArgentinaToday, getArgentinaTime, formatLocalDate)
 │       ├── types/express.d.ts    # Augment Request con req.user
 │       ├── middleware/
 │       │   ├── authMiddleware.ts    # JWT Bearer validation
 │       │   ├── errorHandler.ts      # Global error handler
-│       │   ├── rateLimiter.ts       # In-memory rate limit (100 req/min/IP)
+│       │   ├── rateLimiter.ts       # Rate limiting con Redis + fallback in-memory. Factory createRateLimiter() + limiters por ruta (login 5/min, webchat 30/min, API 100/min)
 │       │   ├── rateLimitWhatsApp.ts # Rate limit por numero WhatsApp (10 msg/min, Redis)
 │       │   ├── requestId.ts         # Genera X-Request-ID unico por request
 │       │   ├── requestLogger.ts     # Log method, url, status, duration
@@ -93,12 +102,14 @@ chatboot/
 │       │   ├── simulator.ts      # POST /api/simulator/send
 │       │   ├── conversaciones.ts # CRUD + acciones de control
 │       │   ├── complejos.ts      # CRUD + tarifas + tarifas especiales + bloqueos + media + iCal feeds
-│       │   ├── botConfig.ts     # GET/PATCH /api/bot-config (configuracion del bot + logo)
+│       │   ├── botConfig.ts     # GET/PATCH /api/bot/config + POST/DELETE /api/bot/logo
 │       │   ├── reservas.ts       # CRUD + cambio de estado + query por rango de fechas
 │       │   ├── inventario.ts     # Consulta + disponibilidad
 │       │   ├── huespedes.ts      # Lista + detalle + edicion
 │       │   ├── agentes.ts        # CRUD (admin only para crear)
-│       │   └── ical.ts           # GET /api/ical/:complejoId.ics (publico, export iCal)
+│       │   ├── ical.ts           # GET /api/ical/:complejoId.ics (publico, export iCal)
+│       │   ├── webchat.ts        # POST /api/webchat/send (publico, bot para landing page)
+│       │   └── whatsappProfile.ts # GET/PATCH /api/whatsapp/profile (perfil WA Business)
 │       ├── services/
 │       │   ├── authService.ts         # Login, JWT, password reset tokens
 │       │   ├── emailService.ts        # Envio de emails SMTP (recuperacion de contrasena)
@@ -119,7 +130,9 @@ chatboot/
 │       │   ├── icalService.ts         # Export iCal + Import/sync multi-plataforma (Booking, Airbnb, VRBO, etc.)
 │       │   ├── icalSyncJob.ts         # Cron job iCal sync cada 30 min (itera IcalFeed activos)
 │       │   ├── googleCalendarService.ts # Push/pull bidireccional con Google Calendar
-│       │   └── gcalSyncJob.ts         # Cron job Google Calendar sync cada 5 min
+│       │   ├── gcalSyncJob.ts         # Cron job Google Calendar sync cada 5 min
+│       │   ├── botConfigService.ts    # getBotConfig() con cache 5 min, updateBotConfig()
+│       │   └── whatsappProfileService.ts # Get/update WhatsApp Business profile (Meta API o simulador)
 │       ├── scripts/
 │       │   ├── seedAgente.ts          # Crea admin inicial
 │       │   ├── seedInventory.ts       # Seed de inventario (3 anios x departamentos)
@@ -148,6 +161,7 @@ chatboot/
     │   ├── apiClient.ts          # apiFetch con Bearer + 401 handling
     │   ├── authApi.ts            # login, logout, isAuthenticated, forgotPassword, resetPassword
     │   ├── botConfigApi.ts       # GET/PATCH bot config + logo upload
+    │   ├── whatsappProfileApi.ts # GET/PATCH perfil WhatsApp Business
     │   ├── conversacionApi.ts    # CRUD conversaciones + acciones
     │   ├── complejoApi.ts        # CRUD complejos + tarifas + bloqueos + media + iCal feeds
     │   ├── reservaApi.ts         # CRUD reservas + query por rango de fechas
@@ -165,7 +179,7 @@ chatboot/
         │   ├── LoginPage.tsx         # Login + link a recuperar contrasena
         │   ├── AuthLayout.tsx        # Layout compartido para paginas de auth
         │   └── ResetPasswordPage.tsx # Flujo de recuperacion de contrasena
-        ├── bot/BotConfigPage.tsx     # Configuracion del bot (nombre, tono, mensajes, logo)
+        ├── bot/BotConfigPage.tsx     # Configuracion del bot (nombre, tono, mensajes, logo, titulares verificados)
         ├── layout/Header.tsx
         ├── chat/
         │   ├── ChatList.tsx       # Lista con filtros
@@ -173,7 +187,8 @@ chatboot/
         │   ├── ChatWindow.tsx     # Ventana de chat completa
         │   ├── ChatHeader.tsx     # Acciones: tomar/devolver/cerrar
         │   ├── ChatInput.tsx      # Input de mensaje
-        │   └── MessageBubble.tsx  # Burbuja por tipo de origen
+        │   ├── ChatSearchBar.tsx  # Busqueda dentro de conversacion (texto + rango fechas)
+        │   └── MessageBubble.tsx  # Burbuja por tipo de origen (highlight de busqueda)
         ├── guests/GuestCard.tsx   # Sidebar con info del huesped
         ├── complejos/
         │   ├── ComplejoList.tsx   # Lista/grilla de complejos
@@ -187,9 +202,12 @@ chatboot/
         │   ├── ReservaList.tsx    # Tabla de reservas con toggle calendario
         │   └── ReservaCalendar.tsx # Calendario mensual visual (grilla)
         ├── simulator/WhatsAppSimulator.tsx
+        ├── whatsapp/WhatsAppProfilePage.tsx # Edicion del perfil WA Business
         └── ui/
             ├── Badge.tsx          # Badge con colores por estado
-            └── EmptyState.tsx     # Placeholder vacio
+            ├── EmptyState.tsx     # Placeholder vacio
+            ├── ErrorBoundary.tsx  # Error boundary React
+            └── Skeleton.tsx       # Placeholder de carga
 ```
 
 ### 2.2 Diagrama de Componentes
@@ -245,9 +263,13 @@ Peticion HTTP
   │
   ├── RUTAS PUBLICAS (sin auth):
   │   ├── GET/POST /api/health
-  │   ├── POST /api/auth/login
+  │   ├── POST /api/auth/login         ← loginRateLimiter (5 req/min/IP)
+  │   ├── POST /api/auth/forgot-password ← loginRateLimiter (5 req/min/IP)
+  │   ├── POST /api/auth/reset-password
   │   ├── GET/POST /api/webhook
-  │   └── POST /api/simulator/send
+  │   ├── POST /api/simulator/send
+  │   ├── GET /api/ical/:complejoId.ics
+  │   └── POST /api/webchat/send       ← webchatRateLimiter (30 req/min/IP)
   │
   ├── RUTAS PROTEGIDAS (Router separado):
   │   ├── authMiddleware           # Valida JWT Bearer
@@ -257,7 +279,9 @@ Peticion HTTP
   │   ├── /api/inventario/*
   │   ├── /api/reservas/*
   │   ├── /api/huespedes/*
-  │   └── /api/agentes/*
+  │   ├── /api/agentes/*
+  │   ├── /api/bot/config          # GET/PATCH config del bot + POST/DELETE logo
+  │   └── /api/whatsapp/profile    # GET/PATCH perfil WhatsApp Business
   │
   └── errorHandler                # Catch-all de errores
 ```
@@ -330,10 +354,23 @@ Peticion HTTP
                      │ id (PK)    │
                      │ complejoId │
                      │ tipo       │
-                     │ url        │
-                     │ caption    │
-                     │ orden      │
-                     └────────────┘
+                     │ url        │       ┌────────────┐
+                     │ caption    │       │  IcalFeed  │
+                     │ orden      │       │────────────│
+                     └────────────┘       │ id (PK)    │
+                                    ┌────►│ complejoId │
+┌────────────┐                      │     │ plataforma │
+│ BotConfig  │    Complejo.id ──────┘     │ url        │
+│────────────│                            │ etiqueta   │
+│ id (PK)    │                            │ activo     │
+│ nombreAgte │                            │ ultimoSync │
+│ ubicacion  │                            └────────────┘
+│ tono       │
+│ idioma     │
+│ logo       │
+│ ...config  │
+└────────────┘
+(singleton)
 ```
 
 ### 3.2 Modelos Prisma
@@ -373,6 +410,8 @@ Peticion HTTP
 - `nroFactura`, `importeUsd`, `notas`
 
 **Inventario** (`inventario`): Disponibilidad diaria por habitacion. Constraint unico `[fecha, habitacion]` para evitar duplicados. Campos: `fecha`, `habitacion`, `disponible`, `precio`, `notas`.
+
+**BotConfig** (`bot_config`): Configuracion global del bot (singleton, un solo registro). Campos: `nombreAgente`, `ubicacion`, `tono`, `idioma` (es_AR/es/en), `usarEmojis`, `longitudRespuesta` (corta/media/detallada), `autoPreReserva`, `modoEnvioFotos` (auto/off), `escalarSiQueja`, `escalarSiPago`, `mensajeBienvenida`, `mensajeDespedida`, `mensajeFueraHorario`, `mensajeEsperaHumano`, `horarioInicio/Fin`, `telefonoContacto`, `logo` (URL). Cache en memoria de 5 min. Editable desde el panel admin (`/api/bot/config`).
 
 **WaTemplate** (`wa_templates`): Templates de WhatsApp pre-aprobados por Meta (para mensajes fuera de ventana de 24h). Preparado pero no implementado aun.
 
@@ -437,6 +476,7 @@ Peticion HTTP
 | `POST` | `/api/simulator/send` | Enviar mensaje simulado (solo en `SIMULATOR_MODE`) |
 | `POST` | `/api/simulator/send-audio` | Enviar audio simulado — transcribe con Claude y procesa como texto (solo en `SIMULATOR_MODE`) |
 | `GET` | `/api/ical/:complejoId.ics` | Export calendario iCal (Booking.com lee esta URL para ver disponibilidad) |
+| `POST` | `/api/webchat/send` | Envia mensaje al bot desde la landing page y recibe respuesta JSON |
 
 #### POST /api/auth/login
 
@@ -487,6 +527,25 @@ Peticion HTTP
 
 // Response 500
 { "error": "Transcription failed" }
+```
+
+#### POST /api/webchat/send
+
+```json
+// Request
+{
+  "sessionId": "abc12345",   // ID sesion del visitante web (8-64 chars, requerido)
+  "message": "Hola, tienen disponibilidad para febrero?",
+  "name": "Maria"            // opcional, default: "Visitante Web"
+}
+
+// Response 200
+{
+  "response": "Hola Maria! Bienvenido a Las Grutas Departamentos..."
+}
+
+// Response 400
+{ "error": "Validation error", "details": { ... } }
 ```
 
 ### 4.2 Rutas Protegidas (requieren `Authorization: Bearer <token>`)
@@ -581,6 +640,22 @@ Peticion HTTP
 |--------|------|-------------|
 | `GET` | `/api/agentes` | Listar agentes |
 | `POST` | `/api/agentes` | Crear agente (solo admin) |
+
+#### Configuracion del Bot
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/bot/config` | Obtener configuracion actual del bot (auto-create con defaults) |
+| `PATCH` | `/api/bot/config` | Actualizar configuracion parcialmente (Zod validation) |
+| `POST` | `/api/bot/logo` | Subir logo del bot (base64 en body, max 500KB) |
+| `DELETE` | `/api/bot/logo` | Eliminar logo del bot |
+
+#### Perfil WhatsApp Business
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/whatsapp/profile` | Obtener perfil del negocio (about, description, address, email, websites, vertical) |
+| `PATCH` | `/api/whatsapp/profile` | Actualizar perfil (Zod: about max 139, description max 512, address max 256, websites max 2) |
 
 ---
 
@@ -731,7 +806,7 @@ El archivo `accommodationContext.ts` construye dinamicamente el contexto desde l
 
 - **getFullContext()**: Genera markdown con TODOS los departamentos activos, sus amenities, tarifas por temporada, politicas, datos de pago y zona
 - **getFilteredContext(departamento)**: Genera markdown solo para UN departamento especifico (por nombre o alias). Se usa cuando el huesped ya eligio un departamento para evitar que Claude mencione otros
-- **getDepartmentImages(departamento, max?)**: Retorna URLs de imagenes del departamento desde la tabla Media
+- **getDepartmentImages(departamento, max?)**: Retorna objetos `{ url, caption }` de imagenes del departamento desde la tabla Media (max 6 por defecto)
 
 **Cache in-memory (5 min TTL)**: Las consultas a la DB para construir el contexto se cachean en memoria durante 5 minutos. La funcion `invalidateContextCache()` borra el cache inmediatamente cuando se modifican complejos, tarifas, tarifas especiales, media o bloqueos (llamada desde `complejoService.ts`). Esto evita queries repetidos a la DB en cada mensaje del bot sin perder consistencia ante cambios del admin.
 
@@ -783,11 +858,18 @@ El bot opera bajo un conjunto estricto de directivas inyectadas en el system pro
 - Texto plano para WhatsApp (sin markdown, sin emojis excesivos)
 - Precios siempre en pesos argentinos (ARS)
 
+**Formato WhatsApp (obligatorio):**
+- Mensajes cortos y bien espaciados para burbujas de WhatsApp
+- Datos bancarios (CBU, alias, titular, CUIT, banco): cada dato en su propia linea, nunca en medio de un parrafo
+- Listas con saltos de linea simples (sin guiones largos)
+- Parrafos de maximo 3 lineas antes de un salto
+- Links de Google Maps en su propia linea (para que WhatsApp genere preview del mapa)
+
 ### 7.2 Reglas Estrictas del Bot
 
 | # | Regla | Detalle |
 |---|-------|---------|
-| 1 | **FOTOS** | NUNCA incluir URLs de imagenes, links a web, YouTube ni video tours en texto. NUNCA mencionar que las fotos "se envian automaticamente". Las fotos se envian por codigo separado via `sendImage()` |
+| 1 | **FOTOS** | NUNCA incluir URLs de imagenes, links a web, YouTube ni video tours en texto. Las fotos se envian automaticamente como imagenes adjuntas via `sendImage()` con caption (nombre del depto + descripcion de la imagen). Si el usuario pide fotos, responder brevemente ("Aca te muestro fotos de X") y el sistema envia las imagenes. NUNCA generar URLs de fotos en el texto |
 | 2 | **PRECIOS** | Usar EXCLUSIVAMENTE las tarifas de la tabla del contexto. NUNCA inventar ni estimar precios |
 | 3 | **CAPACIDAD** | La capacidad es POR UNIDAD (por depto individual). NUNCA sugerir un depto si personas > capacidad maxima por unidad. NUNCA ofrecer mas unidades de las que existen. Para grupos que exceden capacidad total, sugerir contactar por telefono |
 | 4 | **NO INVENTAR** | NUNCA inventar ni asumir datos que el usuario no dijo. NUNCA inventar restricciones de estadia minima que no aparezcan en el contexto adicional |
@@ -795,7 +877,8 @@ El bot opera bajo un conjunto estricto de directivas inyectadas en el system pro
 | 6 | **NO REPETIR PREGUNTAS** | Leer "DATOS YA CONOCIDOS" del contexto adicional. NUNCA volver a preguntar algo ya sabido. Solo preguntar lo que aparece en "Datos que FALTAN" |
 | 7 | **FLUJO** | Si no hay datos conocidos, preguntar: personas, fechas y noches. Si ya hay algunos, solo preguntar los faltantes |
 | 8 | **RESERVAS** | Ver seccion 7.3 — Flujo completo de reservas |
-| 9 | **ESTADO** | Usar siempre "pre-reserva" (no "confirmada"). Solo decir "confirmada" si el contexto lo indica explicitamente |
+| 9 | **TERMINOLOGIA** | JAMAS usar "pre-reserva", "prereserva", "reserva preliminar" ni "reserva tentativa" con el huesped (son terminos internos). Siempre usar "reserva" |
+| 10 | **DATOS BANCARIOS** | JAMAS inventar datos bancarios (CBU, alias, banco, titular, CUIT). Si el contexto adicional contiene "ADVERTENCIA DATOS BANCARIOS", NO mostrar datos de pago bajo ninguna circunstancia |
 
 ### 7.3 Flujo Completo de Reservas (Regla 8)
 
@@ -804,21 +887,22 @@ El bot opera bajo un conjunto estricto de directivas inyectadas en el system pro
 ```
 PASO 1: Huesped quiere reservar
   └── Bot resume los datos: departamento, fechas, personas, precio total
+  └── Consulta el porcentaje de sena del depto
+  │   ├── Si es 0% → la reserva queda agendada de palabra, un agente contactara (salta a PASO 4)
+  │   └── Si es >0% → informa el porcentaje y pregunta si quiere proceder
   └── Pregunta: "¿Queres proceder con la reserva?"
 
-PASO 2: Huesped acepta → Bot ofrece opciones de pago de la sena (30%)
-  ├── a) Transferencia bancaria:
-  │     └── Pasa datos de la cuenta (titular, CBU, alias, banco) del contexto
-  └── b) Tarjeta de credito via MercadoPago:
-        └── Pasa el link de pago (aclara recargo del 8%)
-  └── Nota: El saldo restante se abona por transferencia al momento del check-in
+PASO 2: Huesped acepta → Bot indica que la sena se abona por transferencia
+  └── Pasa datos de la cuenta (titular, CBU, alias, banco) del contexto
+  └── El saldo restante se abona por transferencia al momento del check-in
+  └── IMPORTANTE: NO mencionar tarjeta/MercadoPago a menos que el huesped PREGUNTE explicitamente
 
 PASO 3: Huesped dice que ya pago
   └── Bot pide:
       ├── Comprobante de la transferencia (foto)
       └── Numero de DNI
 
-PASO 4: Huesped envia comprobante y DNI
+PASO 4: Huesped envia comprobante y DNI (o reserva sin sena)
   └── Bot dice: "Un agente va a verificar el pago y te va a enviar la factura por este medio"
   └── "Recien cuando recibas la factura, la reserva queda confirmada"
   └── NUNCA el bot confirma la reserva por si mismo
@@ -830,7 +914,7 @@ El PASO 2 tiene un guardrail de seguridad en `botEngine.ts` que valida los datos
 
 | Escenario | Condicion | Accion del bot |
 |-----------|-----------|----------------|
-| 1. Titular de confianza | Datos bancarios cargados + titular en whitelist (`sergio machado`, `laura gartland`, `martin machado`) | Muestra datos bancarios normalmente |
+| 1. Titular de confianza | Datos bancarios cargados + titular en lista de `titularesVerificados` (configurable en BotConfig) | Muestra datos bancarios normalmente |
 | 2. Sin datos bancarios | Complejo no tiene titular/CBU/banco configurados | Bot dice "un agente te va a contactar" + conversacion pasa a `espera_humano` |
 | 3. Titular desconocido | Datos bancarios cargados pero titular NO esta en whitelist | Bot NO muestra datos (riesgo de fraude) + conversacion pasa a `espera_humano` |
 
@@ -852,6 +936,8 @@ Si se detecta el escenario 2 o 3, Claude recibe una "ADVERTENCIA DATOS BANCARIOS
 | `consulta_alojamiento` | Responde sobre el departamento activo o presenta opciones filtradas por capacidad |
 | `consulta_zona` | Recomienda actividades y lugares cercanos (buceo, kayak, pinguinera, etc.) |
 | `reservar` | Pide SOLO los datos que faltan. Cuando tiene todos, sigue el flujo de la regla 8 (NUNCA confirmar) |
+| `cancelar_reserva` | Informa al huesped que un agente gestionara la cancelacion. Escala a `espera_humano` con mensaje de sistema |
+| `cambiar_reserva` | Informa al huesped que un agente gestionara la modificacion. Escala a `espera_humano` con mensaje de sistema |
 | `hablar_humano` | Indica que un agente se pondra en contacto pronto. Escala conversacion |
 | `queja` | Pide disculpas y escala automaticamente a un agente humano |
 | `despedida` | Se despide amablemente y cierra la conversacion |
@@ -886,10 +972,13 @@ El bot valida la estadia minima con la siguiente prioridad:
 
 Las fotos se envian directamente por codigo, sin pasar por Claude:
 
-1. Bot detecta patron de foto en el mensaje (`/fotos?|imagene?s?|mostrame|ver el depto/`)
+1. Bot detecta patron de foto en el mensaje (`/fotos?|imagene?s?|pictures?|mostrame/`)
 2. Si hay `habitacion` en entidades → busca imagenes en la tabla Media via `getDepartmentImages()`
-3. Si hay imagenes → las envia una por una via `sendImage()` y retorna sin llamar a Claude
-4. Si NO hay imagenes → pasa a Claude con instruccion de describir el depto con palabras
+3. `getDepartmentImages()` retorna objetos `{ url, caption }` (no solo URLs)
+4. Si hay imagenes:
+   - **WhatsApp**: envia cada imagen via `sendImage(to, url, caption)` con su caption original (ej: "Living comedor") o fallback `"NombreDepto - Foto N"`
+   - **Web chat**: guarda las URLs en `metadata.imageUrls` del mensaje para que el frontend las renderice como galeria
+5. Si NO hay imagenes → pasa a Claude con instruccion `photosFailed` de describir el depto con palabras (sin mencionar fotos ni dar excusas tecnicas)
 
 ---
 
@@ -897,8 +986,11 @@ Las fotos se envian directamente por codigo, sin pasar por Claude:
 
 ### 8.1 inventarioService.ts
 
+La lista de habitaciones se obtiene dinamicamente de la tabla `complejos` (activos) via `getActiveHabitaciones()`, no esta hardcodeada.
+
 | Funcion | Parametros | Descripcion |
 |---------|-----------|-------------|
+| `getActiveHabitaciones` | — | Retorna nombres de complejos activos desde la DB (reemplaza array hardcoded) |
 | `checkAvailability` | `fechaEntrada, fechaSalida, habitacion?` | Consulta disponibilidad real contra Inventario y Reservas. Retorna `DisponibilidadResult[]` con precios por noche |
 | `getOccupiedDepartments` | `fechaEntrada, fechaSalida` | Retorna lista de nombres de deptos que tienen reserva activa (no cancelada) en ese rango |
 | `blockDates` | `habitacion, fechaEntrada, fechaSalida` | Marca fechas como `disponible=false` en Inventario |
@@ -956,7 +1048,7 @@ Las fotos se envian directamente por codigo, sin pasar por Claude:
 
 | Funcion | Descripcion |
 |---------|-------------|
-| `classifyIntent(message, history?)` | Clasifica intent con Claude Haiku. Retorna {intent, confidence, entities}. Timeout configurable via `CLAUDE_TIMEOUT_MS` (default 30s) |
+| `classifyIntent(message, history?)` | Clasifica intent con Claude Haiku. 12 intents: saludo, consulta_disponibilidad, consulta_precio, consulta_alojamiento, consulta_zona, reservar, cancelar_reserva, cambiar_reserva, hablar_humano, queja, despedida, otro. Retorna {intent, confidence, entities}. Timeout configurable via `CLAUDE_TIMEOUT_MS` (default 30s) |
 | `generateResponse(intent, entities, history, additionalContext?)` | Genera respuesta con Claude Sonnet. Timeout configurable via `CLAUDE_TIMEOUT_MS` |
 | `transcribeAudio(audioBuffer, mimeType)` | Transcribe audio a texto con Claude Haiku |
 
@@ -1004,13 +1096,23 @@ Sincronizacion fire-and-forget con Google Sheets. Si falla, loguea error pero no
 
 | Funcion | Descripcion |
 |---------|-------------|
-| `sendWhatsAppMessage(to, body)` | Envia mensaje de texto. Extrae URLs de imagenes del body y las envia por separado. En modo simulador emite via Socket.io |
-| `sendImage(to, imageUrl, caption?)` | Envia imagen al huesped. En modo simulador emite `simulator:mensaje` con `type: 'image'` |
+| `sendWhatsAppMessage(to, body)` | Envia mensaje de texto. Extrae URLs de imagenes del body y las envia por separado. En modo simulador emite via Socket.io. Para usuarios web (`web_*`) no envia por WhatsApp (la respuesta se guarda en DB) |
+| `sendImage(to, imageUrl, caption?)` | Envia imagen al huesped con caption opcional. En modo simulador emite `simulator:mensaje` con `type: 'image'`. Para usuarios web (`web_*`) se omite el envio (imagenes en `metadata.imageUrls`) |
 | `downloadMedia(mediaId)` | Descarga archivo multimedia de WhatsApp Cloud API. Retorna Buffer o null |
+| `extractImages(body)` | (interna) Extrae URLs de imagenes (jpg/jpeg/png/gif/webp) del texto y las separa. Retorna `{ text, imageUrls }` |
 
 ### 8.12 webhookProcessor.ts
 
 Orquesta el procesamiento de mensajes entrantes (WhatsApp o simulador). Flujo: `findOrCreateHuesped` → `findOrCreateConversacion` → `createMensaje` → si estado es `bot`, delega a `botEngine.handleBotMessage()`.
+
+**Tipos de mensajes soportados:**
+
+| Tipo | Procesamiento |
+|------|--------------|
+| `text` | Se procesa normalmente por el bot |
+| `audio` | Se transcribe via Claude Haiku, se procesa como texto |
+| `image` | Se guarda con metadata (`mediaId`, `mimeType`) + caption del usuario. Escala a `espera_humano` con mensaje "Un agente la va a revisar". El bot no interpreta imagenes (ej: comprobantes de pago, DNI) |
+| otros (`document`, `sticker`, etc.) | Se loguea warning, se guarda como texto plano |
 
 **Deduplicacion por waMessageId**: Antes de procesar un mensaje, verifica si ya existe un registro con el mismo `waMessageId` en la DB. Si existe, hace `return` sin procesar. Esto protege contra los reintentos frecuentes del webhook de WhatsApp, evitando mensajes duplicados, respuestas dobles del bot y reservas duplicadas.
 
@@ -1070,6 +1172,35 @@ Servicio de sincronizacion bidireccional con Google Calendar. Usa la misma Servi
 | Funcion | Descripcion |
 |---------|-------------|
 | `sendResetPasswordEmail(email, token)` | Envia email con link de recuperacion de contrasena via SMTP (Gmail). Requiere `SMTP_USER` y `SMTP_PASS` configurados. |
+
+### 8.19 botConfigService.ts
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `getBotConfig()` | Retorna config del bot. Cache in-memory 5 min TTL. Si no existe registro, lo crea con defaults |
+| `updateBotConfig(data)` | Actualiza config en DB e invalida cache inmediatamente |
+| `invalidateBotConfigCache()` | Limpia cache manualmente (para tests) |
+
+### 8.20 whatsappProfileService.ts
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `getBusinessProfile()` | Obtiene perfil WA Business via Meta Graph API (v20.0+). En modo simulador retorna datos dummy |
+| `updateBusinessProfile(data)` | Actualiza perfil via Meta API POST. En modo simulador retorna success sin persistir |
+| `isSimulatorMode()` | Verifica si esta en modo simulador (sin credenciales WA configuradas) |
+
+### 8.21 Utilidades (utils/)
+
+**errors.ts** — Clases de error custom para respuestas HTTP consistentes:
+
+| Clase | Status | Code |
+|-------|--------|------|
+| `AppError` | configurable | configurable |
+| `ValidationError` | 400 | `VALIDATION_ERROR` |
+| `NotFoundError` | 404 | `NOT_FOUND` |
+| `UnauthorizedError` | 401 | `UNAUTHORIZED` |
+
+**asyncHandler.ts** — HOF que wrappea handlers async para capturar Promise rejections y pasarlas a `next()` de Express, previniendo errores no manejados.
 
 ---
 
@@ -1312,15 +1443,20 @@ POST https://graph.facebook.com/v21.0/{WA_PHONE_NUMBER_ID}/messages
 ### 13.4 Envio de Imagenes
 
 ```typescript
-// sendImage() — envia URL de imagen al huesped
+// sendImage(to, imageUrl, caption?) — envia imagen con caption opcional
 POST https://graph.facebook.com/v21.0/{WA_PHONE_NUMBER_ID}/messages
 {
   "messaging_product": "whatsapp",
   "to": "5491155550000",
   "type": "image",
-  "image": { "link": "https://..." }
+  "image": {
+    "link": "https://...",
+    "caption": "Pewmafe - Living comedor"  // opcional
+  }
 }
 ```
+
+El caption se obtiene del campo `caption` de la tabla `MediaFile`. Si no tiene caption, se usa `"NombreDepto - Foto N"` como fallback.
 
 ### 13.5 Consideraciones de Produccion
 
@@ -1442,26 +1578,140 @@ npm run dev
 
 ## 16. Seguridad
 
-### 16.1 Autenticacion
+### 16.1 Autenticacion y Gestion de Usuarios
 
-- Passwords hasheados con bcrypt (12 rounds)
-- JWT con expiracion de 24 horas
-- Token invalidado en frontend al recibir 401
-- Socket.io requiere token valido para conectar
+**Tecnologia:**
+- Passwords hasheados con **bcrypt** (12 rounds de salt)
+- **JWT** (JSON Web Token) con expiracion configurable (`JWT_EXPIRY`, default 24h)
+- Token firmado con `JWT_SECRET` (variable de entorno)
+- Payload del token: `{ id, email, rol }`
+- Token invalidado en frontend automaticamente al recibir HTTP 401
+- Socket.io requiere token JWT valido en el handshake para conectar
+
+**Roles de usuario:**
+
+| Rol | Permisos |
+|-----|----------|
+| `admin` | Acceso total: crear/editar agentes, gestionar complejos, reservas, configuracion del bot, ver todas las conversaciones |
+| `agente` | Gestionar conversaciones (tomar, responder, cerrar), ver reservas y complejos. NO puede crear otros agentes |
+
+**Creacion del primer administrador (seed):**
+
+El sistema requiere al menos un agente admin para funcionar. Se crea ejecutando el script de seed:
+
+```bash
+npx tsx server/src/scripts/seedAgente.ts
+```
+
+Este script crea (o actualiza si ya existe) un agente admin con:
+- Email: `admin@chatboot.com`
+- Password: `admin123` (hasheado con bcrypt 12 rounds)
+- Rol: `admin`
+- Usa `upsert` por email — seguro de ejecutar multiples veces
+
+**Creacion de agentes adicionales:**
+
+Solo un admin puede crear nuevos agentes, via API:
+
+```
+POST /api/agentes
+Authorization: Bearer <token-admin>
+{
+  "nombre": "Maria Lopez",
+  "email": "maria@empresa.com",
+  "password": "contraseña-segura",   // min 6 caracteres
+  "rol": "agente"                    // o "admin"
+}
+```
+
+- Requiere token JWT con `rol: admin` — si el rol no es admin, retorna 403 Forbidden
+- Password se hashea con bcrypt (12 rounds) antes de guardar
+- Email debe ser unico (constraint en DB)
+- Validacion con Zod: nombre requerido, email valido, password min 6 chars
+
+**Recuperacion de contrasena:**
+
+1. `POST /api/auth/forgot-password { email }` — genera token aleatorio (32 bytes hex), expira en 1 hora, se envia por email SMTP
+2. `POST /api/auth/reset-password { token, newPassword }` — valida token + expiry, hashea nueva password, limpia el token (single-use)
+3. Si el email no existe o el agente esta inactivo, retorna 200 igualmente (no revela si el email existe)
 
 ### 16.2 Middleware de Seguridad
 
-- **helmet**: Headers HTTP de seguridad (CSP, HSTS, X-Frame-Options, etc.)
-- **cors**: Configurado para aceptar origin del frontend
-- **webhookSignature**: Validacion HMAC SHA256 de payloads de Meta
-- **rateLimiter**: 100 requests/minuto por IP (in-memory)
-- **authMiddleware**: Verifica JWT en todas las rutas protegidas
+| Middleware | Ubicacion | Descripcion |
+|-----------|-----------|-------------|
+| **helmet** | Global | Headers HTTP de seguridad: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy |
+| **cors** | Global | CORS habilitado para el origin del frontend. Configurable via variable de entorno |
+| **express.json()** | Global | Parseo de body JSON con limite de tamano |
+| **requestId** | Global | Genera `X-Request-ID` unico (UUID) por cada request para trazabilidad |
+| **requestLogger** | Global | Log de cada peticion: method, url, status, duracion en ms |
+| **authMiddleware** | Rutas protegidas | Extrae token del header `Authorization: Bearer <token>`, verifica firma y expiracion JWT. Inyecta `req.user = { id, email, rol }`. Retorna 401 si el token falta, es invalido o expiro |
+| **rateLimiter** | Rutas protegidas | Limite de requests por IP (ver 16.4) |
+| **webhookSignature** | POST /api/webhook | Validacion HMAC SHA256 de payloads de Meta (ver 16.3) |
 
-### 16.3 Validacion de Datos
+### 16.3 Seguridad del Webhook de WhatsApp
 
-- Zod para validacion de inputs en todas las rutas
-- Prisma para queries parametrizadas (prevencion de SQL injection)
-- Body parsing limitado por express.json()
+Meta firma cada payload del webhook con HMAC SHA256 usando el `WA_APP_SECRET`:
+
+1. Se extrae el header `X-Hub-Signature-256` del request
+2. Se calcula `sha256=HMAC(WA_APP_SECRET, rawBody)` sobre el body crudo
+3. Se compara con `crypto.timingSafeEqual()` (resistente a timing attacks)
+4. Si la firma no coincide → 401 Unauthorized
+5. En `SIMULATOR_MODE` se omite la validacion (desarrollo local)
+
+### 16.4 Rate Limiting (2 niveles)
+
+**Nivel 1 — API por IP** (`rateLimiter.ts`):
+- Limite: 100 requests/minuto por IP (configurable via `RATE_LIMIT_MAX_REQUESTS` y `RATE_LIMIT_WINDOW_MS`)
+- Implementacion: Redis (`INCR` + `EXPIRE`) con fallback in-memory si Redis no esta disponible
+- Aplica a todas las rutas protegidas (panel de agentes)
+- Respuesta si excede: `429 Too Many Requests`
+
+**Nivel 2 — WhatsApp por numero** (`rateLimitWhatsApp.ts`):
+- Limite: 10 mensajes/minuto por numero de WhatsApp (`waId`)
+- Implementacion: Redis sliding window counter
+- Aplica en `webhookProcessor.ts` antes de procesar el mensaje
+- Si Redis no esta disponible → permite todos los mensajes (fail-open)
+- Protege contra spam/flood de un mismo numero
+
+### 16.5 Validacion de Datos
+
+- **Zod** para validacion de inputs en todas las rutas (schemas tipados)
+- **Prisma** para queries parametrizadas (prevencion de SQL injection)
+- **express.json()** con limite de tamano de body
+- **Sanitizacion de entidades del bot** (`botEngine.ts`): `sanitizeEntities()` filtra claves invalidas, valores nulos/vacios, resuelve fechas relativas y valida formato YYYY-MM-DD
+- **Deduplicacion de mensajes**: `waMessageId` unico previene procesamiento duplicado de webhooks
+
+### 16.6 Seguridad del Bot — Proteccion de Datos Bancarios
+
+El bot tiene un guardrail de seguridad en `botEngine.ts` para proteger datos bancarios contra fraude:
+
+**Titulares verificados (configurable desde BotConfig):**
+
+La lista de titulares de confianza se almacena en el campo `titularesVerificados` del modelo `BotConfig` (array de strings). Se gestiona desde el panel admin en la seccion "Comportamiento" de la configuracion del bot. La comparacion es case-insensitive.
+
+```typescript
+// botEngine.ts — lee de la DB en vez de hardcoded
+const trustedHolders = (botConfig.titularesVerificados ?? []).map(h => h.toLowerCase().trim());
+```
+
+| Escenario | Condicion | Accion |
+|-----------|-----------|--------|
+| Titular verificado | CBU/alias cargados + titular en `titularesVerificados` | Bot muestra datos bancarios normalmente |
+| Sin datos bancarios | Complejo no tiene CBU/alias configurados | Bot dice "un agente te contactara" + escala a `espera_humano` |
+| Titular desconocido | CBU/alias cargados pero titular NO en `titularesVerificados` | Bot NO muestra datos (riesgo fraude) + escala a `espera_humano` |
+
+Si se detecta escenario 2 o 3:
+- Claude recibe `ADVERTENCIA DATOS BANCARIOS` en contexto adicional con prohibicion absoluta de mostrar datos
+- La conversacion se escala automaticamente a `espera_humano`
+- Se crea mensaje de sistema: "Conversacion escalada: datos bancarios no disponibles o no verificados"
+
+**Regla de oro:** El bot JAMAS puede inventar datos bancarios. Inventar un CBU o alias se considera fraude. Si no tiene datos verificados, siempre escala a un humano.
+
+### 16.7 Seguridad del Bot — Terminologia y Estado de Reservas
+
+- El bot NUNCA puede confirmar una reserva — solo un agente humano puede hacerlo
+- PROHIBIDO usar terminos como "pre-reserva", "reserva preliminar", "reserva tentativa" con el huesped (son terminos internos del sistema)
+- El bot siempre dice "reserva" y aclara que un agente verificara el pago y enviara la factura
 
 ---
 
@@ -1751,7 +2001,7 @@ Estimacion: ~$0.004 por intercambio. 100 conversaciones/dia ≈ **$36/mes**.
 | **waId** | Identificador unico del huesped en WhatsApp (numero de telefono) |
 | **Simulador** | Interfaz de prueba que emula WhatsApp para desarrollo local |
 | **Fire-and-forget** | Patron donde la operacion secundaria no bloquea la principal |
-| **Sena** | Pago parcial (30%) para confirmar la reserva |
+| **Sena** | Pago parcial (porcentaje variable por departamento, configurado en `porcentajeReserva`) para confirmar la reserva. Si es 0%, la reserva queda de palabra |
 | **WABA** | WhatsApp Business Account — cuenta de negocio en WhatsApp |
 | **System User** | Usuario de servicio en Meta Business para tokens permanentes |
 | **Cloud API** | API de WhatsApp alojada por Meta |
@@ -2012,7 +2262,8 @@ En el frontend, se agrego un indicador compacto en el header:
 Validacion automatica cuando `fecha_entrada > fecha_salida`:
 - Detecta la inversion y las swapea automaticamente
 - Loguea warning para debugging
-- Previene queries de disponibilidad fallidas silenciosamente
+- Agrega contexto adicional para que Claude confirme las fechas con el huesped: "Las fechas estaban invertidas. Se corrigieron automaticamente: entrada X, salida Y. Confirma amablemente con el huesped que esas son las fechas correctas."
+- Previene queries de disponibilidad fallidas
 
 ### 22.5 Mejora de loading state en ChatWindow
 
@@ -2116,6 +2367,8 @@ Nuevo script con 12 escenarios diseñados para encontrar bugs especificos del bo
 ---
 
 ## 23. Integracion con Booking.com (iCal Bidireccional) (2026-03-10)
+
+> **NOTA**: Esta seccion documenta la implementacion original con un solo campo `icalUrl` por complejo. Esta arquitectura fue reemplazada por el modelo `IcalFeed` multi-plataforma (ver **Seccion 28**), que soporta multiples feeds por complejo (Booking, Airbnb, VRBO, etc.). La logica core de export/import se mantiene igual.
 
 Sincronizacion de disponibilidad con Booking.com mediante el protocolo iCal (RFC 5545). Permite que las reservas de Booking bloqueen automaticamente el inventario local y viceversa.
 
@@ -2256,6 +2509,7 @@ model BotConfig {
   horarioInicio       String?  // HH:mm (uso futuro)
   horarioFin          String?  // HH:mm (uso futuro)
   telefonoContacto    String   @default("+54 2920 561033")
+  titularesVerificados String[] @default([])  // Nombres de titulares bancarios autorizados (comparacion case-insensitive)
   creadoEn            DateTime @default(now())
   actualizadoEn       DateTime @updatedAt
 }
@@ -2268,7 +2522,7 @@ model BotConfig {
 | `server/src/services/botConfigService.ts` | `getBotConfig()` con cache 5 min, `updateBotConfig()`, `invalidateBotConfigCache()` |
 | `server/src/routes/botConfig.ts` | `GET /api/bot/config`, `PATCH /api/bot/config` con Zod validation |
 | `src/api/botConfigApi.ts` | Cliente API frontend |
-| `src/components/bot/BotConfigPage.tsx` | Pagina admin con 4 secciones |
+| `src/components/bot/BotConfigPage.tsx` | Pagina admin con 5 secciones (Logo, Identidad, Comportamiento con titulares verificados, Mensajes, Horario) |
 
 ### 25.3 Archivos modificados
 
@@ -2303,6 +2557,7 @@ model BotConfig {
 | `escalarSiQueja` | true | Si false, quejas NO escalan a `espera_humano` (bot responde normalmente) |
 | `escalarSiPago` | true | Si false, problemas bancarios NO escalan a `espera_humano` |
 | `telefonoContacto` | +54 2920 561033 | Usado en mensaje de capacidad excedida |
+| `titularesVerificados` | [] | Lista de nombres de titulares bancarios autorizados. El bot solo muestra datos de pago si el titular del complejo esta en esta lista (comparacion case-insensitive). Se gestiona con UI de agregar/eliminar chips |
 
 **Seccion 3 — Mensajes personalizados:**
 
@@ -2608,6 +2863,8 @@ Requiere una cuenta de Gmail con "Contrasena de aplicacion":
 
 ## 31. Configuracion del Bot (BotConfig) (2026-03-17)
 
+> **NOTA**: Esta seccion complementa la **Seccion 25** (que documenta los archivos creados, la logica del cache y el impacto en el prompt de Claude). Aqui se resumen los campos y endpoints actualizados incluyendo soporte para logo.
+
 ### 31.1 Descripcion
 
 Modelo `BotConfig` para personalizar el comportamiento del bot desde el panel de administracion. Incluye soporte para logo.
@@ -2638,5 +2895,273 @@ Modelo `BotConfig` para personalizar el comportamiento del bot desde el panel de
 
 | Metodo | Ruta | Descripcion |
 |--------|------|-------------|
-| `GET` | `/api/bot-config` | Obtener configuracion actual |
-| `PATCH` | `/api/bot-config` | Actualizar configuracion parcialmente |
+| `GET` | `/api/bot/config` | Obtener configuracion actual |
+| `PATCH` | `/api/bot/config` | Actualizar configuracion parcialmente |
+| `POST` | `/api/bot/logo` | Subir logo (base64 en body, max 500KB) |
+| `DELETE` | `/api/bot/logo` | Eliminar logo |
+
+---
+
+## 32. Endpoint Webchat para Landing Page (2026-03-18)
+
+### 32.1 Descripcion
+
+Endpoint publico REST que permite integrar el bot como widget de chat en la landing page (`lasgrutasdepartamentos.com/nueva`). Los mensajes pasan por el mismo pipeline del bot (clasificacion + respuesta + acumulacion de entidades) pero sin requerir WhatsApp.
+
+### 32.2 Endpoint
+
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| `POST` | `/api/webchat/send` | No | Envia mensaje y recibe respuesta del bot |
+
+**Request body:**
+```json
+{
+  "sessionId": "abc12345",   // ID de sesion unico del visitante (8-64 chars)
+  "message": "Hola, quiero consultar disponibilidad",
+  "name": "Juan"             // Opcional, nombre del visitante
+}
+```
+
+**Response:**
+```json
+{
+  "response": "Hola Juan! Bienvenido a Las Grutas Departamentos..."
+}
+```
+
+### 32.3 Funcionamiento Interno
+
+1. El `sessionId` se prefija con `web_` para crear un `waId` virtual (`web_abc12345`)
+2. Se procesa via `processIncomingMessage()` (mismo pipeline que WhatsApp)
+3. Las funciones `sendText()` y `sendImage()` detectan el prefijo `web_` y omiten el envio a WhatsApp API
+4. La respuesta se obtiene de la DB (ultimo mensaje `origen: 'bot'` de la conversacion)
+5. Las fotos se incluyen en `metadata.imageUrls` del mensaje (para renderizado frontend)
+
+### 32.4 Diferencias con WhatsApp
+
+| Aspecto | WhatsApp | Webchat |
+|---------|----------|---------|
+| Fotos | Se envian via `sendImage()` como imagenes adjuntas con caption | URLs en `metadata.imageUrls` para renderizado frontend |
+| Texto | Se envia via WhatsApp Cloud API | Se guarda en DB y se retorna en el response JSON |
+| Ubicacion | Google Maps link genera preview automatica | Link plano en texto |
+| Audio | Soportado (transcripcion via Claude) | No soportado |
+
+---
+
+## 33. Mejoras de Formato y UX en WhatsApp (2026-03-18)
+
+### 33.1 Formato de Datos Bancarios para WhatsApp
+
+**Problema:** Cuando el bot enviaba datos bancarios (CBU, alias, titular), el texto largo excedia los margenes de la burbuja de WhatsApp, haciendolo dificil de leer y copiar.
+
+**Solucion:** Se agrego la directiva `FORMATO WHATSAPP — OBLIGATORIO` al system prompt de Claude (`claudeService.ts`) con reglas de formato:
+
+- Cada dato bancario (CBU, alias, titular, CUIT, banco) debe ir en su propia linea
+- NUNCA poner CBU o alias dentro de un parrafo largo
+- Listas con saltos de linea simples (sin guiones largos)
+- Parrafos de maximo 3 lineas seguidas antes de un salto
+
+**Ejemplo de formato correcto en WhatsApp:**
+```
+Los datos para la transferencia son:
+
+Titular: Sergio Machado
+CBU: 0000000000000000000000
+Alias: lasgrutas.dep
+Banco: Banco Nacion
+CUIT: 20-12345678-9
+
+El saldo restante se abona al momento del check-in.
+```
+
+### 33.2 Envio de Fotos con Caption
+
+**Problema:** Cuando el huesped pedia fotos, el bot enviaba imagenes sin descripcion, haciendo dificil identificar que muestra cada foto.
+
+**Solucion:** Se modifico `getDepartmentImages()` en `accommodationContext.ts` para retornar objetos `{ url, caption }` en vez de strings planos. Se actualizo `botEngine.ts` para enviar cada imagen con su caption via `sendImage(to, url, caption)`.
+
+**Archivos modificados:**
+- `server/src/data/accommodationContext.ts` — `getDepartmentImages()` retorna `{ url: string; caption: string | null }[]`
+- `server/src/services/botEngine.ts` — Usa `img.caption || "NombreDepto - Foto N"` como caption de cada imagen
+
+**Comportamiento por canal:**
+
+| Canal | Antes | Despues |
+|-------|-------|---------|
+| WhatsApp | Imagenes sin caption | Cada imagen con caption (ej: "Living comedor", "Pewmafe - Foto 2") |
+| Web chat | Lista de URLs como texto plano | Texto breve + `metadata.imageUrls` para renderizado frontend |
+
+### 33.3 Compartir Ubicacion via Google Maps
+
+**Problema:** Cuando el huesped pedia la ubicacion, el bot insertaba el link de Google Maps dentro de un parrafo de texto. WhatsApp no generaba la vista previa del mapa.
+
+**Solucion:** Se agrego la directiva de formato de ubicacion al system prompt. El link de Google Maps se envia en su propia linea, limpio, para que WhatsApp genere automaticamente la vista previa con el mapa.
+
+**Formato en el system prompt:**
+```
+UBICACION / GOOGLE MAPS: Cuando el huesped pregunte la ubicacion,
+compartir el link de Google Maps en su propia linea:
+
+Ubicacion de Pewmafe:
+https://www.google.com/maps/search/?api=1&query=...
+```
+
+**Archivos modificados:**
+- `server/src/services/claudeService.ts` — Directiva de formato de ubicacion en el bloque `FORMATO WHATSAPP`
+
+**Contexto tecnico:** La URL de Google Maps se genera en `accommodationContext.ts` (linea 174) usando `encodeURIComponent(direccion, Rio Negro, Argentina)` para cada complejo. El formato `maps/search/?api=1&query=` es el formato oficial de Google Maps para links compartidos.
+
+---
+
+## 34. Utilidades de Fecha — Argentina Timezone (dateUtils.ts)
+
+### 34.1 Descripcion
+
+Modulo utilitario para manejar fechas y horas en timezone Argentina (UTC-3). Critico para el correcto funcionamiento del bot (clasificacion de fechas relativas como "mañana", "hoy") y del pipeline de disponibilidad.
+
+**Archivo:** `server/src/utils/dateUtils.ts`
+
+### 34.2 Funciones
+
+| Funcion | Parametros | Retorno | Descripcion |
+|---------|-----------|---------|-------------|
+| `getArgentinaToday()` | — | `string` (YYYY-MM-DD) | Fecha de hoy en Argentina. Usa `Intl` timezone con fallback manual UTC-3 |
+| `getArgentinaTime()` | — | `string` (HH:MM) | Hora actual en Argentina (24h). Usa `toLocaleTimeString` con timezone |
+| `formatLocalDate(d)` | `Date` | `string` (YYYY-MM-DD) | Formatea Date a YYYY-MM-DD usando componentes locales |
+
+### 34.3 Uso en el sistema
+
+| Archivo | Uso |
+|---------|-----|
+| `claudeService.ts` | Inyecta `getArgentinaToday()` en el prompt del clasificador para resolver "mañana", "pasado mañana", etc. |
+| `botEngine.ts` | Usa `getArgentinaToday()` para resolver fechas relativas en `resolveRelativeDate()` |
+
+### 34.4 Fallback robusto
+
+Si `Intl.DateTimeFormat` no respeta el timezone (posible en algunos entornos Node sin ICU completo), la funcion `manualArgentinaDate()` calcula la fecha manualmente restando 3 horas al UTC actual.
+
+---
+
+## 35. Gestion del Perfil de WhatsApp Business
+
+### 35.1 Descripcion
+
+Funcionalidad para consultar y editar el perfil del negocio en WhatsApp Business (about, descripcion, direccion, email, websites, categoria) directamente desde el panel de administracion.
+
+### 35.2 Archivos
+
+| Archivo | Responsabilidad |
+|---------|----------------|
+| `server/src/routes/whatsappProfile.ts` | Endpoints GET/PATCH `/api/whatsapp/profile` con Zod validation |
+| `server/src/services/whatsappProfileService.ts` | Obtener/actualizar perfil via Meta Graph API (v20.0+). En modo simulador, retorna datos dummy |
+| `src/api/whatsappProfileApi.ts` | Cliente API frontend |
+| `src/components/whatsapp/WhatsAppProfilePage.tsx` | Pagina admin con formulario de edicion |
+
+### 35.3 Endpoints
+
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| `GET` | `/api/whatsapp/profile` | Si (JWT) | Obtiene perfil actual (about, description, address, email, websites, vertical, profile_picture_url) |
+| `PATCH` | `/api/whatsapp/profile` | Si (JWT) | Actualiza campos del perfil |
+
+**Validacion Zod del PATCH:**
+- `about`: string, max 139 caracteres
+- `description`: string, max 512 caracteres
+- `address`: string, max 256 caracteres
+- `email`: email valido
+- `websites`: array de URLs, max 2 elementos
+- `vertical`: enum de categorias de negocio (HOTEL, TRAVEL, OTHER, etc.)
+
+### 35.4 Modo simulador
+
+Cuando `SIMULATOR_MODE=true` o no hay credenciales de WhatsApp configuradas, el servicio retorna un perfil dummy con datos de ejemplo del alojamiento. Las actualizaciones en modo simulador retornan success pero no persisten.
+
+### 35.5 UI
+
+Pagina accesible desde el panel de admin con:
+- Campos editables: about, description, address, email, 2 websites, vertical (dropdown)
+- Indicadores de limite de caracteres (about: 139, description: 512, address: 256)
+- Foto de perfil en modo solo-lectura (no editable via API)
+- Aviso visible cuando esta en modo simulador
+- Boton guardar con estado de carga
+
+---
+
+## 36. Mejoras de Seguridad, Performance y Funcionalidad (2026-03-18)
+
+Lote de 10 correcciones y mejoras implementadas en una sola sesion.
+
+### 36.1 Rate Limiting en rutas publicas
+
+**Archivo**: `server/src/middleware/rateLimiter.ts`
+
+Refactorizado a un patron factory `createRateLimiter(namespace, maxRequests, windowSeconds)` que permite crear limiters con distintos limites por ruta. Cada namespace tiene su propia store en Redis (key prefix `chatboot:ratelimit:{namespace}:`) con fallback in-memory independiente.
+
+| Limiter | Namespace | Limite | Rutas |
+|---------|-----------|--------|-------|
+| `rateLimiter` | `api` | 100 req/min/IP | Rutas protegidas (existente) |
+| `loginRateLimiter` | `login` | 5 req/min/IP | `POST /api/auth/login`, `POST /api/auth/forgot-password` |
+| `webchatRateLimiter` | `webchat` | 30 req/min/IP | `POST /api/webchat/send` |
+
+### 36.2 Titulares verificados en BotConfig
+
+**Archivos**: `schema.prisma`, `botEngine.ts`, `botConfig.ts` (route), `botConfigApi.ts`, `BotConfigPage.tsx`
+
+Movido el array hardcodeado `TRUSTED_HOLDERS` a un campo configurable `titularesVerificados` (String[]) en el modelo `BotConfig`. La comparacion es case-insensitive. Gestionable desde el panel admin con UI de chips (agregar/eliminar titulares).
+
+**Migracion**: `20260318210944_add_titulares_verificados` — agrega columna `titulares_verificados` (text[]) a tabla `bot_config`.
+
+### 36.3 Manejo de imagenes WhatsApp
+
+**Archivo**: `server/src/services/webhookProcessor.ts`
+
+Nuevo branch para mensajes tipo `image` en el procesamiento de mensajes entrantes:
+- Guarda el mensaje con `tipo: 'image'`, `contenido: caption || '[Imagen recibida]'`
+- Almacena `metadata: { mediaId, mimeType }` para futura descarga
+- Si la conversacion esta en estado `bot`, escala a `espera_humano` con mensaje de sistema y responde al usuario: "Recibimos tu imagen. Un agente la va a revisar y te contacta en breve."
+- Agrega campo `image` a la interfaz `WhatsAppMessage`: `{ id: string; mime_type: string; caption?: string }`
+
+### 36.4 Indexes de performance en base de datos
+
+**Archivo**: `server/prisma/schema.prisma`
+
+**Migracion**: `20260318211244_add_performance_indexes`
+
+| Modelo | Index | Columnas | Uso |
+|--------|-------|----------|-----|
+| `Conversacion` | simple | `estado` | Filtrado por estado en listado de conversaciones |
+| `Reserva` | compuesto | `habitacion, estado` | Consultas de ocupacion por departamento |
+| `Reserva` | compuesto | `fechaEntrada, fechaSalida` | Consultas de rango de fechas |
+| `Bloqueo` | compuesto | `complejoId, fechaInicio, fechaFin` | Consultas de disponibilidad con bloqueos |
+
+### 36.5 Habitaciones dinamicas en inventarioService
+
+**Archivo**: `server/src/services/inventarioService.ts`
+
+Reemplazado el array hardcodeado `HABITACIONES = ['Pewmafe', 'Luminar Mono', 'Luminar 2Amb', 'LG']` por la funcion `getActiveHabitaciones()` que consulta `prisma.complejo.findMany({ where: { activo: true } })`. Esto permite que al agregar o desactivar complejos desde el panel admin, el inventario y disponibilidad se actualicen automaticamente.
+
+### 36.6 Notificacion de fechas invertidas
+
+**Archivo**: `server/src/services/botEngine.ts`
+
+Cuando se detectan fechas invertidas (`fecha_entrada > fecha_salida`), ademas del swap automatico, ahora se agrega contexto adicional para Claude: "Las fechas del huesped estaban invertidas. Se corrigieron automaticamente: entrada X, salida Y. Confirma amablemente con el huesped que esas son las fechas correctas." Esto evita el swap silencioso y permite al usuario verificar.
+
+### 36.7 Intents cancelar_reserva y cambiar_reserva
+
+**Archivos**: `server/src/services/claudeService.ts`, `server/src/services/botEngine.ts`
+
+Dos nuevos intents agregados al clasificador (total: 12 intents):
+
+| Intent | Deteccion (fallback regex) | Accion |
+|--------|---------------------------|--------|
+| `cancelar_reserva` | `/cancel.*reserv\|anular.*reserv/` | Escala a `espera_humano` + mensaje sistema "Huesped solicito cancelar su reserva" |
+| `cambiar_reserva` | `/cambiar.*reserv\|modificar.*reserv\|mover.*reserv\|cambiar.*fecha/` | Escala a `espera_humano` + mensaje sistema "Huesped solicito modificar su reserva" |
+
+Ambos intents se tratan como escalacion obligatoria (el bot no puede cancelar ni modificar reservas). El clasificador Claude Haiku los detecta en el prompt, y el fallback regex los detecta antes del intent generico `reservar` para evitar falsos positivos.
+
+### 36.8 Warning CORS en produccion
+
+**Archivo**: `server/src/app.ts`
+
+Cuando `ALLOWED_ORIGINS` es `*` y `NODE_ENV` es `production`, se loguea un warning via Pino: "ALLOWED_ORIGINS is set to '*' in production — this allows any origin. Set explicit origins in .env for security."

@@ -23,6 +23,8 @@ export type Intent =
   | 'consulta_alojamiento'
   | 'consulta_zona'
   | 'reservar'
+  | 'cancelar_reserva'
+  | 'cambiar_reserva'
   | 'hablar_humano'
   | 'queja'
   | 'despedida'
@@ -55,6 +57,9 @@ export async function classifyIntent(
     // Add current message
     messages.push({ role: 'user', content: message });
 
+    const todayStr = getArgentinaToday();
+    logger.debug({ todayArgentina: todayStr }, 'Classifier: Argentina date used for relative date resolution');
+
     const classifierSystem: TextBlockParam[] = [
       {
         type: 'text',
@@ -66,6 +71,8 @@ Clasifica el ULTIMO mensaje del usuario en una de estas intenciones:
 - consulta_alojamiento: pregunta sobre habitaciones, servicios, amenities, check-in/out, politicas, fotos
 - consulta_zona: pregunta sobre la zona, restaurantes, actividades, transporte
 - reservar: quiere hacer una reserva
+- cancelar_reserva: quiere cancelar una reserva existente
+- cambiar_reserva: quiere modificar una reserva existente (cambiar fechas, departamento, personas)
 - hablar_humano: quiere hablar con una persona real
 - queja: se queja de algo, esta insatisfecho
 - despedida: se despide
@@ -90,7 +97,7 @@ Solo incluye en entities las claves que esten EXPLICITAMENTE presentes en el ult
       },
       {
         type: 'text',
-        text: `5. Las fechas deben estar en formato YYYY-MM-DD. La fecha de hoy es ${getArgentinaToday()}. Usa esta fecha para resolver referencias relativas como "mañana", "pasado mañana", "este fin de semana", "la semana que viene".`,
+        text: `5. Las fechas deben estar en formato YYYY-MM-DD. La fecha de hoy es ${todayStr}. Usa esta fecha para resolver referencias relativas como "mañana", "pasado mañana", "este fin de semana", "la semana que viene".`,
       },
     ];
 
@@ -122,6 +129,8 @@ function classifyIntentFallback(message: string): ClassifyResult {
   // Check specific intents BEFORE saludo (a message starting with "hola" may still be a price/availability query)
   if (/disponib|libre|hay lugar/.test(lower)) return { intent: 'consulta_disponibilidad', confidence: 0.7, entities: {} };
   if (/precio|cuesta|cuánto|cuanto.*sale|tarifa|coste|cost/.test(lower)) return { intent: 'consulta_precio', confidence: 0.7, entities: {} };
+  if (/cancel.*reserv|anular.*reserv/.test(lower)) return { intent: 'cancelar_reserva', confidence: 0.8, entities: {} };
+  if (/cambiar.*reserv|modificar.*reserv|mover.*reserv|cambiar.*fecha/.test(lower)) return { intent: 'cambiar_reserva', confidence: 0.8, entities: {} };
   if (/reserv|quiero reservar|book/.test(lower)) return { intent: 'reservar', confidence: 0.7, entities: {} };
   if (/habitaci|servicio|wifi|piscina|check|mascotas?|perros?|parking|amenities|parrilla|estacionamiento|foto/.test(lower)) return { intent: 'consulta_alojamiento', confidence: 0.7, entities: {} };
   if (/zona|restaurante|actividad|senderismo|visitar|pueblo|como llego|ubicaci|direcci/.test(lower)) return { intent: 'consulta_zona', confidence: 0.7, entities: {} };
@@ -172,8 +181,26 @@ export async function generateResponse(
 Tu tono es ${botConfig.tono}. Usas ${idioma}. Respuestas concisas (${longitud}).
 ${emojiRule} Los precios son en pesos argentinos (ARS).
 
+FORMATO WHATSAPP — OBLIGATORIO:
+- Tus respuestas se muestran en burbujas de WhatsApp. Mantene los mensajes cortos y bien espaciados.
+- DATOS BANCARIOS: Cuando informes CBU, alias, titular, CUIT o banco, pone CADA dato en su propia linea con un salto de linea entre ellos. Usa formato limpio:
+  Titular: Nombre Apellido
+  CBU: 0000000000000000000000
+  Alias: nombre.alias
+  Banco: Nombre del Banco
+  CUIT: 00-00000000-0
+- NUNCA pongas el CBU o alias en medio de un parrafo largo. Siempre en lineas separadas.
+- Para listas, usa saltos de linea simples (no listas con guiones largos).
+- Evita parrafos de mas de 3 lineas seguidas sin un salto de linea.
+- UBICACION / GOOGLE MAPS: Cuando el huesped pregunte la ubicacion, direccion o como llegar, comparti el link de Google Maps en su propia linea, limpio y sin texto adicional alrededor:
+
+Ubicacion de [nombre depto]:
+https://www.google.com/maps/search/?api=1&query=...
+
+  NUNCA metas el link de Maps dentro de un parrafo. Siempre en su propia linea para que WhatsApp genere la vista previa del mapa.
+
 REGLAS IMPORTANTES:
-1. FOTOS: NUNCA incluyas URLs de imagenes, links a paginas web, YouTube ni video tours en tu respuesta de texto. NUNCA menciones que las fotos "se envian automaticamente" ni des explicaciones tecnicas sobre el envio de fotos.
+1. FOTOS: NUNCA incluyas URLs de imagenes ni links a paginas web en tu respuesta de texto. Las fotos se envian automaticamente como imagenes adjuntas, NO como links. Si el usuario pide fotos de un departamento especifico, respondele brevemente (ej: "Aca te muestro fotos de Pewmafe") y el sistema se encarga de enviar las imagenes. NUNCA generes URLs de fotos.
 2. PRECIOS: Usa EXCLUSIVAMENTE las tarifas que aparecen en la tabla de tarifas del contexto. NUNCA inventes ni estimes precios.
 3. CAPACIDAD: La "Capacidad" indicada en cada departamento es POR UNIDAD (por depto individual). NUNCA sugieras un departamento si la cantidad de personas excede su capacidad maxima por unidad. Si son 4 personas, NO ofrezcas el Monoambiente (max 3 personas). NUNCA ofrezcas mas unidades de las que existen segun "Cantidad de unidades". Si un departamento tiene 1 sola unidad, solo podes ofrecer 1. Para grupos grandes que superan la capacidad total disponible combinando todos los departamentos, indica que no contamos con capacidad para alojar a tantas personas juntas y sugeri que nos contacten directamente por telefono para analizar opciones.
 4. NUNCA inventes ni asumas datos que el usuario no dijo. ESTADIA MINIMA: NUNCA menciones estadia minima proactivamente. Solo informala cuando el "Contexto adicional" contenga la etiqueta "ADVERTENCIA ESTADIA MINIMA" (significa que el huesped pidio menos noches que el minimo). Si NO hay ADVERTENCIA, NO menciones estadia minima bajo ninguna circunstancia. JAMAS generalices la estadia minima de un departamento a los demas. NUNCA digas "todos nuestros departamentos requieren estadia minima" porque es FALSO.
@@ -208,6 +235,8 @@ Instrucciones segun intencion:
 - consulta_alojamiento: Responder sobre el departamento activo o presentar opciones filtradas por capacidad.
 - consulta_zona: Recomienda actividades y lugares cercanos.
 - reservar: Pedir SOLO los datos que faltan (fechas, personas, departamento). Cuando tenga todos los datos, seguir el flujo del punto 8 (NUNCA decir que la reserva esta confirmada).
+- cancelar_reserva: Decile al huesped que vas a comunicarlo con un agente para gestionar la cancelacion. NO canceles la reserva vos, solo un agente humano puede hacerlo.
+- cambiar_reserva: Decile al huesped que vas a comunicarlo con un agente para gestionar la modificacion. NO modifiques la reserva vos, solo un agente humano puede hacerlo.
 - hablar_humano: Indica que un agente se pondra en contacto pronto.
 - queja: Pide disculpas y escala a un agente humano.
 - despedida: Despidete amablemente.
@@ -295,6 +324,8 @@ function generateResponseFallback(intent: Intent, botConfig?: BotConfig): string
     consulta_alojamiento: 'Tenemos 4 departamentos: Pewmafe (4 pers, con patio y parrilla), Luminar Monoambiente (3 pers), Luminar 2 Ambientes (4 pers, con parrilla) y LG (4 pers, 50m2). Todos con cocina equipada, Wi-Fi, aire acondicionado y a 2-3 cuadras de la playa. ¿Cual te interesa?',
     consulta_zona: 'Estamos en Las Grutas, la playa mas linda de la Patagonia! Podes disfrutar de buceo, kayak, mountain bike, y visitar las famosas grutas. A 100 km esta la pinguinera de El Condor. ¿Te interesa alguna actividad?',
     reservar: 'Perfecto, vamos a gestionar tu reserva. Necesito: 1) Fechas de entrada y salida, 2) Cantidad de personas, 3) Preferencia de departamento (Pewmafe, Luminar Mono, Luminar 2Amb o LG). ¿Me pasas esos datos?',
+    cancelar_reserva: 'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la cancelacion de tu reserva. Te va a atender en breve.',
+    cambiar_reserva: 'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la modificacion de tu reserva. Te va a atender en breve.',
     hablar_humano: botConfig?.mensajeEsperaHumano ?? 'Entendido, te voy a comunicar con uno de nuestros agentes. Te va a atender en breve. Gracias por tu paciencia.',
     queja: 'Lamento mucho la situacion. Te voy a comunicar con uno de nuestros agentes para que pueda ayudarte personalmente. Disculpa las molestias.',
     despedida: botConfig?.mensajeDespedida ?? 'Gracias por contactarnos! Si necesitas algo mas, no dudes en escribirnos. Que tengas un excelente dia!',

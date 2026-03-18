@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { processIncomingMessage } from '../services/webhookProcessor.js';
+import { webchatRateLimiter } from '../middleware/rateLimiter.js';
 import { prisma } from '../lib/prisma.js';
 import { logger } from '../utils/logger.js';
 
@@ -12,7 +13,7 @@ const webchatSchema = z.object({
   name: z.string().max(100).optional(),
 });
 
-router.post('/webchat/send', async (req, res) => {
+router.post('/webchat/send', webchatRateLimiter, async (req, res) => {
   const parsed = webchatSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });

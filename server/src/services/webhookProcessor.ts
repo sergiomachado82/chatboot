@@ -15,6 +15,7 @@ interface WhatsAppMessage {
   type: string;
   text?: { body: string };
   audio?: { id: string; mime_type: string };
+  image?: { id: string; mime_type: string; caption?: string };
   name?: string;
 }
 
@@ -77,6 +78,36 @@ export async function processIncomingMessage(message: WhatsAppMessage, contactNa
       sendWhatsAppMessage(from, 'No pudimos procesar tu audio. Un agente te va a atender en breve.').catch(() => {});
       return;
     }
+  } else if (type === 'image' && message.image) {
+    msgTipo = 'image';
+    const caption = message.image.caption ?? '';
+    body = caption || '[Imagen recibida]';
+    metadata = { mediaId: message.image.id, mimeType: message.image.mime_type };
+    logger.info({ from, caption: caption.slice(0, 100) }, 'Image message received');
+
+    // Save the image message and escalate to human (bot can't interpret images)
+    await createMensaje({
+      conversacionId: conversacion.id,
+      tipo: msgTipo,
+      direccion: 'entrante',
+      origen: 'huesped',
+      contenido: body,
+      waMessageId: id,
+      metadata,
+    });
+
+    if (conversacion.estado === 'bot') {
+      await updateConversacionEstado(conversacion.id, 'espera_humano');
+      await createMensaje({
+        conversacionId: conversacion.id,
+        tipo: 'text',
+        direccion: 'saliente',
+        origen: 'sistema',
+        contenido: 'Conversacion escalada: el huesped envio una imagen.',
+      });
+      sendWhatsAppMessage(from, 'Recibimos tu imagen. Un agente la va a revisar y te contacta en breve.').catch(() => {});
+    }
+    return;
   } else {
     body = message.text?.body ?? '';
     msgTipo = type === 'text' ? 'text' : (type as 'image' | 'audio' | 'document');

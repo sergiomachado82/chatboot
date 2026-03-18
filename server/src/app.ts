@@ -9,6 +9,7 @@ import { authMiddleware } from './middleware/authMiddleware.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { env } from './config/env.js';
+import { logger } from './utils/logger.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
 import webhookRouter from './routes/webhook.js';
@@ -28,6 +29,9 @@ const app = express();
 
 // Parse allowed origins from env
 const allowedOrigins = env.ALLOWED_ORIGINS;
+if (allowedOrigins === '*' && env.NODE_ENV === 'production') {
+  logger.warn('ALLOWED_ORIGINS is set to "*" in production — this allows any origin. Set explicit origins in .env for security.');
+}
 
 // Global middleware
 app.use(helmet({

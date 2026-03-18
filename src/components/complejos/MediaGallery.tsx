@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { removeMedia } from '../../api/complejoApi';
-import { X } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { MediaFile } from '@shared/types/complejo';
 import MediaUploadForm from './MediaUploadForm';
 
@@ -15,6 +15,7 @@ export default function MediaGallery({ complejoId, media }: MediaGalleryProps) {
   const deleteMutation = useMutation({
     mutationFn: (mediaId: string) => removeMedia(complejoId, mediaId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['complejos'] }),
+    onError: () => alert('Error al eliminar la imagen. Intenta de nuevo.'),
   });
 
   return (
@@ -24,7 +25,7 @@ export default function MediaGallery({ complejoId, media }: MediaGalleryProps) {
       {media.length > 0 ? (
         <div className="grid grid-cols-3 gap-2">
           {media.map((m) => (
-            <div key={m.id} className="relative group rounded overflow-hidden bg-gray-100">
+            <div key={m.id} className="relative rounded overflow-hidden bg-gray-100">
               {m.tipo === 'image' ? (
                 <img src={m.url} alt={m.caption ?? ''} className="w-full h-24 object-cover" />
               ) : (
@@ -33,14 +34,17 @@ export default function MediaGallery({ complejoId, media }: MediaGalleryProps) {
                 </div>
               )}
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (confirm('Eliminar esta imagen?')) {
                     deleteMutation.mutate(m.id);
                   }
                 }}
-                className="absolute top-1 right-1 p-0.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                disabled={deleteMutation.isPending}
+                className="absolute top-1 right-1 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-md transition-colors disabled:opacity-50"
+                title="Eliminar imagen"
               >
-                <X size={12} />
+                <Trash2 size={14} />
               </button>
               {m.caption && (
                 <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 truncate">

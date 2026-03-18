@@ -1,7 +1,15 @@
 import { prisma } from '../lib/prisma.js';
 import type { DisponibilidadResult } from '@shared/types/inventario.js';
 
-const HABITACIONES = ['Pewmafe', 'Luminar Mono', 'Luminar 2Amb', 'LG'];
+/** Get all active complejo names from DB */
+async function getActiveHabitaciones(): Promise<string[]> {
+  const complejos = await prisma.complejo.findMany({
+    where: { activo: true },
+    select: { nombre: true },
+    orderBy: { creadoEn: 'asc' },
+  });
+  return complejos.map((c) => c.nombre);
+}
 
 /** Converts a Date (possibly UTC midnight) to local midnight for the same calendar date.
  *  e.g. 2026-10-01T00:00:00Z → local Oct 1 00:00 → 2026-10-01T03:00:00Z in UTC-3 */
@@ -96,7 +104,7 @@ export async function checkAvailability(
   fechaSalida: Date,
   habitacion?: string
 ): Promise<DisponibilidadResult[]> {
-  const habitaciones = habitacion ? [habitacion] : HABITACIONES;
+  const habitaciones = habitacion ? [habitacion] : await getActiveHabitaciones();
   const results: DisponibilidadResult[] = [];
   const noches = Math.ceil((fechaSalida.getTime() - fechaEntrada.getTime()) / (1000 * 60 * 60 * 24));
   const dates = dateRange(fechaEntrada, fechaSalida);
@@ -147,7 +155,8 @@ export async function getOccupiedDepartments(fechaEntrada: Date, fechaSalida: Da
   const occupied: string[] = [];
   const dates = dateRange(fechaEntrada, fechaSalida);
 
-  for (const hab of HABITACIONES) {
+  const habitaciones = await getActiveHabitaciones();
+  for (const hab of habitaciones) {
     const cantidadUnidades = await getCantidadUnidades(hab);
     let fullyOccupied = false;
 

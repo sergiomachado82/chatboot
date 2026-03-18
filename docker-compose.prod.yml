@@ -8,6 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-chatboot}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-chatboot}
+      TZ: America/Argentina/Buenos_Aires
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -44,6 +45,7 @@ services:
       REDIS_URL: redis://redis:6379
       NODE_ENV: production
       PORT: 5050
+      TZ: America/Argentina/Buenos_Aires
     depends_on:
       postgres:
         condition: service_healthy

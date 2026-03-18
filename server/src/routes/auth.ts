@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { verifyCredentials, generateToken, generateResetToken, resetPassword } from '../services/authService.js';
 import { sendResetEmail } from '../services/emailService.js';
+import { loginRateLimiter } from '../middleware/rateLimiter.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { z } from 'zod';
@@ -12,7 +13,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', loginRateLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', message: parsed.error.flatten().fieldErrors });
@@ -36,7 +37,7 @@ const forgotPasswordSchema = z.object({
   email: z.string().email(),
 });
 
-router.post('/auth/forgot-password', async (req, res) => {
+router.post('/auth/forgot-password', loginRateLimiter, async (req, res) => {
   const parsed = forgotPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', message: parsed.error.flatten().fieldErrors });

@@ -33,8 +33,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper signal handling + tzdata for timezone support
+RUN apk add --no-cache dumb-init tzdata
 
 # Copy built frontend
 COPY --from=build /app/dist ./dist
