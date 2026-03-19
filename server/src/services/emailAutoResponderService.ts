@@ -5,6 +5,7 @@ import { getFullContext, getFilteredContext } from '../data/accommodationContext
 import { checkAvailability } from './inventarioService.js';
 import { sendAutoReplyEmail } from './emailService.js';
 import { getArgentinaToday } from '../utils/dateUtils.js';
+import type { ContactFormFields } from './emailPollerService.js';
 
 let client: Anthropic | null = null;
 
@@ -22,6 +23,7 @@ interface IncomingEmail {
   body: string;
   inReplyTo?: string;
   activeComplejos: Array<{ id: string; nombre: string }>;
+  formFields?: ContactFormFields;
 }
 
 interface ExtractedData {
@@ -31,6 +33,67 @@ interface ExtractedData {
   complejo_nombre: string | null;
   nombre_huesped: string | null;
   consulta: string;
+}
+
+/**
+ * Try to normalize a date string to YYYY-MM-DD.
+ * Handles: "2026-04-01", "01/04/2026", "1/4/2026"
+ */
+function normalizeDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+  const trimmed = dateStr.trim();
+
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  // DD/MM/YYYY or D/M/YYYY
+  const slashMatch = trimmed.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (slashMatch) {
+    const day = slashMatch[1]!.padStart(2, '0');
+    const month = slashMatch[2]!.padStart(2, '0');
+    const year = slashMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // Let Date parse it as last resort
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0]!;
+  }
+
+  return null;
+}
+
+/**
+ * Build ExtractedData from contact form fields (no Claude call needed).
+ */
+function extractFromFormFields(
+  fields: ContactFormFields,
+  activeComplejos: Array<{ id: string; nombre: string }>
+): ExtractedData {
+  // Match complejo name from form to known complejos
+  let complejoNombre: string | null = null;
+  if (fields.complejo) {
+    const lower = fields.complejo.toLowerCase();
+    const match = activeComplejos.find(
+      c => c.nombre.toLowerCase() === lower ||
+           c.nombre.toLowerCase().includes(lower) ||
+           lower.includes(c.nombre.toLowerCase())
+    );
+    if (match) complejoNombre = match.nombre;
+    else complejoNombre = fields.complejo; // pass as-is for context
+  }
+
+  const numPersonas = fields.huespedes ? parseInt(fields.huespedes, 10) : null;
+
+  return {
+    fecha_entrada: normalizeDate(fields.fechaIngreso),
+    fecha_salida: normalizeDate(fields.fechaSalida),
+    num_personas: isNaN(numPersonas as number) ? null : numPersonas,
+    complejo_nombre: complejoNombre,
+    nombre_huesped: fields.nombre,
+    consulta: fields.mensaje || 'Consulta de disponibilidad desde formulario web',
+  };
 }
 
 /**
@@ -45,14 +108,22 @@ export async function processIncomingEmail(email: IncomingEmail): Promise<string
   const todayStr = getArgentinaToday();
   const complejoNames = email.activeComplejos.map(c => c.nombre).join(', ');
 
-  // Step 1: Extract data with Claude (Haiku - fast + cheap)
-  const extractionResponse = await getClient().messages.create({
-    model: env.CLAUDE_CLASSIFIER_MODEL,
-    max_tokens: 300,
-    system: [
-      {
-        type: 'text',
-        text: `Eres un extractor de datos de emails de consulta de alojamiento turistico.
+  // ── Step 1: Extract data ──
+  let extracted: ExtractedData;
+
+  if (email.formFields) {
+    // Contact form: use structured fields directly (no Claude call)
+    extracted = extractFromFormFields(email.formFields, email.activeComplejos);
+    logger.info({ extracted, from: email.from }, 'Form fields extracted directly');
+  } else {
+    // Regular email: use Claude to extract data
+    const extractionResponse = await getClient().messages.create({
+      model: env.CLAUDE_CLASSIFIER_MODEL,
+      max_tokens: 300,
+      system: [
+        {
+          type: 'text',
+          text: `Eres un extractor de datos de emails de consulta de alojamiento turistico.
 La fecha de hoy es ${todayStr}.
 Los complejos/departamentos disponibles son: ${complejoNames}.
 
@@ -73,36 +144,36 @@ Reglas:
 - Si menciona un departamento, usa el nombre exacto de la lista
 - Si no menciona ningun departamento, deja null
 - "consulta" es un resumen de 1 linea de lo que pide el email`,
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: `Asunto: ${email.subject}\n\n${email.body}`.slice(0, 3000),
-      },
-    ],
-  }, { timeout: env.CLAUDE_TIMEOUT_MS });
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: `Asunto: ${email.subject}\n\n${email.body}`.slice(0, 3000),
+        },
+      ],
+    }, { timeout: env.CLAUDE_TIMEOUT_MS });
 
-  const extractionText = extractionResponse.content[0]?.type === 'text'
-    ? extractionResponse.content[0].text : '{}';
-  const cleanExtraction = extractionText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const extractionText = extractionResponse.content[0]?.type === 'text'
+      ? extractionResponse.content[0].text : '{}';
+    const cleanExtraction = extractionText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
-  let extracted: ExtractedData;
-  try {
-    extracted = JSON.parse(cleanExtraction);
-  } catch {
-    logger.warn({ raw: cleanExtraction }, 'Failed to parse extraction JSON');
-    extracted = {
-      fecha_entrada: null,
-      fecha_salida: null,
-      num_personas: null,
-      complejo_nombre: null,
-      nombre_huesped: null,
-      consulta: 'Consulta general',
-    };
+    try {
+      extracted = JSON.parse(cleanExtraction);
+    } catch {
+      logger.warn({ raw: cleanExtraction }, 'Failed to parse extraction JSON');
+      extracted = {
+        fecha_entrada: null,
+        fecha_salida: null,
+        num_personas: null,
+        complejo_nombre: null,
+        nombre_huesped: null,
+        consulta: 'Consulta general',
+      };
+    }
+
+    logger.info({ extracted, from: email.from }, 'Email data extracted via Claude');
   }
-
-  logger.info({ extracted, from: email.from }, 'Email data extracted');
 
   // Resolve complejoId
   let complejoId: string | null = null;
@@ -113,7 +184,7 @@ Reglas:
     if (match) complejoId = match.id;
   }
 
-  // Step 2: Check availability if we have dates
+  // ── Step 2: Check availability if we have dates ──
   let availabilityInfo = '';
   if (extracted.fecha_entrada && extracted.fecha_salida) {
     try {
@@ -121,7 +192,6 @@ Reglas:
       const fechaSalida = new Date(extracted.fecha_salida);
       const noches = Math.ceil((fechaSalida.getTime() - fechaEntrada.getTime()) / (1000 * 60 * 60 * 24));
 
-      // Check requested dates for the requested complejo (or all)
       const results = await checkAvailability(
         fechaEntrada,
         fechaSalida,
@@ -134,10 +204,9 @@ Reglas:
         );
         availabilityInfo = `\nRESULTADOS DE DISPONIBILIDAD para ${extracted.fecha_entrada} a ${extracted.fecha_salida}:\n${lines.join('\n')}`;
       } else {
-        // No availability — search alternatives
         availabilityInfo = `\nSIN DISPONIBILIDAD para ${extracted.complejo_nombre || 'ningun departamento'} en las fechas ${extracted.fecha_entrada} a ${extracted.fecha_salida}.`;
 
-        // Alternative A: Other complejos available on the same dates
+        // Alternative A: Other complejos on the same dates
         if (extracted.complejo_nombre) {
           const otherResults = await checkAvailability(fechaEntrada, fechaSalida);
           if (otherResults.length > 0) {
@@ -149,7 +218,7 @@ Reglas:
           }
         }
 
-        // Alternative B: Nearby dates for the same complejo (±7 days, check 3 offsets)
+        // Alternative B: Nearby dates (±3/7 days)
         const nearbyResults: Array<{ offset: number; results: typeof results }> = [];
         const offsets = [-7, -3, 3, 7];
         for (const dayOffset of offsets) {
@@ -158,7 +227,6 @@ Reglas:
           const altSalida = new Date(altEntrada);
           altSalida.setDate(altSalida.getDate() + noches);
 
-          // Skip past dates
           const today = new Date(todayStr);
           if (altEntrada < today) continue;
 
@@ -194,14 +262,18 @@ Reglas:
     }
   }
 
-  // Step 3: Get context for the response
-  // If we're offering alternatives from other complejos, use full context so Claude can describe them
+  // ── Step 3: Get context ──
   const needsFullContext = availabilityInfo.includes('OTROS DEPARTAMENTOS DISPONIBLES');
   const contextData = (extracted.complejo_nombre && !needsFullContext)
     ? await getFilteredContext(extracted.complejo_nombre)
     : await getFullContext();
 
-  // Step 4: Generate response with Claude (Sonnet)
+  // ── Step 4: Generate response with Claude ──
+  const isFormSubmission = !!email.formFields;
+  const personasInfo = extracted.num_personas ? `Personas: ${extracted.num_personas}` : '';
+  const fechasInfo = extracted.fecha_entrada ? `Fechas: ${extracted.fecha_entrada} a ${extracted.fecha_salida}` : '';
+  const complejoInfo = extracted.complejo_nombre ? `Departamento consultado: ${extracted.complejo_nombre}` : '';
+
   const responseResult = await getClient().messages.create({
     model: env.CLAUDE_RESPONSE_MODEL,
     max_tokens: 1000,
@@ -228,6 +300,7 @@ REGLAS PARA EMAIL:
     c) Si hay ambas alternativas, menciona las dos opciones.
     d) Si no hay ninguna alternativa, invita al huesped a contactarnos por WhatsApp para buscar opciones juntos.
     e) Siempre se empatico: "Lamentablemente no tenemos disponibilidad en [depto] para esas fechas, pero te podemos ofrecer..."
+12. FORMULARIO WEB: Si los datos vienen de un formulario web y el mensaje esta vacio, responde directamente con la informacion de disponibilidad y precios para las fechas y departamento indicados. No pidas mas informacion, ya tenes todos los datos del formulario.
 
 CONTEXTO DEL ALOJAMIENTO:
 ${contextData}
@@ -241,13 +314,14 @@ ${availabilityInfo}`,
         content: `Responde a este email de ${extracted.nombre_huesped || email.from}:
 
 Asunto: ${email.subject}
+${isFormSubmission ? 'Origen: Formulario de contacto web' : ''}
+${complejoInfo}
+${fechasInfo}
+${personasInfo}
 Consulta: ${extracted.consulta}
-${extracted.num_personas ? `Personas: ${extracted.num_personas}` : ''}
-${extracted.fecha_entrada ? `Fechas: ${extracted.fecha_entrada} a ${extracted.fecha_salida}` : ''}
-${extracted.complejo_nombre ? `Departamento: ${extracted.complejo_nombre}` : ''}
 
-Texto original del email:
-${email.body.slice(0, 2000)}`,
+${isFormSubmission && email.formFields?.mensaje ? `Mensaje del huesped: ${email.formFields.mensaje}` : ''}
+${!isFormSubmission ? `Texto original del email:\n${email.body.slice(0, 2000)}` : ''}`.trim(),
       },
     ],
   }, { timeout: env.CLAUDE_TIMEOUT_MS });
@@ -256,7 +330,7 @@ ${email.body.slice(0, 2000)}`,
     ? responseResult.content[0].text
     : 'Gracias por tu consulta. Te contactaremos a la brevedad. Saludos, Las Grutas Departamentos.';
 
-  // Step 5: Send reply
+  // ── Step 5: Send reply ──
   const replySubject = email.subject.startsWith('Re:')
     ? email.subject
     : `Re: ${email.subject}`;
