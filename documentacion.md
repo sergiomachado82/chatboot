@@ -3165,3 +3165,164 @@ Ambos intents se tratan como escalacion obligatoria (el bot no puede cancelar ni
 **Archivo**: `server/src/app.ts`
 
 Cuando `ALLOWED_ORIGINS` es `*` y `NODE_ENV` es `production`, se loguea un warning via Pino: "ALLOWED_ORIGINS is set to '*' in production — this allows any origin. Set explicit origins in .env for security."
+
+---
+
+## 37. Recoleccion de datos del huesped en flujo de reserva (nombre, telefono, DNI)
+
+### 37.1 Contexto
+
+El bot ahora recolecta 3 datos adicionales del huesped durante el flujo de reserva: **nombre completo**, **numero de celular** y **numero de DNI**. Estos datos se piden de forma progresiva (uno a la vez) junto con los datos de reserva existentes (personas, fechas, departamento). La reserva no se auto-crea hasta que TODOS los datos estan completos, incluyendo DNI.
+
+### 37.2 Nuevas entidades del clasificador
+
+**Archivo**: `server/src/services/claudeService.ts`
+
+Se agregaron 3 nuevas reglas de extraccion de entidades al prompt del clasificador Haiku:
+
+| Entidad | Regla | Ejemplo |
+|---------|-------|---------|
+| `nombre_huesped` | Solo si el usuario dice su nombre | "soy Juan", "me llamo Maria Perez" |
+| `telefono` | Solo si da un numero de celular | "mi celular es 2920412345" |
+| `dni` | Solo si da su numero de documento | "mi DNI es 35123456", "documento 28.456.789" |
+
+Las 3 entidades se agregaron a `VALID_ENTITY_KEYS` en `botEngine.ts` para que sean aceptadas por `sanitizeEntities()`.
+
+### 37.3 Validacion de DNI
+
+**Archivo**: `server/src/services/botEngine.ts` (funcion `sanitizeEntities`)
+
+El DNI se valida server-side:
+- Se eliminan puntos separadores (`28.456.789` → `28456789`)
+- Se verifica que sea un numero entre **5.000.000** y **99.999.999**
+- Si no cumple el rango, se descarta la entidad y se loguea un warning
+- El prompt de Claude tambien instruye al bot a pedir verificacion si el numero esta fuera de rango
+
+### 37.4 Flujo de recoleccion progresiva
+
+**Archivo**: `server/src/services/botEngine.ts`
+
+Los datos faltantes se detectan en la seccion "missing" y se comunican a Claude como "Datos que FALTAN por preguntar". El orden de recoleccion es:
+
+1. Cantidad de personas
+2. Fechas de entrada y salida
+3. Preferencia de departamento
+4. Nombre del huesped
+5. Numero de celular
+6. Numero de DNI
+
+Claude pregunta por **un dato a la vez** siguiendo las reglas de "PREGUNTAS PROGRESIVAS".
+
+### 37.5 Auto-creacion de reserva
+
+**Archivo**: `server/src/services/botEngine.ts` (seccion 10)
+
+La condicion `allPresent` ahora requiere **7 campos** (antes 4):
+
+```typescript
+const allPresent = mergedEntities.habitacion && mergedEntities.fecha_entrada &&
+                   mergedEntities.fecha_salida && mergedEntities.num_personas &&
+                   mergedEntities.nombre_huesped && mergedEntities.telefono &&
+                   mergedEntities.dni;
+```
+
+La misma condicion se aplica a `prevHadAll` (para verificar que PASO 1 fue mostrado con todos los datos). Al crear la reserva, se pasan los datos extraidos:
+
+```typescript
+await createReserva({
+  nombreHuesped: mergedEntities.nombre_huesped || huesped?.nombre || undefined,
+  telefonoHuesped: mergedEntities.telefono || huesped?.telefono || huesped?.waId || undefined,
+  dni: mergedEntities.dni || undefined,
+  // ... resto de campos
+});
+```
+
+Los datos de la conversacion tienen prioridad sobre los datos del huesped en la DB.
+
+### 37.6 Campo DNI en base de datos
+
+**Archivo**: `server/prisma/schema.prisma`
+
+Se agrego el campo `dni` al modelo `Reserva`:
+
+```prisma
+model Reserva {
+  ...
+  dni             String?
+  ...
+}
+```
+
+**Migracion**: `20260319001233_add_dni_to_reservas` — `ALTER TABLE "reservas" ADD COLUMN "dni" TEXT`
+
+### 37.7 DNI en API REST
+
+**Archivo**: `server/src/routes/reservas.ts`
+
+El campo `dni` se agrego a los schemas Zod de:
+- `createManualSchema`: `dni: z.string().optional()`
+- `updateSchema`: `dni: z.string().nullable().optional()`
+
+**Archivo**: `server/src/services/reservaService.ts`
+
+El campo `dni` se agrego a las interfaces `CreateReservaParams`, `CreateReservaManualParams` y `UpdateReservaParams`, y se pasa a `prisma.reserva.create()`.
+
+### 37.8 DNI en panel de administracion (frontend)
+
+**Archivo**: `src/components/reservas/ReservaList.tsx`
+
+- **Tabla desktop**: nueva columna "DNI" entre Telefono y Tarifa
+- **Modal crear/editar**: campo DNI en Fila 1 (Nombre + Telefono + DNI, grid 3 cols)
+- **Formulario**: se agrego `dni` a `EMPTY_FORM`, `reservaToForm()`, y `handleSubmit()`
+
+**Archivo**: `shared/types/reserva.ts`
+
+Se agrego `dni: string | null` a la interfaz `Reserva`, `dni?: string` a `CrearReservaManualRequest`, y `dni?: string | null` a `UpdateReservaRequest`.
+
+### 37.9 Cambios en prompts de Claude
+
+**Archivo**: `server/src/services/claudeService.ts`
+
+| Seccion | Cambio |
+|---------|--------|
+| Regla 7 (FLUJO) | Agrega nombre, celular y DNI como datos requeridos |
+| Regla 7 (validacion) | DNI debe ser entre 5.000.000 y 99.999.999 |
+| Regla 8 PASO 1 | Resumen incluye nombre, telefono, DNI, precio total |
+| Regla 8 PASO 3 | Ya no pide DNI (se recolecta antes de PASO 1) |
+| Instruccion `reservar` | Lista los 6 datos requeridos incluyendo nombre, celular y DNI |
+| Fallback `reservar` | Respuesta de fallback actualizada con los 6 campos |
+
+---
+
+## 38. Correccion de distancias al centro de Las Grutas
+
+### 38.1 Problema
+
+La ubicacion de los complejos indicaba solo la distancia a la playa ("a 2 cuadras de la playa") pero no la distancia al centro comercial de Las Grutas. Esto causaba que el bot informara incorrectamente que Pewmafe era uno de los complejos mas cercanos al centro, cuando en realidad es el mas lejano.
+
+### 38.2 Ubicaciones corregidas
+
+Se investigo en Google Maps y fuentes turisticas la posicion real de cada complejo respecto al centro de Las Grutas (zona peatonal Viedma / Primeras Bajadas):
+
+| Complejo | Direccion | Ubicacion anterior | Ubicacion corregida |
+|----------|-----------|-------------------|---------------------|
+| **LG** | Nahuel Huapi 75 (antes: Golfo San Jorge 560) | a 2 cuadras del mar (bajada Los Acantilados) | a 2 cuadras del centro y de la playa (Primeras Bajadas) |
+| **Luminar Mono** | Golfo San Jorge 560 | a 2-3 cuadras de la playa (bajada Los Acantilados) | a 6 cuadras del centro, a 2-3 cuadras de la playa (bajada Los Acantilados) |
+| **Luminar 2Amb** | Golfo San Jorge 560 | a 2 cuadras de la playa (bajada Los Acantilados) | a 6 cuadras del centro, a 2 cuadras de la playa (bajada Los Acantilados) |
+| **Pewmafe** | Punta Perdices 370 | a 2 cuadras de la playa (bajada La Rinconada) | a 20 cuadras del centro, a 2 cuadras de la playa (bajada La Rinconada, acceso norte) |
+
+**Orden de cercania al centro**: LG (2 cuadras) → Luminar (6 cuadras) → Pewmafe (20 cuadras)
+
+### 38.3 Correccion de direccion de LG
+
+La direccion de LG en el seed estaba incorrecta (`Golfo San Jorge 560`, que es la direccion de Luminar). La direccion real es `Nahuel Huapi 75`, que coincide con la direccion de la oficina de Las Grutas Departamentos. Se corrigio en el seed y en la base de datos.
+
+### 38.4 Archivos modificados
+
+- `server/prisma/seed-complejos.ts`: direccion y ubicacion actualizadas para los 4 complejos
+- Base de datos local: UPDATE directo en tabla `complejos`
+- Base de datos produccion: UPDATE aplicado via SSH
+
+### 38.5 Impacto
+
+Los datos de ubicacion se leen dinamicamente de la DB por `accommodationContext.ts` y se inyectan en el prompt de Claude. Tras esta correccion, el bot informara correctamente las distancias al centro cuando un huesped pregunte por la ubicacion de los departamentos.

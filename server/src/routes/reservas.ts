@@ -78,6 +78,7 @@ router.post('/reservas', async (req, res) => {
 const createManualSchema = z.object({
   nombreHuesped: z.string().min(1),
   telefonoHuesped: z.string().optional(),
+  dni: z.string().optional(),
   fechaEntrada: z.string(),
   fechaSalida: z.string(),
   numHuespedes: z.number().int().min(1).default(1),
@@ -112,6 +113,7 @@ router.post('/reservas/manual', async (req, res) => {
 const updateSchema = z.object({
   nombreHuesped: z.string().min(1).optional(),
   telefonoHuesped: z.string().nullable().optional(),
+  dni: z.string().nullable().optional(),
   fechaEntrada: z.string().optional(),
   fechaSalida: z.string().optional(),
   numHuespedes: z.number().int().min(1).optional(),

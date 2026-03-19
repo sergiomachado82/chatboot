@@ -19,7 +19,7 @@ interface BotContext {
 }
 
 /** Only these entity keys are meaningful to our bot logic */
-const VALID_ENTITY_KEYS = new Set(['num_personas', 'fecha_entrada', 'fecha_salida', 'habitacion']);
+const VALID_ENTITY_KEYS = new Set(['num_personas', 'fecha_entrada', 'fecha_salida', 'habitacion', 'nombre_huesped', 'telefono', 'dni']);
 
 /** YYYY-MM-DD pattern */
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -74,6 +74,17 @@ function sanitizeEntities(raw: Record<string, unknown>): Record<string, string> 
         logger.warn({ value: clean[dateKey], key: dateKey }, 'Removing unresolvable date entity');
         delete clean[dateKey];
       }
+    }
+  }
+
+  // Validate DNI: must be a number between 5_000_000 and 99_999_999
+  if (clean.dni) {
+    const dniNum = parseInt(clean.dni.replace(/\./g, ''), 10);
+    if (isNaN(dniNum) || dniNum < 5_000_000 || dniNum > 99_999_999) {
+      logger.warn({ value: clean.dni }, 'Removing invalid DNI entity (out of range 5M-99.999.999)');
+      delete clean.dni;
+    } else {
+      clean.dni = String(dniNum); // normalize (remove dots)
     }
   }
 
@@ -361,6 +372,15 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
   if (mergedEntities.fecha_salida) {
     known.push(`Fecha salida: ${mergedEntities.fecha_salida}`);
   }
+  if (mergedEntities.nombre_huesped) {
+    known.push(`Nombre: ${mergedEntities.nombre_huesped}`);
+  }
+  if (mergedEntities.telefono) {
+    known.push(`Telefono: ${mergedEntities.telefono}`);
+  }
+  if (mergedEntities.dni) {
+    known.push(`DNI: ${mergedEntities.dni}`);
+  }
 
   if (known.length > 0) {
     additionalContext += `\nDATOS YA CONOCIDOS de esta conversacion (NO volver a preguntar):\n${known.join('\n')}\n`;
@@ -405,6 +425,9 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
   if (!mergedEntities.num_personas) missing.push('cantidad de personas');
   if (!mergedEntities.fecha_entrada || !mergedEntities.fecha_salida) missing.push('fechas de entrada y salida');
   if (!mergedEntities.habitacion) missing.push('preferencia de departamento');
+  if (!mergedEntities.nombre_huesped) missing.push('nombre del huesped');
+  if (!mergedEntities.telefono) missing.push('numero de celular');
+  if (!mergedEntities.dni) missing.push('numero de DNI');
 
   if (missing.length > 0 && !isGenericQuery) {
     additionalContext += `Datos que FALTAN por preguntar: ${missing.join(', ')}. Solo pregunta por estos datos faltantes.\n`;
@@ -585,9 +608,13 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
   // already had all 4 fields (meaning PASO 1 summary was shown and guest is confirming)
   if (botConfig.autoPreReserva && classification.intent === 'reservar' && ctx.huespedId) {
     const allPresent = mergedEntities.habitacion && mergedEntities.fecha_entrada &&
-                       mergedEntities.fecha_salida && mergedEntities.num_personas;
+                       mergedEntities.fecha_salida && mergedEntities.num_personas &&
+                       mergedEntities.nombre_huesped && mergedEntities.telefono &&
+                       mergedEntities.dni;
     const prevHadAll = accumulated.habitacion && accumulated.fecha_entrada &&
-                       accumulated.fecha_salida && accumulated.num_personas;
+                       accumulated.fecha_salida && accumulated.num_personas &&
+                       accumulated.nombre_huesped && accumulated.telefono &&
+                       accumulated.dni;
 
     if (allPresent && prevHadAll && availabilityResults) {
       try {
@@ -622,8 +649,9 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
           await createReserva({
             huespedId: ctx.huespedId,
             conversacionId,
-            nombreHuesped: huesped?.nombre ?? undefined,
-            telefonoHuesped: huesped?.telefono ?? huesped?.waId ?? undefined,
+            nombreHuesped: mergedEntities.nombre_huesped || huesped?.nombre || undefined,
+            telefonoHuesped: mergedEntities.telefono || huesped?.telefono || huesped?.waId || undefined,
+            dni: mergedEntities.dni || undefined,
             fechaEntrada: new Date(mergedEntities.fecha_entrada),
             fechaSalida: new Date(mergedEntities.fecha_salida),
             numHuespedes: parseInt(mergedEntities.num_personas, 10),

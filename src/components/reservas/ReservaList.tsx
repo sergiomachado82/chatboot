@@ -34,6 +34,7 @@ function fmtMoney(n: number | null | undefined): string {
 const EMPTY_FORM = {
   nombreHuesped: '',
   telefonoHuesped: '',
+  dni: '',
   fechaEntrada: '',
   fechaSalida: '',
   numHuespedes: 1,
@@ -55,6 +56,7 @@ function reservaToForm(r: Reserva): FormData {
   return {
     nombreHuesped: r.nombreHuesped ?? r.huesped?.nombre ?? '',
     telefonoHuesped: r.telefonoHuesped ?? r.huesped?.telefono ?? '',
+    dni: r.dni ?? '',
     fechaEntrada: r.fechaEntrada ? r.fechaEntrada.slice(0, 10) : '',
     fechaSalida: r.fechaSalida ? r.fechaSalida.slice(0, 10) : '',
     numHuespedes: r.numHuespedes,
@@ -263,6 +265,7 @@ export default function ReservaList() {
     const base = {
       nombreHuesped: form.nombreHuesped.trim(),
       telefonoHuesped: form.telefonoHuesped.trim() || undefined,
+      dni: form.dni.trim() || undefined,
       fechaEntrada: form.fechaEntrada,
       fechaSalida: form.fechaSalida,
       numHuespedes: Number(form.numHuespedes) || 1,
@@ -284,6 +287,7 @@ export default function ReservaList() {
           ...base,
           estado: form.estado as any,
           telefonoHuesped: form.telefonoHuesped.trim() || null,
+          dni: form.dni.trim() || null,
           tarifaNoche: form.tarifaNoche ? Number(form.tarifaNoche) : null,
           montoReserva: form.montoReserva ? Number(form.montoReserva) : null,
           saldo: form.saldo ? Number(form.saldo) : null,
@@ -402,6 +406,7 @@ export default function ReservaList() {
               <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">OUT</th>
               <th className="text-center px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Dias</th>
               <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Telefono</th>
+              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">DNI</th>
               <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Tarifa</th>
               <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Total</th>
               <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Reserva</th>
@@ -427,6 +432,7 @@ export default function ReservaList() {
                   <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.fechaSalida)}</td>
                   <td className="px-3 py-2 text-center">{dias}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{telefono}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{r.dni ?? '-'}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{fmtMoney(r.tarifaNoche)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap font-medium">{fmtMoney(r.precioTotal)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{fmtMoney(r.montoReserva)}</td>
@@ -485,7 +491,7 @@ export default function ReservaList() {
             })}
             {reservas?.length === 0 && (
               <tr>
-                <td colSpan={16} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={17} className="px-4 py-8 text-center text-gray-400">
                   No hay reservas
                 </td>
               </tr>
@@ -533,8 +539,8 @@ export default function ReservaList() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
-              {/* Fila 1: Nombre + Telefono */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {/* Fila 1: Nombre + Telefono + DNI */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Nombre *</label>
                   <input
@@ -552,6 +558,16 @@ export default function ReservaList() {
                     value={form.telefonoHuesped}
                     onChange={(e) => handleChange('telefonoHuesped', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">DNI</label>
+                  <input
+                    type="text"
+                    value={form.dni}
+                    onChange={(e) => handleChange('dni', e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                    placeholder="Ej: 35123456"
                   />
                 </div>
               </div>

@@ -25,6 +25,7 @@ interface CreateReservaParams {
   conversacionId?: string;
   nombreHuesped?: string;
   telefonoHuesped?: string;
+  dni?: string;
   fechaEntrada: Date;
   fechaSalida: Date;
   numHuespedes: number;
@@ -48,6 +49,7 @@ export async function createReserva(params: CreateReservaParams) {
         conversacionId: params.conversacionId ?? null,
         nombreHuesped: params.nombreHuesped ?? null,
         telefonoHuesped: params.telefonoHuesped ?? null,
+        dni: params.dni ?? null,
         fechaEntrada: params.fechaEntrada,
         fechaSalida: params.fechaSalida,
         numHuespedes: params.numHuespedes,
@@ -105,6 +107,7 @@ export async function createReserva(params: CreateReservaParams) {
 interface CreateReservaManualParams {
   nombreHuesped: string;
   telefonoHuesped?: string;
+  dni?: string;
   fechaEntrada: Date;
   fechaSalida: Date;
   numHuespedes: number;
@@ -125,6 +128,7 @@ export async function createReservaManual(params: CreateReservaManualParams) {
     data: {
       nombreHuesped: params.nombreHuesped,
       telefonoHuesped: params.telefonoHuesped ?? null,
+      dni: params.dni ?? null,
       fechaEntrada: params.fechaEntrada,
       fechaSalida: params.fechaSalida,
       numHuespedes: params.numHuespedes,
@@ -156,6 +160,7 @@ export async function createReservaManual(params: CreateReservaManualParams) {
 interface UpdateReservaParams {
   nombreHuesped?: string;
   telefonoHuesped?: string | null;
+  dni?: string | null;
   fechaEntrada?: Date;
   fechaSalida?: Date;
   numHuespedes?: number;

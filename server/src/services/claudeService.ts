@@ -90,6 +90,9 @@ REGLAS ESTRICTAS PARA ENTIDADES:
 4. "habitacion": Incluir si el usuario menciona un departamento o si se puede inferir del contexto conversacional.
 6. Si el usuario dice solo un mes (ej: "para abril"), NO inventes dias.
 7. NO copies entidades de mensajes anteriores del bot. Solo extrae del mensaje actual del usuario.
+8. "nombre_huesped": SOLO incluir si el usuario dice su nombre (ej: "soy Juan", "me llamo Maria Perez", "Juan Garcia"). Extraer nombre completo.
+9. "telefono": SOLO incluir si el usuario da un numero de celular/telefono (ej: "mi celular es 2920412345", "te paso mi numero 1155667788").
+10. "dni": SOLO incluir si el usuario dice su numero de DNI/documento (ej: "mi DNI es 35123456", "documento 28.456.789"). Extraer solo los digitos sin puntos.
 
 Responde UNICAMENTE con JSON valido, sin markdown, sin backticks, sin texto adicional: {"intent":"...", "confidence":0.0-1.0, "entities":{}}
 Solo incluye en entities las claves que esten EXPLICITAMENTE presentes en el ultimo mensaje del usuario. Si no hay entidades, devuelve entities vacio: {}.`,
@@ -212,11 +215,11 @@ REGLAS IMPORTANTES:
    d) RESPUESTA COMPACTA: No enumeres preguntas redundantes. Formula UNA pregunta enfocada en el dato que falta.
    e) CONSISTENCIA: El contexto previo es fuente de verdad absoluta. "Somos 4 personas" dicho antes = NUNCA re-preguntar personas.
    f) ESTILO: Se amable, claro y directo, como un agente humano de reservas. GRAMATICA: Siempre usa 3ra persona para referirte a los huespedes ("son 2 personas", "llegan mañana"). NUNCA uses 1ra persona del plural ("somos", "llegamos") porque vos no sos parte del grupo.
-7. FLUJO: Si no hay datos conocidos, pregunta personas, fechas y noches (UNA cosa a la vez). Si ya hay algunos datos, solo pregunta los faltantes.
+7. FLUJO: Si no hay datos conocidos, pregunta personas, fechas y noches (UNA cosa a la vez). Tambien necesitas el nombre, numero de celular y DNI del huesped. Si ya hay algunos datos, solo pregunta los faltantes. VALIDACION DNI: El numero de DNI debe ser entre 5.000.000 y 99.999.999. Si el huesped da un numero fuera de ese rango, pedile que lo verifique.
 8. RESERVAS - FLUJO COMPLETO: El flujo es:
-   PASO 1: El huesped quiere reservar → resumi los datos (depto, fechas, personas, precio total) y pregunta si quiere proceder. Consulta el porcentaje de sena indicado en la ficha del departamento. Si es 0%, decile que la reserva queda agendada de palabra y que un agente lo va a contactar para confirmar (NO pidas sena ni datos bancarios, saltea directamente al PASO 4). Si es mayor a 0%, informale el porcentaje exacto y decile que necesitas una sena de ese porcentaje.
+   PASO 1: El huesped quiere reservar → resumi los datos (depto, fechas, personas, nombre, telefono, DNI, precio total) y pregunta si quiere proceder. Consulta el porcentaje de sena indicado en la ficha del departamento. Si es 0%, decile que la reserva queda agendada de palabra y que un agente lo va a contactar para confirmar (NO pidas sena ni datos bancarios, saltea directamente al PASO 4). Si es mayor a 0%, informale el porcentaje exacto y decile que necesitas una sena de ese porcentaje.
    PASO 2: Si acepta → indica que la sena se abona por transferencia bancaria y pasale los datos de la cuenta del contexto. El saldo restante se abona por transferencia al momento del check-in. IMPORTANTE: NO menciones la opcion de tarjeta de credito/MercadoPago a menos que el huesped PREGUNTE EXPLICITAMENTE por esa opcion. Si pregunta, recien ahi le pasas el link de MercadoPago (aclarando el recargo del 8%).
-   PASO 3: Cuando el huesped diga que ya realizo el pago → pedile que envie el comprobante de transferencia y su numero de DNI.
+   PASO 3: Cuando el huesped diga que ya realizo el pago → pedile que envie el comprobante de transferencia.
    PASO 4: Una vez recibido el comprobante y DNI → decile que un agente va a verificar el pago y le va a enviar la factura por este mismo medio. Recien cuando reciba la factura, la reserva queda confirmada.
    NUNCA confirmes una reserva vos. Solo un agente humano puede confirmarla.
 9. TERMINOLOGIA DE RESERVA — REGLA CRITICA:
@@ -234,7 +237,7 @@ Instrucciones segun intencion:
 - consulta_precio: Si faltan las fechas, NO listes precios por temporada (baja/media/alta). Primero pregunta para que fechas y cuantas personas, asi podes dar el precio exacto. Solo cuando tengas las fechas concretas, informa el precio correspondiente a ESA temporada especifica (una sola). Filtrar por capacidad si se conoce num_personas.
 - consulta_alojamiento: Responder sobre el departamento activo o presentar opciones filtradas por capacidad.
 - consulta_zona: Recomienda actividades y lugares cercanos.
-- reservar: Pedir SOLO los datos que faltan (fechas, personas, departamento). Cuando tenga todos los datos, seguir el flujo del punto 8 (NUNCA decir que la reserva esta confirmada).
+- reservar: Pedir SOLO los datos que faltan (fechas, personas, departamento, nombre, celular y DNI del huesped). Cuando tenga todos los datos, seguir el flujo del punto 8 (NUNCA decir que la reserva esta confirmada).
 - cancelar_reserva: Decile al huesped que vas a comunicarlo con un agente para gestionar la cancelacion. NO canceles la reserva vos, solo un agente humano puede hacerlo.
 - cambiar_reserva: Decile al huesped que vas a comunicarlo con un agente para gestionar la modificacion. NO modifiques la reserva vos, solo un agente humano puede hacerlo.
 - hablar_humano: Indica que un agente se pondra en contacto pronto.
@@ -323,7 +326,7 @@ function generateResponseFallback(intent: Intent, botConfig?: BotConfig): string
     consulta_precio: 'Para darte el precio exacto necesito saber las fechas de entrada y salida, y la cantidad de personas. ¿Me las podes indicar?',
     consulta_alojamiento: 'Tenemos 4 departamentos: Pewmafe (4 pers, con patio y parrilla), Luminar Monoambiente (3 pers), Luminar 2 Ambientes (4 pers, con parrilla) y LG (4 pers, 50m2). Todos con cocina equipada, Wi-Fi, aire acondicionado y a 2-3 cuadras de la playa. ¿Cual te interesa?',
     consulta_zona: 'Estamos en Las Grutas, la playa mas linda de la Patagonia! Podes disfrutar de buceo, kayak, mountain bike, y visitar las famosas grutas. A 100 km esta la pinguinera de El Condor. ¿Te interesa alguna actividad?',
-    reservar: 'Perfecto, vamos a gestionar tu reserva. Necesito: 1) Fechas de entrada y salida, 2) Cantidad de personas, 3) Preferencia de departamento (Pewmafe, Luminar Mono, Luminar 2Amb o LG). ¿Me pasas esos datos?',
+    reservar: 'Perfecto, vamos a gestionar tu reserva. Necesito: 1) Fechas de entrada y salida, 2) Cantidad de personas, 3) Preferencia de departamento (Pewmafe, Luminar Mono, Luminar 2Amb o LG), 4) Tu nombre completo, 5) Un numero de celular y 6) Tu numero de DNI. ¿Me pasas esos datos?',
     cancelar_reserva: 'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la cancelacion de tu reserva. Te va a atender en breve.',
     cambiar_reserva: 'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la modificacion de tu reserva. Te va a atender en breve.',
     hablar_humano: botConfig?.mensajeEsperaHumano ?? 'Entendido, te voy a comunicar con uno de nuestros agentes. Te va a atender en breve. Gracias por tu paciencia.',

@@ -6,6 +6,7 @@ export interface Reserva {
   conversacionId: string | null;
   nombreHuesped: string | null;
   telefonoHuesped: string | null;
+  dni: string | null;
   fechaEntrada: string;
   fechaSalida: string;
   numHuespedes: number;
@@ -42,6 +43,7 @@ export interface CrearReservaRequest {
 export interface CrearReservaManualRequest {
   nombreHuesped: string;
   telefonoHuesped?: string;
+  dni?: string;
   fechaEntrada: string;
   fechaSalida: string;
   numHuespedes: number;
@@ -60,6 +62,7 @@ export interface CrearReservaManualRequest {
 export interface UpdateReservaRequest {
   nombreHuesped?: string;
   telefonoHuesped?: string;
+  dni?: string | null;
   fechaEntrada?: string;
   fechaSalida?: string;
   numHuespedes?: number;

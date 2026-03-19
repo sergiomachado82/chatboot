@@ -78,6 +78,7 @@ model Reserva {
   conversacionId  String?      @map("conversacion_id")
   nombreHuesped   String?      @map("nombre_huesped")
   telefonoHuesped String?      @map("telefono_huesped")
+  dni             String?
   fechaEntrada    DateTime     @map("fecha_entrada")
   fechaSalida     DateTime     @map("fecha_salida")
   numHuespedes    Int          @default(1) @map("num_huespedes")
