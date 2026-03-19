@@ -102,6 +102,7 @@ export async function sendContactEmail(data: ContactFormData): Promise<void> {
         Enviado desde el formulario de contacto de lasgrutasdepartamentos.com
       </p>
     </div>
+    <!-- FORM_DATA:${JSON.stringify({ nombre, email, telefono, complejo: complejo || null, huespedes: huespedes || null, fechaIngreso: fechaIngreso || null, fechaSalida: fechaSalida || null, mensaje: mensaje || null })} -->
   `;
 
   await transporter.sendMail({

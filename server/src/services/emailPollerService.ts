@@ -47,20 +47,29 @@ function extractContactFormFields(parsed: ParsedMail): ContactFormFields {
   const html = parsed.html || '';
   const text = parsed.text || '';
 
-  // Try extracting from HTML table first (most reliable)
-  function fromHtml(label: string): string | null {
-    // Match: >Label</td> ... <td ...>VALUE</td>
-    // Handle values with or without nested tags like <a>
-    const regex = new RegExp(
-      `>${label}</td>[\\s\\S]*?<td[^>]*>\\s*(?:<a[^>]*>)?\\s*([^<]+?)\\s*(?:</a>)?\\s*</td>`,
-      'i'
-    );
-    const match = html.match(regex);
-    const val = match?.[1]?.trim();
-    return val && val !== '-' && val !== 'No especificado' ? val : null;
+  // Primary: extract from embedded JSON comment (most reliable)
+  const jsonMatch = html.match(/<!-- FORM_DATA:(.*?) -->/);
+  if (jsonMatch) {
+    try {
+      const data = JSON.parse(jsonMatch[1]);
+      logger.info({ source: 'json_comment' }, 'Extracted form fields from JSON comment');
+      return {
+        nombre: data.nombre || null,
+        email: data.email || null,
+        telefono: data.telefono || null,
+        complejo: data.complejo || null,
+        huespedes: data.huespedes || null,
+        fechaIngreso: data.fechaIngreso || null,
+        fechaSalida: data.fechaSalida || null,
+        mensaje: data.mensaje || null,
+      };
+    } catch (e) {
+      logger.warn({ raw: jsonMatch[1] }, 'Failed to parse FORM_DATA JSON comment');
+    }
   }
 
   // Fallback: extract from text version
+  logger.info({ source: 'text_fallback' }, 'No JSON comment found, falling back to text extraction');
   function fromText(label: string): string | null {
     const regex = new RegExp(`${label}[:\\s]+(.+)`, 'i');
     const match = text.match(regex);
@@ -68,27 +77,19 @@ function extractContactFormFields(parsed: ParsedMail): ContactFormFields {
     return val && val !== '-' && val !== 'No especificado' ? val : null;
   }
 
-  function extract(label: string): string | null {
-    return fromHtml(label) || fromText(label);
-  }
-
-  // Extract mensaje from the separate div
+  // Extract mensaje from text
   let mensaje: string | null = null;
-  const msgHtmlMatch = html.match(/Mensaje:<\/p>\s*<p[^>]*>([\s\S]*?)<\/p>/i);
-  if (msgHtmlMatch) mensaje = msgHtmlMatch[1].trim() || null;
-  if (!mensaje) {
-    const msgTextMatch = text.match(/Mensaje:\s*([\s\S]+?)(?:\n\s*\n|Enviado desde)/i);
-    if (msgTextMatch) mensaje = msgTextMatch[1].trim() || null;
-  }
+  const msgTextMatch = text.match(/Mensaje:\s*([\s\S]+?)(?:\n\s*\n|Enviado desde)/i);
+  if (msgTextMatch) mensaje = msgTextMatch[1].trim() || null;
 
   return {
-    nombre: extract('Nombre'),
-    email: extract('Email'),
-    telefono: extract('Telefono'),
-    complejo: extract('Complejo'),
-    huespedes: extract('Huespedes'),
-    fechaIngreso: extract('Fecha ingreso'),
-    fechaSalida: extract('Fecha salida'),
+    nombre: fromText('Nombre'),
+    email: fromText('Email'),
+    telefono: fromText('Telefono'),
+    complejo: fromText('Complejo'),
+    huespedes: fromText('Huespedes'),
+    fechaIngreso: fromText('Fecha ingreso'),
+    fechaSalida: fromText('Fecha salida'),
     mensaje,
   };
 }
