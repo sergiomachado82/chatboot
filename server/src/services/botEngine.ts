@@ -643,8 +643,17 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
 
           const huesped = await tx.huesped.findUnique({
             where: { id: ctx.huespedId },
-            select: { nombre: true, telefono: true, waId: true },
+            select: { nombre: true, telefono: true, dni: true, waId: true },
           });
+
+          // Update huesped record with collected data (name, phone, dni)
+          const huespedUpdate: Record<string, string> = {};
+          if (mergedEntities.nombre_huesped && !huesped?.nombre) huespedUpdate.nombre = mergedEntities.nombre_huesped;
+          if (mergedEntities.telefono && !huesped?.telefono) huespedUpdate.telefono = mergedEntities.telefono;
+          if (mergedEntities.dni && !huesped?.dni) huespedUpdate.dni = mergedEntities.dni;
+          if (Object.keys(huespedUpdate).length > 0) {
+            await tx.huesped.update({ where: { id: ctx.huespedId }, data: huespedUpdate });
+          }
 
           await createReserva({
             huespedId: ctx.huespedId,

@@ -20,6 +20,7 @@ router.get('/huespedes/:id', async (req, res) => {
 const updateHuespedSchema = z.object({
   nombre: z.string().min(1).max(200).optional(),
   telefono: z.string().max(50).optional(),
+  dni: z.string().max(20).optional(),
   email: z.string().email().optional(),
   notas: z.string().max(2000).optional(),
 });

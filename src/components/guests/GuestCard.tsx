@@ -31,6 +31,10 @@ export default function GuestCard({ huespedId }: GuestCardProps) {
           <span className="ml-2 text-gray-800">{huesped.telefono ?? '-'}</span>
         </div>
         <div>
+          <span className="text-gray-500">DNI:</span>
+          <span className="ml-2 text-gray-800">{huesped.dni ?? '-'}</span>
+        </div>
+        <div>
           <span className="text-gray-500">Email:</span>
           <span className="ml-2 text-gray-800">{huesped.email ?? '-'}</span>
         </div>

@@ -12,6 +12,7 @@ model Huesped {
   waId          String         @unique @map("wa_id")
   nombre        String?
   telefono      String?
+  dni           String?
   email         String?
   notas         String?
   creadoEn      DateTime       @default(now()) @map("creado_en")

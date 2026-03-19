@@ -1,22 +1,14 @@
-[root@vps-5746364-x ~/chatboot] # docker exec chatboot-postgres psql -U chatboot chatboot -c "INSERT INTO agentes (id, nombre, email, \"passwordHash\", rol, activo, \"creadoEn\", \"actualizadoEn\") VALUES (gen_random_uuid()::text, 'Sergio',
-  'sergiomachado82@gmail.com', '\$2b\$12\$P.odwLyyRI0xPBFqX8nTauzGSKWPGpveNXTlkdXy1GvvdnLNNk.Q6', 'admin', true, now(), now());"
-ERROR:  column "passwordHash" of relation "agentes" does not exist
-LINE 1: INSERT INTO agentes (id, nombre, email, "passwordHash", rol,...
-                                                ^
-[root@vps-5746364-x ~/chatboot] # docker exec chatboot-postgres psql -U chatboot chatboot -c "\d agentes"
-                                  Table "public.agentes"
-    Column     |              Type              | Collation | Nullable |      Default
----------------+--------------------------------+-----------+----------+-------------------
- id            | text                           |           | not null |
- nombre        | text                           |           | not null |
- email         | text                           |           | not null |
- password_hash | text                           |           | not null |
- rol           | text                           |           | not null | 'agente'::text
- activo        | boolean                        |           | not null | true
- online        | boolean                        |           | not null | false
- creado_en     | timestamp(3) without time zone |           | not null | CURRENT_TIMESTAMP
-Indexes:
-    "agentes_pkey" PRIMARY KEY, btree (id)
-    "agentes_email_key" UNIQUE, btree (email)
-Referenced by:
-    TABLE "conversaciones" CONSTRAINT "conversaciones_agente_id_fkey" FOREIGN KEY (agente_id) REFERENCES agentes(id) ON UPDATE CASCADE ON DELETE SET NULL
++===================================+
+| Cpanel Info                       |
++===================================+
+| Domain: cpanel.lasgrutasdepartamentos.com/   ---   198.54.114.136/cpanel
+| UserName: las6ru7
+| PassWord: 5MJ{le)%QN*o~wdj03
++===================================+
++===================================+
+| Admin Info                        |
++===================================+
+| Domain: lasgrutasdepartamentos.com/wp-admin
+| UserName: l4s6rut
+| PassWord: g&R4txjZ}M(IaWF!pm
++===================================+

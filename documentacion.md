@@ -300,10 +300,10 @@ Peticion HTTP
 │ nombre    │   └───│ agenteId(FK) │   │   │ waId (U) │
 │ email (U) │       │ huespedId(FK)│───┘   │ nombre   │
 │ passwordH │       │ estado       │       │ telefono │
-│ rol       │       │ ultimoMsg    │       │ email    │
-│ activo    │       │ ultimoMsgEn  │       │ notas    │
-│ online    │       └──────┬───────┘       └─────┬────┘
-└───────────┘              │                     │
+│ rol       │       │ ultimoMsg    │       │ dni      │
+│ activo    │       │ ultimoMsgEn  │       │ email    │
+│ online    │       └──────┬───────┘       │ notas    │
+└───────────┘              │               └─────┬────┘
                            │                     │
                     ┌──────┴───────┐       ┌─────┴────┐
                     │   Mensaje    │       │ Reserva  │
@@ -313,10 +313,11 @@ Peticion HTTP
                     │ tipo         │       │ convId   │
                     │ direccion    │       │ nombreH  │
                     │ origen       │       │ telefonoH│
-                    │ contenido    │       │ fechaEnt │
-                    │ metadata     │       │ fechaSal │
-                    │ waMessageId  │       │ numHuesp │
-                    └──────────────┘       │ habitac  │
+                    │ contenido    │       │ dni      │
+                    │ metadata     │       │ fechaEnt │
+                    │ waMessageId  │       │ fechaSal │
+                    └──────────────┘       │ numHuesp │
+                                           │ habitac  │
                                            │ tarifaN  │
                                            │ precioT  │
                                            │ montoRes │
@@ -3291,6 +3292,34 @@ Se agrego `dni: string | null` a la interfaz `Reserva`, `dni?: string` a `CrearR
 | Regla 8 PASO 3 | Ya no pide DNI (se recolecta antes de PASO 1) |
 | Instruccion `reservar` | Lista los 6 datos requeridos incluyendo nombre, celular y DNI |
 | Fallback `reservar` | Respuesta de fallback actualizada con los 6 campos |
+
+### 37.10 DNI en modelo Huesped
+
+**Archivo**: `server/prisma/schema.prisma`
+
+Se agrego el campo `dni` tambien al modelo `Huesped`, ya que el DNI es un dato personal que pertenece al huesped (no solo a una reserva). Esto permite que al volver a reservar, el sistema ya tenga el DNI del huesped.
+
+**Migracion**: `20260319003537_add_dni_to_huespedes` — `ALTER TABLE "huespedes" ADD COLUMN "dni" TEXT`
+
+**Archivos actualizados**:
+- `shared/types/huesped.ts`: agregado `dni: string | null`
+- `server/src/routes/huespedes.ts`: agregado `dni` al schema Zod de update
+- `src/components/guests/GuestCard.tsx`: muestra DNI en sidebar del chat
+- `server/src/services/botEngine.ts`: al auto-crear reserva, tambien actualiza nombre/telefono/dni en el registro del huesped si no los tenia
+
+**Logica de actualizacion del huesped** (botEngine.ts, seccion auto-create):
+
+```typescript
+const huespedUpdate: Record<string, string> = {};
+if (mergedEntities.nombre_huesped && !huesped?.nombre) huespedUpdate.nombre = mergedEntities.nombre_huesped;
+if (mergedEntities.telefono && !huesped?.telefono) huespedUpdate.telefono = mergedEntities.telefono;
+if (mergedEntities.dni && !huesped?.dni) huespedUpdate.dni = mergedEntities.dni;
+if (Object.keys(huespedUpdate).length > 0) {
+  await tx.huesped.update({ where: { id: ctx.huespedId }, data: huespedUpdate });
+}
+```
+
+Solo se actualizan campos que el huesped no tenia previamente (no sobreescribe datos existentes).
 
 ---
 

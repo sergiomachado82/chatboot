@@ -3,6 +3,7 @@ export interface Huesped {
   waId: string;
   nombre: string | null;
   telefono: string | null;
+  dni: string | null;
   email: string | null;
   notas: string | null;
   creadoEn: string;
