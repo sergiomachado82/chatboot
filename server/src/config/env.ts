@@ -40,6 +40,14 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(465),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
+
+  IMAP_HOST: z.string().default(''),
+  IMAP_PORT: z.coerce.number().default(993),
+  IMAP_USER: z.string().default(''),
+  IMAP_PASS: z.string().default(''),
+  EMAIL_POLL_INTERVAL_MS: z.coerce.number().default(180_000),
+  EMAIL_AUTO_RESPONDER_ENABLED: z.string().transform(v => v === 'true').default('false'),
+
   FRONTEND_URL: z.string().default('http://localhost:5173'),
 
   ALLOWED_ORIGINS: z.string().default('*'),

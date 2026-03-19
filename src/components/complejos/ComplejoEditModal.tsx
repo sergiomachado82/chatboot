@@ -41,6 +41,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
     ninos: true,
     fumar: false,
     fiestas: false,
+    autoResponderEmail: false,
     titularCuenta: '',
     banco: '',
     cbu: '',
@@ -81,6 +82,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
         ninos: complejo.ninos,
         fumar: complejo.fumar,
         fiestas: complejo.fiestas,
+        autoResponderEmail: complejo.autoResponderEmail ?? false,
         titularCuenta: complejo.titularCuenta ?? '',
         banco: complejo.banco ?? '',
         cbu: complejo.cbu ?? '',
@@ -131,6 +133,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
         ninos: form.ninos,
         fumar: form.fumar,
         fiestas: form.fiestas,
+        autoResponderEmail: form.autoResponderEmail,
         videoTour: form.videoTour || undefined,
         titularCuenta: form.titularCuenta || undefined,
         banco: form.banco || undefined,
@@ -418,6 +421,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
                 { key: 'ninos', label: 'Ninos permitidos' },
                 { key: 'fumar', label: 'Se permite fumar' },
                 { key: 'fiestas', label: 'Fiestas permitidas' },
+                { key: 'autoResponderEmail', label: 'Responder emails automaticamente' },
               ] as const).map((p) => (
                 <label key={p.key} className="flex items-center gap-3 cursor-pointer">
                   <div

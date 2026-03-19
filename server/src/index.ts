@@ -8,6 +8,7 @@ import { initSocketIO } from './services/socketManager.js';
 import { startCleanupJob, stopCleanupJob } from './services/conversacionCleanup.js';
 import { startIcalSyncJob, stopIcalSyncJob } from './services/icalSyncJob.js';
 import { startGCalSyncJob, stopGCalSyncJob } from './services/gcalSyncJob.js';
+import { startEmailPollerJob, stopEmailPollerJob } from './services/emailPollerService.js';
 
 const server = http.createServer(app);
 
@@ -21,6 +22,7 @@ async function start() {
   startCleanupJob();
   startIcalSyncJob();
   startGCalSyncJob();
+  startEmailPollerJob();
 
   server.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} (${env.NODE_ENV})`);
@@ -36,6 +38,7 @@ async function shutdown(signal: string) {
   stopCleanupJob();
   stopIcalSyncJob();
   stopGCalSyncJob();
+  stopEmailPollerJob();
 
   // Stop accepting new connections, wait for in-flight requests
   server.close(async () => {

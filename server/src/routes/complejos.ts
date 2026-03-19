@@ -72,6 +72,7 @@ const createSchema = z.object({
   cuit: z.string().optional(),
   linkMercadoPago: z.string().optional(),
   porcentajeReserva: z.number().int().min(0).max(60).optional(),
+  autoResponderEmail: z.boolean().optional(),
 });
 
 router.post('/complejos', async (req, res) => {

@@ -65,6 +65,7 @@ export async function createComplejo(data: {
   aliasCbu?: string;
   cuit?: string;
   linkMercadoPago?: string;
+  autoResponderEmail?: boolean;
 }) {
   const complejo = await prisma.complejo.create({
     data: {
@@ -93,6 +94,7 @@ export async function createComplejo(data: {
       aliasCbu: data.aliasCbu,
       cuit: data.cuit,
       linkMercadoPago: data.linkMercadoPago,
+      autoResponderEmail: data.autoResponderEmail ?? false,
     },
     include: includeRelations,
   });
@@ -129,6 +131,7 @@ export async function updateComplejo(
     cuit?: string;
     linkMercadoPago?: string;
     activo?: boolean;
+    autoResponderEmail?: boolean;
   }
 ) {
   const complejo = await prisma.complejo.update({

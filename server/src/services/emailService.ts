@@ -114,3 +114,73 @@ export async function sendContactEmail(data: ContactFormData): Promise<void> {
 
   logger.info({ nombre, email }, 'Contact form email sent');
 }
+
+interface AutoReplyData {
+  to: string;
+  subject: string;
+  bodyText: string;
+  inReplyTo?: string;
+}
+
+export async function sendAutoReplyEmail(data: AutoReplyData): Promise<void> {
+  if (!env.SMTP_USER || !env.SMTP_PASS) {
+    logger.error('SMTP credentials not configured for auto-reply');
+    throw new Error('Email service not configured');
+  }
+
+  const { to, subject, bodyText, inReplyTo } = data;
+
+  // Convert plain text to HTML paragraphs
+  const bodyHtml = bodyText
+    .split('\n')
+    .map(line => line.trim())
+    .map(line => line ? `<p style="margin: 0 0 8px 0; color: #1f2937;">${line}</p>` : '<br/>')
+    .join('\n');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #1e40af; padding: 20px 24px; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Las Grutas Departamentos</h1>
+        <p style="color: #bfdbfe; margin: 4px 0 0 0; font-size: 13px;">Alojamiento en Las Grutas, Rio Negro, Patagonia Argentina</p>
+      </div>
+      <div style="padding: 24px; background-color: #ffffff; border: 1px solid #e5e7eb; border-top: none;">
+        ${bodyHtml}
+      </div>
+      <div style="padding: 16px 24px; background-color: #f3f4f6; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+        <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280;">
+          Tel/WhatsApp: <a href="https://wa.me/542920561033" style="color: #1e40af;">+54 2920 561033</a>
+        </p>
+        <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280;">
+          Web: <a href="https://www.lasgrutasdepartamentos.com" style="color: #1e40af;">www.lasgrutasdepartamentos.com</a>
+        </p>
+        <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+          Este mensaje fue generado automaticamente. Para consultas adicionales, responda a este email o contactenos por WhatsApp.
+        </p>
+      </div>
+    </div>
+  `;
+
+  // Plain text fallback
+  const text = `${bodyText}\n\n---\nLas Grutas Departamentos\nTel/WhatsApp: +54 2920 561033\nWeb: www.lasgrutasdepartamentos.com`;
+
+  const headers: Record<string, string> = {
+    'Auto-Submitted': 'auto-replied',
+    'X-Auto-Responded-Message': 'true',
+    'Precedence': 'bulk',
+  };
+  if (inReplyTo) {
+    headers['In-Reply-To'] = inReplyTo;
+    headers['References'] = inReplyTo;
+  }
+
+  await transporter.sendMail({
+    from: `"Las Grutas Departamentos" <${env.SMTP_USER}>`,
+    to,
+    subject,
+    html,
+    text,
+    headers,
+  });
+
+  logger.info({ to, subject }, 'Auto-reply email sent');
+}

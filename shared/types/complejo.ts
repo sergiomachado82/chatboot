@@ -38,6 +38,7 @@ export interface Complejo {
   linkMercadoPago: string | null;
   porcentajeReserva: number;
   activo: boolean;
+  autoResponderEmail: boolean;
   creadoEn: string;
   actualizadoEn: string;
   tarifas: Tarifa[];
@@ -136,6 +137,7 @@ export interface CrearComplejoRequest {
   cuit?: string;
   linkMercadoPago?: string;
   porcentajeReserva?: number;
+  autoResponderEmail?: boolean;
 }
 
 export interface UpdateComplejoRequest extends Partial<CrearComplejoRequest> {}
