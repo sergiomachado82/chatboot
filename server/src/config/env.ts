@@ -36,6 +36,8 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
 
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().default(465),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
   FRONTEND_URL: z.string().default('http://localhost:5173'),
