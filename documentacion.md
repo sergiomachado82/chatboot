@@ -27,6 +27,9 @@ Sistema de chatbot para alojamiento turistico que automatiza la atencion al hues
 - Formato optimizado para burbujas de WhatsApp (datos bancarios, listas, ubicacion)
 - Envio de fotos con caption descriptivo (nombre de la imagen o fallback al depto)
 - Compartir ubicacion via Google Maps con vista previa automatica en WhatsApp
+- Recoleccion progresiva de datos del huesped durante reserva (nombre, celular, DNI)
+- Validacion de DNI server-side (rango 5.000.000 - 99.999.999)
+- Persistencia automatica de datos del huesped entre reservas (nombre, telefono, DNI se guardan en el perfil)
 
 **Stack tecnologico:**
 
@@ -386,7 +389,7 @@ Peticion HTTP
 
 **Bloqueo** (`bloqueos`): Bloqueo de disponibilidad para un complejo (reparaciones, uso personal). Campos: `complejoId`, `fechaInicio`, `fechaFin`, `motivo`, `unidades`, `googleCalEventId` (ID del evento en Google Calendar), `origenGoogle` (true si fue importado desde GCal). Al crear, marca las fechas como no disponibles en Inventario y push a Google Calendar. Al eliminar, libera las fechas solo si no hay reservas ni otros bloqueos, y elimina el evento de GCal.
 
-**Huesped** (`huespedes`): Persona que contacta por WhatsApp. Se identifica por `waId` (numero de telefono WA, unico). Tiene relacion 1:N con conversaciones y reservas.
+**Huesped** (`huespedes`): Persona que contacta por WhatsApp. Se identifica por `waId` (numero de telefono WA, unico). Campos: `nombre`, `telefono`, `dni`, `email`, `notas`. El bot actualiza automaticamente nombre, telefono y DNI del huesped cuando los recolecta durante una reserva (solo si el campo estaba vacio, no sobreescribe). Tiene relacion 1:N con conversaciones y reservas.
 
 **Agente** (`agentes`): Operador del panel web. Autenticacion por email+password (bcrypt). Roles: `admin` o `agente`. Campo `online` para estado de presencia.
 
@@ -402,7 +405,7 @@ Peticion HTTP
 
 **Reserva** (`reservas`): Reserva de alojamiento. Campos principales:
 - `huespedId` (nullable — puede ser manual), `conversacionId` (nullable)
-- `nombreHuesped`, `telefonoHuesped` (para reservas manuales)
+- `nombreHuesped`, `telefonoHuesped`, `dni` (datos del huesped, recolectados por el bot o ingresados manualmente)
 - `fechaEntrada`, `fechaSalida`, `numHuespedes`, `habitacion`
 - `tarifaNoche`, `precioTotal` (Decimal), `montoReserva` (sena), `saldo`
 - `estado`: pre_reserva | confirmada | cancelada | completada
@@ -604,6 +607,7 @@ Peticion HTTP
 {
   "nombreHuesped": "Juan Perez",
   "telefonoHuesped": "+5492920123456",
+  "dni": "35123456",
   "fechaEntrada": "2026-03-20",
   "fechaSalida": "2026-03-25",
   "numHuespedes": 2,
@@ -739,8 +743,12 @@ webhookProcessor.processIncomingMessage()
   │           │
   │           ├── 9. generateResponse(intent, entities, historial, contexto) ──► Claude Sonnet
   │           │
-  │           ├── 10. createMensaje(saliente, bot, metadata={intent,entities})
-  │           └── 11. sendWhatsAppMessage(to, respuesta)
+  │           ├── 10. Si allPresent (7 campos) y usuario confirma:
+  │           │     ├── createReserva(datos + nombre + telefono + dni)
+  │           │     └── updateHuesped(nombre, telefono, dni) si estaban vacios
+  │           │
+  │           ├── 11. createMensaje(saliente, bot, metadata={intent,entities})
+  │           └── 12. sendWhatsAppMessage(to, respuesta)
   │
   └── if estado == 'espera_humano' / 'humano_activo':
         └── (sin respuesta automatica — agentes ven mensaje via Socket.io)
@@ -789,16 +797,24 @@ El clasificador extrae entidades del mensaje cuando es posible:
     "fecha_entrada": "2026-03-20",
     "fecha_salida": "2026-03-25",
     "num_personas": "2",
-    "habitacion": "Pewmafe"
+    "habitacion": "Pewmafe",
+    "nombre_huesped": "Juan Perez",
+    "telefono": "2920412345",
+    "dni": "35123456"
   }
 }
 ```
+
+**Entidades validas** (`VALID_ENTITY_KEYS`): `num_personas`, `fecha_entrada`, `fecha_salida`, `habitacion`, `nombre_huesped`, `telefono`, `dni`
 
 **Reglas estrictas de extraccion:**
 - NUNCA inventar entidades que el usuario no dijo explicitamente
 - `num_personas`: Solo si dice explicitamente cuantas personas ("somos 3"). NUNCA confundir noches con personas
 - `fecha_entrada/fecha_salida`: Solo si menciona fechas concretas. Formato YYYY-MM-DD. Ano actual = 2026
 - `habitacion`: Si menciona departamento o se infiere del contexto conversacional
+- `nombre_huesped`: Solo si el usuario dice su nombre ("soy Juan", "me llamo Maria Perez")
+- `telefono`: Solo si da un numero de celular ("mi celular es 2920412345")
+- `dni`: Solo si da su numero de documento ("mi DNI es 35123456", "documento 28.456.789"). Se valida server-side: rango 5.000.000-99.999.999, se eliminan puntos
 - NO copiar entidades de mensajes anteriores del bot
 
 ### 6.5 Contexto del Alojamiento
@@ -834,9 +850,9 @@ El botEngine construye un `additionalContext` que se inyecta al prompt de Claude
 | Dato | Cuando se agrega | Ejemplo |
 |------|-----------------|---------|
 | Departamento activo | Cuando hay `habitacion` en entidades | "Responde SOLO sobre este departamento" |
-| Datos ya conocidos | Cuando hay entidades acumuladas | "Departamento: Pewmafe, Personas: 2" |
+| Datos ya conocidos | Cuando hay entidades acumuladas | "Departamento: Pewmafe, Personas: 2, Nombre: Juan, Tel: 2920412345, DNI: 35123456" |
 | Analisis de capacidad | Cuando se conoce `num_personas` | "Pewmafe: APTO (4 pers/unidad), Luminar Mono: NO APTO" |
-| Datos faltantes | Cuando faltan entidades clave | "Datos que FALTAN: fechas de entrada y salida" |
+| Datos faltantes | Cuando faltan entidades clave | "Datos que FALTAN: nombre del huesped, numero de celular, DNI" |
 | Deptos no disponibles | Cuando hay fechas y hay reservas | "Pewmafe NO DISPONIBLE para esas fechas" |
 | Disponibilidad + precios | Cuando hay fechas completas | "Luminar Mono: 5 noches, $175.000 ARS total" |
 | Estadia minima | Cuando se valida disponibilidad | "ADVERTENCIA: minimo 3 noches" o "SIN RESTRICCION" |
@@ -876,7 +892,7 @@ El bot opera bajo un conjunto estricto de directivas inyectadas en el system pro
 | 4 | **NO INVENTAR** | NUNCA inventar ni asumir datos que el usuario no dijo. NUNCA inventar restricciones de estadia minima que no aparezcan en el contexto adicional |
 | 5 | **INFORMACION** | Solo mencionar departamentos cuya info aparece en el contexto. NUNCA inventar datos |
 | 6 | **NO REPETIR PREGUNTAS** | Leer "DATOS YA CONOCIDOS" del contexto adicional. NUNCA volver a preguntar algo ya sabido. Solo preguntar lo que aparece en "Datos que FALTAN" |
-| 7 | **FLUJO** | Si no hay datos conocidos, preguntar: personas, fechas y noches. Si ya hay algunos, solo preguntar los faltantes |
+| 7 | **FLUJO** | Si no hay datos conocidos, preguntar progresivamente (uno a la vez): personas, fechas, departamento, nombre, celular, DNI. Si ya hay algunos, solo preguntar los faltantes. El DNI debe estar entre 5.000.000 y 99.999.999 |
 | 8 | **RESERVAS** | Ver seccion 7.3 — Flujo completo de reservas |
 | 9 | **TERMINOLOGIA** | JAMAS usar "pre-reserva", "prereserva", "reserva preliminar" ni "reserva tentativa" con el huesped (son terminos internos). Siempre usar "reserva" |
 | 10 | **DATOS BANCARIOS** | JAMAS inventar datos bancarios (CBU, alias, banco, titular, CUIT). Si el contexto adicional contiene "ADVERTENCIA DATOS BANCARIOS", NO mostrar datos de pago bajo ninguna circunstancia |
@@ -886,12 +902,19 @@ El bot opera bajo un conjunto estricto de directivas inyectadas en el system pro
 **CRITICO: El bot NUNCA puede decir "te confirmo la reserva" ni nada que implique que la reserva esta confirmada. Solo un agente humano puede confirmar.**
 
 ```
-PASO 1: Huesped quiere reservar
-  └── Bot resume los datos: departamento, fechas, personas, precio total
+PASO 0: Recoleccion progresiva de datos (ANTES de PASO 1)
+  └── Bot pregunta uno a la vez hasta tener los 7 campos:
+      ├── num_personas, fecha_entrada, fecha_salida, habitacion
+      ├── nombre_huesped, telefono, dni
+      └── DNI se valida entre 5.000.000 y 99.999.999
+
+PASO 1: Todos los datos completos → Bot resume:
+  └── Departamento, fechas, personas, nombre, telefono, DNI, precio total
   └── Consulta el porcentaje de sena del depto
   │   ├── Si es 0% → la reserva queda agendada de palabra, un agente contactara (salta a PASO 4)
   │   └── Si es >0% → informa el porcentaje y pregunta si quiere proceder
   └── Pregunta: "¿Queres proceder con la reserva?"
+  └── El sistema auto-crea la reserva en pre_reserva y guarda nombre/telefono/dni en el huesped
 
 PASO 2: Huesped acepta → Bot indica que la sena se abona por transferencia
   └── Pasa datos de la cuenta (titular, CBU, alias, banco) del contexto
@@ -899,9 +922,7 @@ PASO 2: Huesped acepta → Bot indica que la sena se abona por transferencia
   └── IMPORTANTE: NO mencionar tarjeta/MercadoPago a menos que el huesped PREGUNTE explicitamente
 
 PASO 3: Huesped dice que ya pago
-  └── Bot pide:
-      ├── Comprobante de la transferencia (foto)
-      └── Numero de DNI
+  └── Bot pide comprobante de la transferencia (foto)
 
 PASO 4: Huesped envia comprobante y DNI (o reserva sin sena)
   └── Bot dice: "Un agente va a verificar el pago y te va a enviar la factura por este medio"
@@ -936,7 +957,7 @@ Si se detecta el escenario 2 o 3, Claude recibe una "ADVERTENCIA DATOS BANCARIOS
 | `consulta_precio` | Informa precios usando la tabla de tarifas. Filtra por capacidad si se conoce num_personas |
 | `consulta_alojamiento` | Responde sobre el departamento activo o presenta opciones filtradas por capacidad |
 | `consulta_zona` | Recomienda actividades y lugares cercanos (buceo, kayak, pinguinera, etc.) |
-| `reservar` | Pide SOLO los datos que faltan. Cuando tiene todos, sigue el flujo de la regla 8 (NUNCA confirmar) |
+| `reservar` | Pide SOLO los datos que faltan (personas, fechas, depto, nombre, celular, DNI). Cuando tiene los 7 campos y el usuario confirma, se auto-crea la reserva y se guardan los datos en el huesped. Sigue el flujo de la regla 8 (NUNCA confirmar) |
 | `cancelar_reserva` | Informa al huesped que un agente gestionara la cancelacion. Escala a `espera_humano` con mensaje de sistema |
 | `cambiar_reserva` | Informa al huesped que un agente gestionara la modificacion. Escala a `espera_humano` con mensaje de sistema |
 | `hablar_humano` | Indica que un agente se pondra en contacto pronto. Escala conversacion |
@@ -955,6 +976,9 @@ El clasificador Claude Haiku opera con estas reglas para extraer entidades del u
 5. Fechas en formato YYYY-MM-DD, ano 2026
 6. Si dice solo un mes ("para abril"), NO inventar dias
 7. NO copiar entidades de mensajes anteriores del bot — solo extraer del mensaje actual
+8. `nombre_huesped`: SOLO si el usuario dice su nombre ("soy Juan", "me llamo Maria Perez"). NO inventar
+9. `telefono`: SOLO si da un numero de celular argentino. NO inventar
+10. `dni`: SOLO si da su numero de documento de identidad. Se aceptan puntos separadores ("28.456.789")
 
 ### 7.6 Validacion de Estadia Minima
 
@@ -1034,8 +1058,8 @@ La lista de habitaciones se obtiene dinamicamente de la tabla `complejos` (activ
 
 | Funcion | Descripcion |
 |---------|-------------|
-| `createReserva(params)` | Desde bot/conversacion. Crea en `pre_reserva`, bloquea fechas, sync Sheets |
-| `createReservaManual(params)` | Entrada manual (requiere nombreHuesped). Bloquea fechas si hay habitacion |
+| `createReserva(params)` | Desde bot/conversacion. Crea en `pre_reserva`, bloquea fechas, sync Sheets. Params incluyen `nombreHuesped`, `telefonoHuesped`, `dni` |
+| `createReservaManual(params)` | Entrada manual (requiere nombreHuesped). Bloquea fechas si hay habitacion. Acepta `dni` opcional |
 | `updateReserva(id, params)` | Actualiza campos. Si cancela, libera fechas |
 | `updateReservaEstado(id, estado)` | Cambia estado. Si cancela, libera fechas. Sync Sheets |
 | `getReservaById(id)` | Detalle con relacion huesped |
@@ -1074,7 +1098,7 @@ Sincronizacion fire-and-forget con Google Sheets. Si falla, loguea error pero no
 | `findOrCreateHuesped(waId, nombre?)` | Busca huesped por waId, si no existe lo crea |
 | `getHuespedById(id)` | Retorna huesped por ID |
 | `listHuespedes()` | Lista todos los huespedes ordenados por fecha de creacion |
-| `updateHuesped(id, data)` | Actualiza nombre, telefono, email o notas |
+| `updateHuesped(id, data)` | Actualiza nombre, telefono, dni, email o notas |
 
 ### 8.9 conversacionService.ts
 
@@ -1301,7 +1325,7 @@ La vista de reservas tiene un toggle tabla/calendario:
 │ [Filtros]│  ┌─ ChatHeader ─────────────────┐  │ Nombre: ...  │
 │ Todas    │  │ Nombre  [Tomar] [Cerrar]     │  │ WA: ...      │
 │ En espera│  └──────────────────────────────┘  │ Tel: ...     │
-│ Mis chats│                                    │              │
+│ Mis chats│                                    │ DNI: ...     │
 │ Bot      │  ┌─ Mensajes ──────────────────┐  │ Reservas:    │
 │ Cerradas │  │ [huesped]  Hola...           │  │  - Pewmafe   │
 │          │  │         Bienvenido!  [bot]   │  │    20-25 mar │
@@ -1353,7 +1377,7 @@ Modal de edicion con 7 tabs:
 ### 11.5 Gestion de Reservas
 
 **Vista tabla:**
-- Columnas: Nombre, Depto, Personas, Entrada, Salida, Dias, Telefono, Tarifa/noche, Total, Monto reserva, Saldo, Origen, Nro Factura, USD, Estado, Acciones
+- Columnas: Nombre, Depto, Personas, Entrada, Salida, Dias, Telefono, DNI, Tarifa/noche, Total, Monto reserva, Saldo, Origen, Nro Factura, USD, Estado, Acciones
 - Filtro por estado: Todas, pre_reserva, confirmada, cancelada, completada
 - Boton "Nueva Reserva" abre modal de creacion manual
 - Acciones por estado:
