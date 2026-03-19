@@ -3379,3 +3379,107 @@ La direccion de LG en el seed estaba incorrecta (`Golfo San Jorge 560`, que es l
 ### 38.5 Impacto
 
 Los datos de ubicacion se leen dinamicamente de la DB por `accommodationContext.ts` y se inyectan en el prompt de Claude. Tras esta correccion, el bot informara correctamente las distancias al centro cuando un huesped pregunte por la ubicacion de los departamentos.
+
+---
+
+## 39. TEST FAILED — Fotos no se muestran en webchat (2026-03-19)
+
+### 39.1 Descripcion del test
+
+**Fecha**: 2026-03-19
+**Canal**: Webchat (landing page)
+**Conversacion**: `cmmxeuesa0013jy2jvbnzhb8r` (Visitante Web, `web_aa85cab6b6a24cb1a667520acec26db1`)
+**Estado final**: `espera_humano` (escalado por queja del huesped)
+
+### 39.2 Pasos reproducidos
+
+1. Usuario web inicia reserva: "Para reservar para hoy somos 3 personas"
+2. Bot pide fecha de salida, usuario dice "3 noches"
+3. Bot muestra opciones disponibles (Luminar 2Amb y Pewmafe)
+4. Usuario pide: **"Luminar, ne envias fotos"**
+5. Bot responde: "Aca te muestro fotos de Luminar 2Amb:" — **sin imagenes visibles**
+6. Usuario dice: "No las rec8bi" (no las recibi)
+7. Bot clasifica como `queja` → escalado a `espera_humano`
+8. Usuario frustrado pide hablar con responsable
+
+### 39.3 Causa raiz
+
+**Archivo**: `server/src/routes/webchat.ts` (lineas 56-63)
+
+El endpoint `/api/webchat/send` solo devuelve el campo `contenido` (texto) del ultimo mensaje del bot:
+
+```typescript
+const botMessage = await prisma.mensaje.findFirst({
+  where: { conversacionId: conv.id, origen: 'bot' },
+  orderBy: { creadoEn: 'desc' },
+});
+
+res.json({
+  response: botMessage?.contenido ?? 'No se pudo generar una respuesta en este momento.',
+});
+```
+
+Las URLs de las fotos estan guardadas correctamente en `metadata.imageUrls` del mensaje:
+
+```json
+{
+  "intent": "consulta_alojamiento",
+  "photosSent": 6,
+  "imageUrls": [
+    "https://www.lasgrutasdepartamentos.com/wp-content/uploads/2016/08/2AMB_B_LIVING2-725x453.jpg",
+    "https://www.lasgrutasdepartamentos.com/wp-content/uploads/2016/08/01a_frente_jpg-750x453.jpg",
+    "..."
+  ]
+}
+```
+
+Pero el endpoint **ignora el campo `metadata`** y solo devuelve `contenido`. El usuario web recibe el texto "Aca te muestro fotos de Luminar 2Amb:" sin ninguna imagen adjunta.
+
+### 39.4 Flujo del error
+
+```
+botEngine.ts                          webchat.ts                    Frontend (landing)
+    |                                      |                              |
+    |-- isWebUser=true                     |                              |
+    |-- Guarda en DB:                      |                              |
+    |   contenido: "Aca te muestro..."     |                              |
+    |   metadata.imageUrls: [6 URLs]       |                              |
+    |   metadata.photosSent: 6             |                              |
+    |                                      |                              |
+    |                                      |-- Lee botMessage             |
+    |                                      |-- Devuelve SOLO contenido  --|-> Muestra texto sin fotos
+    |                                      |-- metadata IGNORADA          |
+    |                                      |                              |-- Usuario no ve fotos
+```
+
+### 39.5 Evidencia en logs de produccion
+
+```
+{"from":"web_aa85cab6...","body":"Luminar, ne envias fotos","msg":"Processing incoming message"}
+{"depto":"Luminar 2Amb","count":6,"isWebUser":true,"msg":"Sending photos directly"}
+```
+
+El bot detecto correctamente la solicitud de fotos, encontro 6 imagenes de Luminar 2Amb, y las guardo en metadata. El error es exclusivamente en la capa de transporte webchat → frontend.
+
+### 39.6 Solucion propuesta (pendiente)
+
+Modificar `server/src/routes/webchat.ts` para incluir `imageUrls` en la respuesta JSON:
+
+```typescript
+// Extraer imageUrls de metadata si existen
+const metadata = botMessage?.metadata as Record<string, unknown> | null;
+const imageUrls = (metadata?.imageUrls as string[]) ?? [];
+
+res.json({
+  response: botMessage?.contenido ?? 'No se pudo generar una respuesta en este momento.',
+  imageUrls,
+});
+```
+
+Y actualizar el widget `WhatsAppPopup.tsx` en la landing page para renderizar las imagenes cuando `imageUrls` viene en la respuesta.
+
+### 39.7 Impacto
+
+- **Afecta**: Solo usuarios del webchat (landing page). WhatsApp funciona correctamente (las fotos se envian via `sendImage()`)
+- **Severidad**: Media — el usuario no recibe la informacion solicitada y se frustra, lo que lleva a escalado innecesario
+- **Workaround**: El agente humano puede enviar las fotos manualmente tras tomar el control de la conversacion

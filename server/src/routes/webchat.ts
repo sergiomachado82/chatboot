@@ -58,8 +58,12 @@ router.post('/webchat/send', webchatRateLimiter, async (req, res) => {
       orderBy: { creadoEn: 'desc' },
     });
 
+    const metadata = botMessage?.metadata as Record<string, unknown> | null;
+    const imageUrls = (metadata?.imageUrls as string[] | undefined) ?? [];
+
     res.json({
       response: botMessage?.contenido ?? 'No se pudo generar una respuesta en este momento.',
+      ...(imageUrls.length > 0 && { images: imageUrls }),
     });
   } catch (err) {
     logger.error({ err, sessionId }, 'Webchat processing error');
