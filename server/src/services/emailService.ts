@@ -11,6 +11,7 @@ const transporter = nodemailer.createTransport({
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
   },
+  tls: { rejectUnauthorized: false },
 });
 
 export async function sendResetEmail(to: string, resetUrl: string): Promise<void> {
