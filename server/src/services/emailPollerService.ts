@@ -202,6 +202,19 @@ async function pollEmails(): Promise<void> {
               continue;
             }
 
+            // Skip known notification senders (never reply to these)
+            const skipDomains = [
+              'booking.com', 'airbnb.com', 'invertironline.com', 'iol.invertironline.com',
+              'mercadolibre.com', 'mercadopago.com', 'bna.com.ar', 'mailing.bna.com.ar',
+              'noreply', 'no-reply', 'mailer-daemon', 'postmaster',
+              'newsletter', 'notifications', 'alert', 'billing',
+            ];
+            if (skipDomains.some(d => fromAddress.includes(d))) {
+              logger.debug({ from: fromAddress }, 'Skipping notification sender');
+              await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
+              continue;
+            }
+
             const autoSubmitted = parsed.headers.get('auto-submitted');
             if (autoSubmitted && autoSubmitted !== 'no') {
               logger.debug({ from: fromAddress, autoSubmitted }, 'Skipping auto-submitted email');
