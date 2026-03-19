@@ -39,6 +39,7 @@ async function pollEmails(): Promise<void> {
   });
 
   if (activeComplejos.length === 0) {
+    logger.debug('No complejos with autoResponderEmail enabled, skipping poll');
     return;
   }
 
@@ -51,38 +52,59 @@ async function pollEmails(): Promise<void> {
 
   isPolling = true;
   let client: ImapFlow | null = null;
+  let loggedOut = false;
 
   try {
-    client = new ImapFlow(getImapConfig());
+    const imapConfig = getImapConfig();
+    logger.info({ host: imapConfig.host, port: imapConfig.port, user: imapConfig.auth.user }, 'Connecting to IMAP...');
+
+    client = new ImapFlow(imapConfig);
     await client.connect();
+    logger.info('IMAP connected successfully');
 
     const lock = await client.getMailboxLock('INBOX');
     try {
-      // Search for unseen messages
-      const messages = client.fetch(
-        { seen: false },
-        {
-          uid: true,
-          flags: true,
-          envelope: true,
-          source: true,
-          headers: ['auto-submitted', 'x-auto-responded-message', 'precedence'],
-        }
-      );
+      // First search for unseen message UIDs
+      const unseenUids = await client.search({ seen: false }, { uid: true });
 
-      for await (const msg of messages) {
+      if (!unseenUids || unseenUids.length === 0) {
+        logger.debug('No unseen emails found');
+        lock.release();
+        await client.logout();
+        loggedOut = true;
+        return;
+      }
+
+      logger.info({ count: unseenUids.length }, 'Found unseen emails');
+
+      // Fetch each unseen message by UID
+      for (const uid of unseenUids) {
         try {
+          const msg = await client.fetchOne(uid, {
+            uid: true,
+            flags: true,
+            envelope: true,
+            source: true,
+          }, { uid: true });
+
+          if (!msg || !msg.source) {
+            logger.warn({ uid }, 'Could not fetch email source');
+            continue;
+          }
+
           const parsed = await simpleParser(msg.source);
 
-          const messageId = parsed.messageId || `unknown-${Date.now()}`;
+          const messageId = parsed.messageId || `unknown-${uid}-${Date.now()}`;
           const fromAddress = parsed.from?.value?.[0]?.address?.toLowerCase() || '';
           const subject = parsed.subject || '';
+
+          logger.info({ uid, from: fromAddress, subject }, 'Processing email');
 
           // Anti-loop: skip our own emails
           if (fromAddress.includes('info@lasgrutasdepartamentos') ||
               fromAddress.includes('lasgrutasdepartamentos@gmail')) {
             logger.debug({ from: fromAddress }, 'Skipping own email');
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
             continue;
           }
 
@@ -90,7 +112,7 @@ async function pollEmails(): Promise<void> {
           const autoSubmitted = parsed.headers.get('auto-submitted');
           if (autoSubmitted && autoSubmitted !== 'no') {
             logger.debug({ from: fromAddress, autoSubmitted }, 'Skipping auto-submitted email');
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
             continue;
           }
 
@@ -98,14 +120,14 @@ async function pollEmails(): Promise<void> {
           const precedence = parsed.headers.get('precedence');
           if (precedence && ['bulk', 'junk', 'list'].includes(String(precedence).toLowerCase())) {
             logger.debug({ from: fromAddress, precedence }, 'Skipping bulk/list email');
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
             continue;
           }
 
           // Skip if X-Auto-Responded-Message header present
           if (parsed.headers.get('x-auto-responded-message')) {
             logger.debug({ from: fromAddress }, 'Skipping already auto-responded email');
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
             continue;
           }
 
@@ -115,7 +137,7 @@ async function pollEmails(): Promise<void> {
           });
           if (existing) {
             logger.debug({ messageId }, 'Email already processed, skipping');
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
             continue;
           }
 
@@ -133,13 +155,13 @@ async function pollEmails(): Promise<void> {
             await prisma.emailProcesado.create({
               data: { messageId, fromEmail: fromAddress, subject, error: 'Rate limit exceeded' },
             });
-            await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
             continue;
           }
 
           // Process the email
           const bodyText = parsed.text || '';
-          logger.info({ from: fromAddress, subject, messageId }, 'Processing incoming email');
+          logger.info({ from: fromAddress, subject, messageId }, 'Delegating to auto-responder');
 
           try {
             const complejoId = await processIncomingEmail({
@@ -161,7 +183,7 @@ async function pollEmails(): Promise<void> {
               },
             });
 
-            logger.info({ from: fromAddress, subject, complejoId }, 'Email auto-reply sent');
+            logger.info({ from: fromAddress, subject, complejoId }, 'Email auto-reply sent successfully');
           } catch (err: any) {
             logger.error({ err, from: fromAddress, subject }, 'Failed to process email');
             await prisma.emailProcesado.create({
@@ -176,10 +198,10 @@ async function pollEmails(): Promise<void> {
           }
 
           // Mark as seen
-          await client.messageFlagsAdd({ uid: msg.uid }, ['\\Seen'], { uid: true });
+          await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
 
         } catch (msgErr) {
-          logger.error({ err: msgErr, uid: msg.uid }, 'Error processing individual email');
+          logger.error({ err: msgErr, uid }, 'Error processing individual email');
         }
       }
     } finally {
@@ -187,10 +209,12 @@ async function pollEmails(): Promise<void> {
     }
 
     await client.logout();
+    loggedOut = true;
+    logger.info('IMAP poll cycle completed');
   } catch (err) {
     logger.error({ err }, 'Email polling error');
   } finally {
-    if (client) {
+    if (client && !loggedOut) {
       try { await client.logout(); } catch { /* ignore */ }
     }
     isPolling = false;
