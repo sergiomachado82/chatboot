@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createReserva,
   createReservaManual,
+  deleteReserva,
   getReservaById,
   getReservasByDateRange,
   listReservas,
@@ -166,6 +167,15 @@ router.patch('/reservas/:id/estado', async (req, res) => {
     return;
   }
   res.json(reserva);
+});
+
+router.delete('/reservas/:id', async (req, res) => {
+  const deleted = await deleteReserva(req.params.id);
+  if (!deleted) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  res.status(204).end();
 });
 
 export default router;

@@ -66,3 +66,10 @@ export async function getEmailStats() {
 export async function getEmailById(id: string) {
   return prisma.emailProcesado.findUnique({ where: { id } });
 }
+
+export async function deleteEmail(id: string) {
+  const email = await prisma.emailProcesado.findUnique({ where: { id } });
+  if (!email) return false;
+  await prisma.emailProcesado.delete({ where: { id } });
+  return true;
+}

@@ -3,10 +3,10 @@ import { useReservas } from '../../hooks/useReservas';
 import { useComplejos } from '../../hooks/useComplejos';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { createReservaManual, updateReserva, updateReservaEstado } from '../../api/reservaApi';
+import { createReservaManual, deleteReserva, updateReserva, updateReservaEstado } from '../../api/reservaApi';
 import Badge, { estadoColor, estadoLabel } from '../ui/Badge';
 import type { Reserva, CrearReservaManualRequest, UpdateReservaRequest } from '@shared/types/reserva';
-import { Plus, Pencil, X, List, CalendarDays } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, List, CalendarDays } from 'lucide-react';
 import ReservaCalendar from './ReservaCalendar';
 import { TableSkeleton } from '../ui/Skeleton';
 import { useModalKeyboard } from '../../hooks/useModalKeyboard';
@@ -77,11 +77,13 @@ function reservaToForm(r: Reserva): FormData {
 function ReservaCard({
   r,
   onEdit,
+  onDelete,
   onEstadoChange,
   isPending,
 }: {
   r: Reserva;
   onEdit: () => void;
+  onDelete: () => void;
   onEstadoChange: (id: string, estado: string) => void;
   isPending: boolean;
 }) {
@@ -103,6 +105,13 @@ function ReservaCard({
             title="Editar"
           >
             <Pencil size={14} />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+            title="Eliminar"
+          >
+            <Trash2 size={14} />
           </button>
         </div>
       </div>
@@ -214,6 +223,18 @@ export default function ReservaList() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reservas'] }),
     onError: (err: Error) => toast.error(err.message || 'Error al cambiar estado'),
   });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteReserva(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reservas'] }),
+    onError: (err: Error) => toast.error(err.message || 'Error al eliminar reserva'),
+  });
+
+  function handleDelete(id: string) {
+    if (window.confirm('Seguro que queres eliminar esta reserva?')) {
+      deleteMut.mutate(id);
+    }
+  }
 
   function openCreate() {
     setEditingId(null);
@@ -385,6 +406,7 @@ export default function ReservaList() {
             key={r.id}
             r={r}
             onEdit={() => openEdit(r)}
+            onDelete={() => handleDelete(r.id)}
             onEstadoChange={(id, estado) => updateEstadoMut.mutate({ id, estado })}
             isPending={updateEstadoMut.isPending}
           />
@@ -452,6 +474,14 @@ export default function ReservaList() {
                         aria-label="Editar reserva"
                       >
                         <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(r.id)}
+                        className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                        title="Eliminar"
+                        aria-label="Eliminar reserva"
+                      >
+                        <Trash2 size={14} />
                       </button>
                       {r.estado === 'pre_reserva' && (
                         <>

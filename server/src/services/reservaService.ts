@@ -274,6 +274,24 @@ export async function getReservasByDateRange(from: Date, to: Date) {
   return reservas.map(serializeReserva);
 }
 
+export async function deleteReserva(id: string) {
+  const reserva = await prisma.reserva.findUnique({ where: { id } });
+  if (!reserva) return false;
+
+  // Recalc inventory if habitacion is set
+  if (reserva.habitacion) {
+    const dates = dateRange(reserva.fechaEntrada, reserva.fechaSalida);
+    await prisma.reserva.delete({ where: { id } });
+    await recalcDisponible(reserva.habitacion, dates).catch((err) =>
+      logger.error({ err }, 'recalcDisponible failed on delete')
+    );
+  } else {
+    await prisma.reserva.delete({ where: { id } });
+  }
+
+  return true;
+}
+
 export async function listReservas(estado?: string, page = 1, pageSize = 20) {
   const where = estado ? { estado } : undefined;
   const [reservas, total] = await Promise.all([

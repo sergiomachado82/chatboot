@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { listEmails, getEmailStats, getEmailById } from '../services/emailQueryService.js';
+import { listEmails, getEmailStats, getEmailById, deleteEmail } from '../services/emailQueryService.js';
 
 const router = Router();
 
@@ -50,6 +50,15 @@ router.get('/emails/:id', async (req, res) => {
     return;
   }
   res.json(email);
+});
+
+router.delete('/emails/:id', async (req, res) => {
+  const deleted = await deleteEmail(req.params.id);
+  if (!deleted) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  res.status(204).end();
 });
 
 export default router;

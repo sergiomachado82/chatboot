@@ -28,3 +28,7 @@ export async function getEmailStats(): Promise<EmailStats> {
 export async function getEmail(id: string): Promise<EmailProcesado> {
   return apiFetch<EmailProcesado>(`/emails/${id}`);
 }
+
+export async function deleteEmail(id: string): Promise<void> {
+  await apiFetch(`/emails/${id}`, { method: 'DELETE' });
+}

@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useEmails, useEmailStats } from '../../hooks/useEmails';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { deleteEmail } from '../../api/emailApi';
 import Badge from '../ui/Badge';
 import { TableSkeleton } from '../ui/Skeleton';
 import EmailDetailModal from './EmailDetailModal';
-import { Mail, CheckCircle, AlertTriangle, FileText, Search } from 'lucide-react';
+import { Mail, CheckCircle, AlertTriangle, FileText, Search, Trash2 } from 'lucide-react';
 import type { EmailProcesado } from '@shared/types/email';
 
 type Filtro = 'todos' | 'respondidos' | 'errores' | 'formularios';
@@ -37,7 +40,7 @@ function StatCard({ label, value, icon: Icon, color }: {
   );
 }
 
-function EmailCard({ email, onClick }: { email: EmailProcesado; onClick: () => void }) {
+function EmailCard({ email, onClick, onDelete }: { email: EmailProcesado; onClick: () => void; onDelete: () => void }) {
   return (
     <div
       onClick={onClick}
@@ -52,6 +55,13 @@ function EmailCard({ email, onClick }: { email: EmailProcesado; onClick: () => v
           <Badge color={email.error ? 'red' : email.respondido ? 'green' : 'gray'}>
             {email.error ? 'Error' : email.respondido ? 'Respondido' : 'Pendiente'}
           </Badge>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+            title="Eliminar"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
       <div className="flex items-center justify-between text-xs text-gray-400">
@@ -76,8 +86,24 @@ export default function EmailList() {
     ...(search ? { search } : {}),
   };
 
+  const queryClient = useQueryClient();
   const { data, isLoading } = useEmails(page, filters);
   const { data: stats } = useEmailStats();
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteEmail(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['emailStats'] });
+    },
+    onError: (err: Error) => toast.error(err.message || 'Error al eliminar email'),
+  });
+
+  function handleDelete(id: string) {
+    if (window.confirm('Seguro que queres eliminar este email?')) {
+      deleteMut.mutate(id);
+    }
+  }
 
   const emails = data?.emails;
   const totalPages = data?.totalPages ?? 1;
@@ -161,7 +187,7 @@ export default function EmailList() {
       {/* Mobile: Card view */}
       <div className="md:hidden space-y-3">
         {emails?.map((e) => (
-          <EmailCard key={e.id} email={e} onClick={() => setSelectedId(e.id)} />
+          <EmailCard key={e.id} email={e} onClick={() => setSelectedId(e.id)} onDelete={() => handleDelete(e.id)} />
         ))}
         {emails?.length === 0 && (
           <div className="text-center text-gray-400 py-8">No hay emails</div>
@@ -179,6 +205,7 @@ export default function EmailList() {
                 <th className="text-center px-3 py-2 text-gray-600 font-medium">Tipo</th>
                 <th className="text-center px-3 py-2 text-gray-600 font-medium">Estado</th>
                 <th className="text-left px-3 py-2 text-gray-600 font-medium">Fecha</th>
+                <th className="text-center px-3 py-2 text-gray-600 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -201,11 +228,21 @@ export default function EmailList() {
                     </Badge>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">{fmtDateTime(e.creadoEn)}</td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); handleDelete(e.id); }}
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Eliminar"
+                      aria-label="Eliminar email"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))}
               {emails?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                     No hay emails
                   </td>
                 </tr>

@@ -601,6 +601,7 @@ Peticion HTTP
 | `POST` | `/api/reservas/manual` | Crear reserva manual (requiere nombreHuesped) |
 | `PATCH` | `/api/reservas/:id` | Actualizar reserva |
 | `PATCH` | `/api/reservas/:id/estado` | Cambiar estado de reserva |
+| `DELETE` | `/api/reservas/:id` | Eliminar reserva (recalcula inventario si tenia habitacion). Retorna 204 |
 
 ```json
 // POST /api/reservas/manual
@@ -622,6 +623,15 @@ Peticion HTTP
 // PATCH /api/reservas/:id/estado
 { "estado": "confirmada" }
 ```
+
+#### Emails Procesados
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/emails?page=&pageSize=&respondido=&complejoId=&esFormulario=&hasError=&search=` | Listar emails procesados (paginados, con filtros) |
+| `GET` | `/api/emails/stats` | Estadisticas: emails hoy, respondidos, errores, formularios |
+| `GET` | `/api/emails/:id` | Detalle de un email procesado |
+| `DELETE` | `/api/emails/:id` | Eliminar email procesado. Retorna 204 |
 
 #### Inventario
 
@@ -1065,6 +1075,7 @@ La lista de habitaciones se obtiene dinamicamente de la tabla `complejos` (activ
 | `getReservaById(id)` | Detalle con relacion huesped |
 | `getReservasByHuesped(huespedId)` | Reservas de un huesped |
 | `getReservasByDateRange(from, to)` | Reservas no canceladas que se solapan con el rango. Usado por calendario |
+| `deleteReserva(id)` | Elimina reserva de la DB. Si tenia habitacion asignada, recalcula disponibilidad del inventario |
 | `listReservas(estado?)` | Lista filtrada por estado |
 
 **Atomicidad**: `createReserva` y `createReservaManual` usan `prisma.$transaction()` para crear la reserva y bloquear las fechas en el inventario de forma atomica. Si alguna operacion falla, se revierte todo. Nota: no usa `SERIALIZABLE` isolation porque el riesgo de concurrencia es bajo en este dominio (alquiler turistico, no ticketing masivo) y todas las reservas son `pre_reserva` que requieren confirmacion humana.
@@ -1192,13 +1203,22 @@ Servicio de sincronizacion bidireccional con Google Calendar. Usa la misma Servi
 | `startGCalSyncJob()` | Inicia cron job: primera ejecucion 15s despues del startup, luego cada 5 minutos. Si `GOOGLE_CALENDAR_ID` no esta configurado, no inicia. |
 | `stopGCalSyncJob()` | Detiene el cron job (llamado en graceful shutdown). |
 
-### 8.18 emailService.ts
+### 8.18 emailQueryService.ts
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `listEmails(filters, page, pageSize)` | Lista emails procesados con filtros (respondido, complejoId, esFormulario, hasError, search). Paginado |
+| `getEmailStats()` | Estadisticas: emails de hoy, respondidos, con error, formularios |
+| `getEmailById(id)` | Detalle de un email procesado |
+| `deleteEmail(id)` | Elimina un email procesado de la DB |
+
+### 8.19 emailService.ts (SMTP)
 
 | Funcion | Descripcion |
 |---------|-------------|
 | `sendResetPasswordEmail(email, token)` | Envia email con link de recuperacion de contrasena via SMTP (Gmail). Requiere `SMTP_USER` y `SMTP_PASS` configurados. |
 
-### 8.19 botConfigService.ts
+### 8.20 botConfigService.ts
 
 | Funcion | Descripcion |
 |---------|-------------|
@@ -1206,7 +1226,7 @@ Servicio de sincronizacion bidireccional con Google Calendar. Usa la misma Servi
 | `updateBotConfig(data)` | Actualiza config en DB e invalida cache inmediatamente |
 | `invalidateBotConfigCache()` | Limpia cache manualmente (para tests) |
 
-### 8.20 whatsappProfileService.ts
+### 8.21 whatsappProfileService.ts
 
 | Funcion | Descripcion |
 |---------|-------------|
@@ -1214,7 +1234,7 @@ Servicio de sincronizacion bidireccional con Google Calendar. Usa la misma Servi
 | `updateBusinessProfile(data)` | Actualiza perfil via Meta API POST. En modo simulador retorna success sin persistir |
 | `isSimulatorMode()` | Verifica si esta en modo simulador (sin credenciales WA configuradas) |
 
-### 8.21 Utilidades (utils/)
+### 8.22 Utilidades (utils/)
 
 **errors.ts** — Clases de error custom para respuestas HTTP consistentes:
 
@@ -1383,6 +1403,7 @@ Modal de edicion con 7 tabs:
 - Acciones por estado:
   - `pre_reserva`: Confirmar / Cancelar
   - `confirmada`: Completar
+- Boton Eliminar (Trash2 rojo) en todas las reservas, con `window.confirm` antes de ejecutar. Disponible en tabla desktop y cards mobile
 
 **Vista calendario:**
 - Grilla mensual con departamentos como filas y dias como columnas
@@ -3483,3 +3504,67 @@ Y actualizar el widget `WhatsAppPopup.tsx` en la landing page para renderizar la
 - **Afecta**: Solo usuarios del webchat (landing page). WhatsApp funciona correctamente (las fotos se envian via `sendImage()`)
 - **Severidad**: Media — el usuario no recibe la informacion solicitada y se frustra, lo que lleva a escalado innecesario
 - **Workaround**: El agente humano puede enviar las fotos manualmente tras tomar el control de la conversacion
+
+---
+
+## 40. Eliminacion de Reservas y Emails desde el Panel Admin (2026-03-20)
+
+### 40.1 Objetivo
+
+Permitir al administrador eliminar registros de reservas (ej: canceladas, duplicadas) y emails procesados desde el panel web para mantener la vista limpia y enfocarse en lo relevante.
+
+### 40.2 Backend
+
+**Nuevos endpoints:**
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `DELETE` | `/api/reservas/:id` | Elimina reserva. Recalcula inventario si tenia habitacion. Retorna 204 |
+| `DELETE` | `/api/emails/:id` | Elimina email procesado. Retorna 204 |
+
+Ambos retornan 404 si el registro no existe.
+
+**Nuevas funciones de servicio:**
+
+| Archivo | Funcion | Descripcion |
+|---------|---------|-------------|
+| `reservaService.ts` | `deleteReserva(id)` | Busca la reserva, la elimina, y si tenia habitacion asignada recalcula disponibilidad del inventario con `recalcDisponible()` |
+| `emailQueryService.ts` | `deleteEmail(id)` | Busca el email, lo elimina de la DB |
+
+### 40.3 Frontend
+
+**API clients:**
+
+| Archivo | Funcion |
+|---------|---------|
+| `src/api/reservaApi.ts` | `deleteReserva(id)` — `fetch DELETE /reservas/:id` |
+| `src/api/emailApi.ts` | `deleteEmail(id)` — `fetch DELETE /emails/:id` |
+
+**Fix en `apiClient.ts`:** Se agrego manejo de respuestas 204 No Content (retorna `undefined` en vez de intentar parsear JSON vacio).
+
+**ReservaList.tsx:**
+- Icono Trash2 rojo en columna Acciones (desktop) al lado del Pencil de edicion
+- Icono Trash2 rojo en el header del card (mobile) al lado del Pencil
+- `window.confirm('Seguro que queres eliminar esta reserva?')` antes de ejecutar
+- `useMutation` con invalidacion de `['reservas']` y `toast.error` en caso de fallo
+
+**EmailList.tsx:**
+- Columna "Acciones" nueva en tabla desktop con icono Trash2
+- Icono Trash2 en esquina del card mobile
+- `e.stopPropagation()` en ambos para evitar abrir el modal de detalle
+- `window.confirm('Seguro que queres eliminar este email?')` antes de ejecutar
+- `useMutation` con invalidacion de `['emails']` (incluye stats por prefix matching) y `toast.error` en caso de fallo
+
+### 40.4 Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `server/src/services/reservaService.ts` | `+ deleteReserva(id)` |
+| `server/src/routes/reservas.ts` | `+ DELETE /reservas/:id` |
+| `server/src/services/emailQueryService.ts` | `+ deleteEmail(id)` |
+| `server/src/routes/emails.ts` | `+ DELETE /emails/:id` |
+| `src/api/apiClient.ts` | Fix: manejo de respuestas 204 No Content |
+| `src/api/reservaApi.ts` | `+ deleteReserva(id)` |
+| `src/api/emailApi.ts` | `+ deleteEmail(id)` |
+| `src/components/reservas/ReservaList.tsx` | Boton eliminar en tabla y cards |
+| `src/components/emails/EmailList.tsx` | Boton eliminar en tabla y cards, nueva columna Acciones |

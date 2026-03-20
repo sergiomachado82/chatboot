@@ -41,6 +41,10 @@ export async function updateReservaEstado(id: string, estado: string): Promise<R
   });
 }
 
+export async function deleteReserva(id: string): Promise<void> {
+  await apiFetch(`/reservas/${id}`, { method: 'DELETE' });
+}
+
 export async function getReservasByDateRange(from: string, to: string): Promise<Reserva[]> {
   return apiFetch<Reserva[]>(`/reservas?from=${from}&to=${to}`);
 }

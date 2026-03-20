@@ -34,6 +34,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       throw new Error(body.message ?? `HTTP ${res.status}`);
     }
 
+    if (res.status === 204) return undefined as T;
     return res.json();
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
