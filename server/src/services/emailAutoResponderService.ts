@@ -100,7 +100,7 @@ function extractFromFormFields(
  * Process an incoming email: extract data, check availability, generate and send reply.
  * Returns the complejoId if one was identified, or null.
  */
-export async function processIncomingEmail(email: IncomingEmail): Promise<string | null> {
+export async function processIncomingEmail(email: IncomingEmail): Promise<{ complejoId: string | null; replyBody: string }> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
@@ -342,5 +342,5 @@ ${!isFormSubmission ? `Texto original del email:\n${email.body.slice(0, 2000)}` 
     inReplyTo: email.messageId,
   });
 
-  return complejoId;
+  return { complejoId, replyBody };
 }

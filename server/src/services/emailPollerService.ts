@@ -269,7 +269,7 @@ async function pollEmails(): Promise<void> {
           logger.info({ replyTo, subject, messageId, isForm }, 'Delegating to auto-responder');
 
           try {
-            const complejoId = await processIncomingEmail({
+            const { complejoId, replyBody } = await processIncomingEmail({
               messageId,
               from: replyTo,
               subject,
@@ -286,6 +286,9 @@ async function pollEmails(): Promise<void> {
                 subject,
                 complejoId,
                 respondido: true,
+                bodyOriginal: isForm && formFields ? JSON.stringify(formFields) : bodyText.slice(0, 5000),
+                respuestaEnviada: replyBody,
+                esFormulario: isForm,
               },
             });
 
@@ -299,6 +302,8 @@ async function pollEmails(): Promise<void> {
                 subject,
                 respondido: false,
                 error: err.message?.slice(0, 500),
+                bodyOriginal: isForm && formFields ? JSON.stringify(formFields) : bodyText.slice(0, 5000),
+                esFormulario: isForm,
               },
             });
           }

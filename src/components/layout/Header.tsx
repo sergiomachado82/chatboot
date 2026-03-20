@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { logout, getStoredAgente } from '../../api/authApi';
-import { MessageCircle, Calendar, Building2, Smartphone, Bot, Menu, X } from 'lucide-react';
+import { MessageCircle, Calendar, Building2, Smartphone, Bot, Mail, Menu, X } from 'lucide-react';
 
-type View = 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot';
+type View = 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot' | 'emails';
 
 interface HeaderProps {
   view: View;
@@ -13,6 +13,7 @@ const NAV_ITEMS: { view: View; icon: typeof MessageCircle; label: string }[] = [
   { view: 'chat', icon: MessageCircle, label: 'Chat' },
   { view: 'reservas', icon: Calendar, label: 'Reservas' },
   { view: 'complejos', icon: Building2, label: 'Complejos' },
+  { view: 'emails', icon: Mail, label: 'Emails' },
   { view: 'whatsapp', icon: Smartphone, label: 'WhatsApp' },
   { view: 'bot', icon: Bot, label: 'Bot' },
 ];

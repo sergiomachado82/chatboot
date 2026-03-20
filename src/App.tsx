@@ -10,11 +10,12 @@ import ReservaList from './components/reservas/ReservaList';
 import ComplejoList from './components/complejos/ComplejoList';
 import WhatsAppProfilePage from './components/whatsapp/WhatsAppProfilePage';
 import BotConfigPage from './components/bot/BotConfigPage';
+import EmailList from './components/emails/EmailList';
 import WhatsAppSimulator from './components/simulator/WhatsAppSimulator';
 import EmptyState from './components/ui/EmptyState';
 import type { Conversacion } from '@shared/types/conversacion';
 
-type View = 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot';
+type View = 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot' | 'emails';
 
 export default function App() {
   const [authed, setAuthed] = useState(isAuthenticated());
@@ -88,6 +89,8 @@ export default function App() {
         <ReservaList />
       ) : view === 'complejos' ? (
         <ComplejoList />
+      ) : view === 'emails' ? (
+        <EmailList />
       ) : view === 'bot' ? (
         <BotConfigPage />
       ) : (

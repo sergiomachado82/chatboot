@@ -268,14 +268,17 @@ model BotConfig {
 }
 
 model EmailProcesado {
-  id          String   @id @default(cuid())
-  messageId   String   @unique @map("message_id")
-  fromEmail   String   @map("from_email")
-  subject     String?
-  complejoId  String?  @map("complejo_id")
-  respondido  Boolean  @default(false)
-  error       String?
-  creadoEn    DateTime @default(now()) @map("creado_en")
+  id                String   @id @default(cuid())
+  messageId         String   @unique @map("message_id")
+  fromEmail         String   @map("from_email")
+  subject           String?
+  complejoId        String?  @map("complejo_id")
+  respondido        Boolean  @default(false)
+  error             String?
+  bodyOriginal      String?  @map("body_original")
+  respuestaEnviada  String?  @map("respuesta_enviada")
+  esFormulario      Boolean  @default(false) @map("es_formulario")
+  creadoEn          DateTime @default(now()) @map("creado_en")
 
   @@index([fromEmail, creadoEn])
   @@map("emails_procesados")

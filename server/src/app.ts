@@ -22,6 +22,7 @@ import agentesRouter from './routes/agentes.js';
 import complejosRouter from './routes/complejos.js';
 import whatsappProfileRouter from './routes/whatsappProfile.js';
 import botConfigRouter from './routes/botConfig.js';
+import emailsRouter from './routes/emails.js';
 import icalRouter from './routes/ical.js';
 import webchatRouter from './routes/webchat.js';
 import contactRouter from './routes/contact.js';
@@ -87,6 +88,7 @@ protectedRouter.use(agentesRouter);
 protectedRouter.use(complejosRouter);
 protectedRouter.use(whatsappProfileRouter);
 protectedRouter.use(botConfigRouter);
+protectedRouter.use(emailsRouter);
 app.use('/api', protectedRouter);
 
 // In production, serve built frontend files (Vite output)
