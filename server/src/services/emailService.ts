@@ -2,26 +2,31 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
+const useLocalMta = env.SMTP_HOST === 'localhost' || env.SMTP_HOST === '127.0.0.1';
+const smtpFrom = env.SMTP_USER || 'info@lasgrutasdepartamentos.com';
+
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST || undefined,
   port: env.SMTP_PORT,
   secure: env.SMTP_PORT === 465,
   ...(!env.SMTP_HOST && { service: 'gmail' }),
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
-  },
+  ...(useLocalMta ? {} : {
+    auth: {
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+    },
+  }),
   tls: { rejectUnauthorized: false },
 });
 
 export async function sendResetEmail(to: string, resetUrl: string): Promise<void> {
-  if (!env.SMTP_USER || !env.SMTP_PASS) {
+  if (!useLocalMta && (!env.SMTP_USER || !env.SMTP_PASS)) {
     logger.error('SMTP_USER and SMTP_PASS must be configured to send emails');
     throw new Error('Email service not configured');
   }
 
   await transporter.sendMail({
-    from: `"Panel de Agentes" <${env.SMTP_USER}>`,
+    from: `"Panel de Agentes" <${smtpFrom}>`,
     to,
     subject: 'Recuperar contraseña - Panel de Agentes',
     html: `
@@ -53,7 +58,7 @@ interface ContactFormData {
 }
 
 export async function sendContactEmail(data: ContactFormData): Promise<void> {
-  if (!env.SMTP_USER || !env.SMTP_PASS) {
+  if (!useLocalMta && (!env.SMTP_USER || !env.SMTP_PASS)) {
     logger.error('SMTP credentials not configured');
     throw new Error('Email service not configured');
   }
@@ -106,7 +111,7 @@ export async function sendContactEmail(data: ContactFormData): Promise<void> {
   `;
 
   await transporter.sendMail({
-    from: `"Las Grutas Departamentos" <${env.SMTP_USER}>`,
+    from: `"Las Grutas Departamentos" <${smtpFrom}>`,
     to: 'info@lasgrutasdepartamentos.com',
     replyTo: email,
     subject: `Consulta de disponibilidad - ${nombre}${complejo ? ` - ${complejo}` : ''}`,
@@ -124,7 +129,7 @@ interface AutoReplyData {
 }
 
 export async function sendAutoReplyEmail(data: AutoReplyData): Promise<void> {
-  if (!env.SMTP_USER || !env.SMTP_PASS) {
+  if (!useLocalMta && (!env.SMTP_USER || !env.SMTP_PASS)) {
     logger.error('SMTP credentials not configured for auto-reply');
     throw new Error('Email service not configured');
   }
@@ -175,7 +180,7 @@ export async function sendAutoReplyEmail(data: AutoReplyData): Promise<void> {
   }
 
   await transporter.sendMail({
-    from: `"Las Grutas Departamentos" <${env.SMTP_USER}>`,
+    from: `"Las Grutas Departamentos" <${smtpFrom}>`,
     to,
     subject,
     html,
