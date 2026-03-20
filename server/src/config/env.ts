@@ -63,8 +63,8 @@ const envSchema = z.object({
     if (!data.ANTHROPIC_API_KEY) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'ANTHROPIC_API_KEY is required in production', path: ['ANTHROPIC_API_KEY'] });
     }
-    if (!data.WA_ACCESS_TOKEN) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'WA_ACCESS_TOKEN is required in production', path: ['WA_ACCESS_TOKEN'] });
+    if (!data.SIMULATOR_MODE && !data.WA_ACCESS_TOKEN) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'WA_ACCESS_TOKEN is required in production (unless SIMULATOR_MODE=true)', path: ['WA_ACCESS_TOKEN'] });
     }
   }
 });
