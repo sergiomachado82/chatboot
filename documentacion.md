@@ -3717,3 +3717,47 @@ El script `deploy.sh update` hace: `git pull` → `docker compose build --no-cac
 | `docker-compose.prod.yml` | App expone `127.0.0.1:5050:5050`. Removidos servicios nginx y certbot de Docker |
 | `/etc/nginx/sites-enabled/chatbot-lasgrutas` (servidor) | `proxy_pass http://localhost:5050` (llega a Docker via port mapping) |
 | PM2 (servidor) | Proceso `chatboot` eliminado permanentemente |
+
+## 44. Fix SMTP desde Docker — Relay a Postfix del host (2026-03-20)
+
+### 44.1 Problema
+
+Los emails de auto-respuesta del formulario de contacto no llegaban al destinatario, aunque el admin panel mostraba `respondido=true`.
+
+**Causa raiz (doble):**
+
+1. **`SMTP_HOST=localhost` dentro de Docker** apunta al propio container (no tiene MTA). El Postfix corre en el **host**, no en el container.
+2. **Postfix rechazaba relay** desde IPs de Docker (`172.17.x.x` / `172.18.x.x`) con error `454 4.7.1 Relay access denied`, porque `mynetworks` solo incluia `127.0.0.0/8`.
+
+### 44.2 Solucion
+
+| Cambio | Donde | Detalle |
+|--------|-------|---------|
+| `extra_hosts: ["host.docker.internal:host-gateway"]` | `docker-compose.prod.yml` | Permite al container resolver `host.docker.internal` → IP del host |
+| `SMTP_HOST=host.docker.internal` | `.env` en servidor | El container envia SMTP al host via esta resolucion |
+| `useLocalMta` reconoce `host.docker.internal` | `server/src/services/emailService.ts` | No intenta autenticacion SMTP (Postfix local no la requiere) |
+| `mynetworks` ampliado | Postfix en host (`/etc/postfix/main.cf`) | `mynetworks = 127.0.0.0/8 ... 172.17.0.0/16 172.18.0.0/16` para permitir relay desde Docker |
+
+### 44.3 Flujo SMTP corregido
+
+```
+Container (app) → host.docker.internal:25 → Postfix (host) → internet (gmail, etc.)
+```
+
+### 44.4 Verificacion
+
+```bash
+# Desde dentro del container, verificar conectividad:
+docker exec chatboot-app sh -c 'echo QUIT | nc host.docker.internal 25'
+# Debe responder: 220 vps-... ESMTP Postfix
+
+# Verificar que Postfix permite relay desde Docker:
+postconf mynetworks
+# Debe incluir 172.17.0.0/16 y 172.18.0.0/16
+
+# Enviar test:
+curl -X POST https://chatbot.lasgrutasdepartamentos.com/api/contact \
+  -H 'Content-Type: application/json' \
+  -d '{"nombre":"Test","email":"tu@email.com","telefono":"123","complejo":"Pewmafe"}'
+# Verificar en logs: docker logs chatboot-app --since 1m | grep "Auto-reply email sent"
+```
