@@ -38,6 +38,8 @@ services:
       dockerfile: Dockerfile
     container_name: chatboot-app
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:5050:5050"
     env_file:
       - .env.production
     environment:
@@ -58,35 +60,11 @@ services:
       retries: 3
       start_period: 30s
 
-  # --- Nginx (SSL termination + reverse proxy) ---
-  nginx:
-    image: nginx:alpine
-    container_name: chatboot-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/active.conf:/etc/nginx/conf.d/default.conf:ro
-      - certbot-etc:/etc/letsencrypt:ro
-      - certbot-var:/var/lib/letsencrypt
-      - certbot-www:/var/www/certbot:ro
-    depends_on:
-      app:
-        condition: service_healthy
-
-  # --- Certbot (SSL certificates) ---
-  certbot:
-    image: certbot/certbot
-    container_name: chatboot-certbot
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
-      - certbot-www:/var/www/certbot
+  # NOTA: Nginx y Certbot NO se usan en esta configuracion.
+  # SSL lo maneja el nginx del HOST (/etc/nginx/sites-enabled/chatbot-lasgrutas)
+  # con certificados de Certbot instalados directamente en el host.
+  # El nginx del host hace proxy_pass a localhost:5050 (port mapping del app container).
 
 volumes:
   pgdata:
   redisdata:
-  certbot-etc:
-  certbot-var:
-  certbot-www:

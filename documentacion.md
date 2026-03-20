@@ -3568,3 +3568,152 @@ Ambos retornan 404 si el registro no existe.
 | `src/api/emailApi.ts` | `+ deleteEmail(id)` |
 | `src/components/reservas/ReservaList.tsx` | Boton eliminar en tabla y cards |
 | `src/components/emails/EmailList.tsx` | Boton eliminar en tabla y cards, nueva columna Acciones |
+
+---
+
+## 41. Formulario de contacto - Guardado directo en BD + Auto-respuesta (2026-03-20)
+
+### 41.1 Problema
+
+Cuando un visitante envia el formulario de contacto desde la landing page, el endpoint `POST /api/contact` solo enviaba un email de notificacion a `info@lasgrutasdepartamentos.com`. No guardaba nada en la BD ni enviaba auto-respuesta al visitante.
+
+El flujo indirecto (IMAP poller recoge el email, detecta formulario, procesa, guarda en BD) no funcionaba confiablemente porque:
+- Depende de que IMAP este configurado y conectado al mismo buzon
+- En produccion con SMTP localhost:25 (Postfix), el email puede no llegar al buzon IMAP de cPanel
+- Hay 3 minutos de delay minimo entre polls
+
+### 41.2 Solucion
+
+Se modifico `POST /api/contact` para que directamente:
+1. Responda `{ ok: true }` al frontend inmediatamente (sin esperar procesamiento)
+2. En background (fire-and-forget):
+   - Envie email de notificacion al admin (best-effort)
+   - Llame a `processIncomingEmail()` con `formFields` para generar auto-respuesta con Claude
+   - Guarde registro en tabla `emailProcesado` con `esFormulario: true`
+
+### 41.3 Flujo resultante
+
+```
+Landing POST /api/contact
+  ├── res.json({ ok: true })           -> respuesta inmediata al frontend
+  └── background:
+      ├── sendContactEmail()            -> email notificacion a admin (best-effort)
+      ├── processIncomingEmail()        -> Claude genera respuesta -> sendAutoReplyEmail() al visitante
+      └── prisma.emailProcesado.create() -> aparece en admin panel (seccion Emails, filtro "Formularios")
+```
+
+### 41.4 Casos de error
+
+- Si no hay complejos con `autoResponderEmail: true`: guarda en BD con `respondido: false` y error descriptivo
+- Si `processIncomingEmail()` falla: guarda en BD con `respondido: false` y el mensaje de error
+- Si falla el guardado en BD tras error: se loguea pero no afecta al usuario
+
+### 41.5 Codigo reutilizado (sin cambios)
+
+- `processIncomingEmail` de `emailAutoResponderService.ts` (ya soporta `formFields`)
+- `sendAutoReplyEmail` de `emailService.ts` (llamado internamente por `processIncomingEmail`)
+- Schema `EmailProcesado` ya tiene campo `esFormulario`
+- Frontend `EmailList.tsx` ya tiene filtro "Formularios" y polling cada 60s
+
+### 41.6 Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `server/src/routes/contact.ts` | Agregado: imports de `prisma`, `processIncomingEmail`, `crypto`. Respuesta inmediata al frontend. Background: auto-respuesta con Claude + guardado en BD |
+| `documentacion.md` | Seccion 41 documentando el nuevo flujo |
+
+---
+
+## 42. Fix: datos bancarios no mostrados cuando huesped pregunta por forma de pago (2026-03-20)
+
+### 42.1 Problema
+
+Cuando el huesped, en vez de confirmar "si quiero reservar", preguntaba sobre formas de pago ("puedo pagar con tarjeta?"), el bot solo mencionaba MercadoPago sin dar los datos bancarios de transferencia. Esto sucedia porque el PASO 2 del flujo de reservas decia "Si acepta →" y el bot no interpretaba la pregunta sobre pago como aceptacion.
+
+### 42.2 Solucion
+
+Se actualizo el system prompt del bot en `claudeService.ts` (PASO 2):
+- "Si acepta **o pregunta sobre formas/medios de pago** (esto equivale a aceptar)" — pregunta de pago = aceptacion
+- "SIEMPRE primero indica que la sena se abona por transferencia bancaria y pasale los datos de la cuenta" — datos bancarios van primero, siempre
+- Si el huesped pregunta por tarjeta/MercadoPago: "PRIMERO da los datos bancarios como opcion principal, y DESPUES menciona MercadoPago como alternativa"
+
+### 42.3 Archivo modificado
+
+| Archivo | Cambio |
+|---------|--------|
+| `server/src/services/claudeService.ts` | PASO 2 del system prompt: pregunta sobre pago equivale a aceptacion, datos bancarios siempre primero |
+
+---
+
+## 43. Arquitectura de produccion — UNA sola instancia (2026-03-20)
+
+### 43.1 Problema detectado
+
+Se descubrio que habia **DOS servidores Node.js corriendo en paralelo** en produccion:
+
+| Instancia | Proceso | Puerto | BD | Gestionado por |
+|-----------|---------|--------|----|----------------|
+| Docker container | `tsx src/index.ts` | 5050 (interno Docker) | PostgreSQL Docker (container) | docker-compose |
+| Host nativo | `node dist/index.js` | 5050 (host) | PostgreSQL nativo (localhost:5432) | PM2 |
+
+El nginx del host hacia `proxy_pass http://localhost:5050` que iba al proceso PM2, **NO al container Docker**. Esto causaba:
+- Conversaciones del webchat se guardaban en la BD del host (no visible en el panel admin Docker)
+- Los datos bancarios y `titularesVerificados` de la BD del host estaban desactualizados
+- El bot escalaba SIEMPRE a `espera_humano` por titular no verificado (`titularesVerificados` vacio en BD host)
+- Los cambios deployados via Docker (ej: delete de reservas/emails) no se aplicaban al proceso PM2
+
+### 43.2 Solucion
+
+1. Se elimino el proceso PM2 del host (`pm2 delete chatboot`)
+2. Se actualizo `docker-compose.prod.yml`: el app service ahora expone `127.0.0.1:5050:5050` al host
+3. Se removieron los servicios nginx y certbot de docker-compose (SSL lo maneja el nginx del host)
+4. Se actualizo el nginx del host para `proxy_pass http://localhost:5050` (ahora llega al Docker via port mapping)
+
+### 43.3 Arquitectura VALIDA (unica)
+
+```
+Internet
+  │
+  ▼
+Nginx del HOST (:443 SSL, Certbot)
+  │  proxy_pass http://localhost:5050
+  ▼
+Docker: chatboot-app (:5050, port mapping 127.0.0.1:5050:5050)
+  │
+  ├── Docker: chatboot-postgres (:5432 interno)
+  └── Docker: chatboot-redis (:6379 interno)
+```
+
+**NO DEBE existir** ningun otro proceso Node.js escuchando en el host. Verificar con:
+```bash
+ss -tlnp | grep 5050
+# Debe mostrar SOLO el proceso de Docker (docker-proxy)
+```
+
+### 43.4 Proceso de deploy
+
+```bash
+# Desde el servidor (ssh -p5748 root@66.97.40.119)
+cd /var/www/chatboot
+git pull origin main
+bash deploy.sh update
+```
+
+El script `deploy.sh update` hace: `git pull` → `docker compose build --no-cache app` → `docker compose up -d app`.
+
+### 43.5 Reglas para evitar recurrencia
+
+1. **NUNCA usar PM2, systemd o similar** para correr Node.js en el host. Solo Docker.
+2. **NUNCA instalar Node.js nativo** para produccion. El Dockerfile usa `node:20-alpine`.
+3. **NUNCA conectarse a `localhost:5432`** desde la app. La BD es `postgres:5432` (nombre del container Docker).
+4. **Verificar despues de cada deploy** que no haya procesos duplicados: `ss -tlnp | grep 5050`
+5. **El nginx del host** (`/etc/nginx/sites-enabled/chatbot-lasgrutas`) es el unico reverse proxy. El nginx de Docker fue removido.
+6. **Los certificados SSL** los maneja Certbot instalado en el host (renovacion via cron).
+
+### 43.6 Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `docker-compose.prod.yml` | App expone `127.0.0.1:5050:5050`. Removidos servicios nginx y certbot de Docker |
+| `/etc/nginx/sites-enabled/chatbot-lasgrutas` (servidor) | `proxy_pass http://localhost:5050` (llega a Docker via port mapping) |
+| PM2 (servidor) | Proceso `chatboot` eliminado permanentemente |
