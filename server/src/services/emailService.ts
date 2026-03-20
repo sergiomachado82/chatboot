@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
-const useLocalMta = env.SMTP_HOST === 'localhost' || env.SMTP_HOST === '127.0.0.1';
+const useLocalMta = env.SMTP_HOST === 'localhost' || env.SMTP_HOST === '127.0.0.1' || env.SMTP_HOST === 'host.docker.internal';
 const smtpFrom = env.SMTP_USER || 'info@lasgrutasdepartamentos.com';
 
 const transporter = nodemailer.createTransport({
