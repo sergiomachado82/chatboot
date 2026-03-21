@@ -21,12 +21,16 @@ export async function logIntegrationWarning(servicio: string, mensaje: string, d
 }
 
 export async function getIntegrationLogs(options?: { servicio?: string; limit?: number }) {
-  const limit = Math.min(options?.limit ?? 100, 500);
-  return prisma.integrationLog.findMany({
-    where: options?.servicio ? { servicio: options.servicio } : undefined,
-    orderBy: { creadoEn: 'desc' },
-    take: limit,
-  });
+  try {
+    const limit = Math.min(options?.limit ?? 100, 500);
+    return await prisma.integrationLog.findMany({
+      where: options?.servicio ? { servicio: options.servicio } : undefined,
+      orderBy: { creadoEn: 'desc' },
+      take: limit,
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function clearOldLogs(daysToKeep = 30) {

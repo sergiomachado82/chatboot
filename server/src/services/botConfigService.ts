@@ -42,9 +42,13 @@ export async function updateBotConfig(
     data,
   });
 
-  // Save audit entries (non-blocking)
+  // Save audit entries (non-blocking, defensive)
   if (auditEntries.length > 0) {
-    prisma.botConfigAudit.createMany({ data: auditEntries }).catch(() => {});
+    try {
+      prisma.botConfigAudit.createMany({ data: auditEntries }).catch(() => {});
+    } catch {
+      // Model may not exist if prisma client wasn't regenerated
+    }
   }
 
   cachedConfig = updated;
@@ -53,10 +57,14 @@ export async function updateBotConfig(
 }
 
 export async function getBotConfigHistory(limit = 50) {
-  return prisma.botConfigAudit.findMany({
-    orderBy: { creadoEn: 'desc' },
-    take: limit,
-  });
+  try {
+    return await prisma.botConfigAudit.findMany({
+      orderBy: { creadoEn: 'desc' },
+      take: limit,
+    });
+  } catch {
+    return [];
+  }
 }
 
 export function invalidateBotConfigCache(): void {
