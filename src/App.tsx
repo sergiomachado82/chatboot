@@ -25,7 +25,6 @@ export default function App() {
   const [view, setView] = useState<View>('dashboard');
   const [selectedConv, setSelectedConv] = useState<Conversacion | null>(null);
   const { isDark, toggle: toggleDark } = useDarkMode();
-  useDocumentTitle(view);
 
   // Handle /reset-password?token=xxx route
   const urlParams = new URLSearchParams(window.location.search);
@@ -48,6 +47,7 @@ export default function App() {
 
   return (
     <div className={`h-screen flex flex-col ${isDark ? 'dark' : ''}`}>
+      <AuthenticatedTitle view={view} />
       <Header view={view} onViewChange={setView} isDark={isDark} onToggleDark={toggleDark} />
 
       <div key={view} className="view-transition flex-1 flex flex-col overflow-hidden">
@@ -107,6 +107,11 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+function AuthenticatedTitle({ view }: { view: string }) {
+  useDocumentTitle(view);
+  return null;
 }
 
 function SimulatorToggle() {
