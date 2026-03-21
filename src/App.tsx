@@ -72,7 +72,7 @@ function AuthenticatedApp({ isDark, toggleDark }: { isDark: boolean; toggleDark:
       <Header isDark={isDark} onToggleDark={toggleDark} />
       <ServiceBanner />
 
-      <main id="main-content">
+      <main id="main-content" className="flex-1 flex flex-col overflow-hidden">
         <Suspense fallback={<ViewSpinner />}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
