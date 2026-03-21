@@ -6,6 +6,7 @@ import { X, Plus, Trash2, Copy, Check } from 'lucide-react';
 import type { Complejo, CrearComplejoRequest, IcalFeed } from '@shared/types/complejo';
 import TarifaSection from './TarifaSection';
 import MediaGallery from './MediaGallery';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import { useModalKeyboard } from '../../hooks/useModalKeyboard';
 
 type Tab = 'datos' | 'amenities' | 'politicas' | 'tarifas' | 'media' | 'reserva' | 'sync';
@@ -103,8 +104,13 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
   const isDirty = JSON.stringify(form) !== initialFormRef.current ||
     JSON.stringify(amenities) !== initialAmenitiesRef.current;
 
+  const [showDirtyConfirm, setShowDirtyConfirm] = useState(false);
+
   function handleCloseWithDirtyCheck() {
-    if (isDirty && !window.confirm('Hay cambios sin guardar. Seguro que queres cerrar?')) return;
+    if (isDirty) {
+      setShowDirtyConfirm(true);
+      return;
+    }
     onClose();
   }
 
@@ -666,6 +672,16 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDirtyConfirm}
+        title="Cambios sin guardar"
+        message="Hay cambios sin guardar. ¿Descartar los cambios?"
+        confirmLabel="Descartar"
+        variant="warning"
+        onConfirm={() => { setShowDirtyConfirm(false); onClose(); }}
+        onCancel={() => setShowDirtyConfirm(false)}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { getBotConfig, updateBotConfig } from '../services/botConfigService.js';
+import { getBotConfig, updateBotConfig, getBotConfigHistory } from '../services/botConfigService.js';
 
 const MAX_LOGO_SIZE = 500 * 1024; // 500 KB base64
 
@@ -45,10 +45,20 @@ router.patch('/bot/config', async (req, res) => {
   }
 
   try {
-    const updated = await updateBotConfig(parsed.data);
+    const updated = await updateBotConfig(parsed.data, req.user?.id);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Error al actualizar configuracion del bot', message: (err as Error).message });
+  }
+});
+
+router.get('/bot/config/history', async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const history = await getBotConfigHistory(limit);
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener historial', message: (err as Error).message });
   }
 });
 
@@ -64,7 +74,7 @@ router.post('/bot/logo', async (req, res) => {
   }
 
   try {
-    await updateBotConfig({ logo: parsed.data.logo });
+    await updateBotConfig({ logo: parsed.data.logo }, req.user?.id);
     res.json({ message: 'Logo actualizado' });
   } catch (err) {
     res.status(500).json({ error: 'Error al actualizar logo', message: (err as Error).message });

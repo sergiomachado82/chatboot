@@ -10,6 +10,7 @@ import { getDepartmentImages } from '../data/accommodationContext.js';
 import { getSeason } from './inventarioSyncService.js';
 import { getArgentinaToday, formatLocalDate } from '../utils/dateUtils.js';
 import { getBotConfig } from './botConfigService.js';
+import { logIntegrationError } from './integrationLogService.js';
 
 interface BotContext {
   conversacionId: string;
@@ -274,6 +275,7 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
       photosFailed = true;
     } catch (err) {
       logger.error({ err, depto: classification.entities.habitacion }, 'Error fetching/sending photos, falling through to text response');
+      logIntegrationError('whatsapp', 'Error enviando fotos', (err as Error).message).catch(() => {});
       photosFailed = true;
     }
   }
@@ -676,6 +678,7 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
         }, { isolationLevel: 'Serializable' });
       } catch (err) {
         logger.error({ err }, 'Error auto-creating reservation');
+        logIntegrationError('reservas', 'Error creando reserva automatica', (err as Error).message).catch(() => {});
       }
     }
   }

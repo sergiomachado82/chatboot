@@ -9,7 +9,9 @@ import type { Reserva, CrearReservaManualRequest, UpdateReservaRequest } from '@
 import { Plus, Pencil, Trash2, X, List, CalendarDays } from 'lucide-react';
 import ReservaCalendar from './ReservaCalendar';
 import { TableSkeleton } from '../ui/Skeleton';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import { useModalKeyboard } from '../../hooks/useModalKeyboard';
+import { useConfirm } from '../../hooks/useConfirm';
 
 function calcDias(entrada: string, salida: string): number {
   const d1 = new Date(entrada);
@@ -79,12 +81,14 @@ function ReservaCard({
   onEdit,
   onDelete,
   onEstadoChange,
+  onCancelReserva,
   isPending,
 }: {
   r: Reserva;
   onEdit: () => void;
   onDelete: () => void;
   onEstadoChange: (id: string, estado: string) => void;
+  onCancelReserva: (id: string) => void;
   isPending: boolean;
 }) {
   const nombre = r.nombreHuesped ?? r.huesped?.nombre ?? r.huesped?.waId ?? '-';
@@ -118,30 +122,30 @@ function ReservaCard({
 
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div>
-          <span className="text-gray-400">IN</span>
+          <span className="text-gray-500">IN</span>
           <p className="text-gray-700">{fmtDate(r.fechaEntrada)}</p>
         </div>
         <div>
-          <span className="text-gray-400">OUT</span>
+          <span className="text-gray-500">OUT</span>
           <p className="text-gray-700">{fmtDate(r.fechaSalida)}</p>
         </div>
         <div>
-          <span className="text-gray-400">Dias</span>
+          <span className="text-gray-500">Dias</span>
           <p className="text-gray-700">{dias}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div>
-          <span className="text-gray-400">Total</span>
+          <span className="text-gray-500">Total</span>
           <p className="text-gray-700 font-medium">{fmtMoney(r.precioTotal)}</p>
         </div>
         <div>
-          <span className="text-gray-400">Sena</span>
+          <span className="text-gray-500">Sena</span>
           <p className="text-gray-700">{fmtMoney(r.montoReserva)}</p>
         </div>
         <div>
-          <span className="text-gray-400">Saldo</span>
+          <span className="text-gray-500">Saldo</span>
           <p className="text-gray-700">{fmtMoney(r.saldo)}</p>
         </div>
       </div>
@@ -157,11 +161,7 @@ function ReservaCard({
             Confirmar
           </button>
           <button
-            onClick={() => {
-              if (window.confirm('Seguro que queres cancelar esta reserva?')) {
-                onEstadoChange(r.id, 'cancelada');
-              }
-            }}
+            onClick={() => onCancelReserva(r.id)}
             disabled={isPending}
             className="flex-1 text-xs py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
           >
@@ -230,10 +230,26 @@ export default function ReservaList() {
     onError: (err: Error) => notify.error(err.message || 'Error al eliminar reserva'),
   });
 
+  const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
+
   function handleDelete(id: string) {
-    if (window.confirm('Seguro que queres eliminar esta reserva?')) {
-      deleteMut.mutate(id);
-    }
+    confirm({
+      title: 'Eliminar reserva',
+      message: 'Esta accion eliminara la reserva permanentemente. ¿Continuar?',
+      confirmLabel: 'Eliminar',
+      variant: 'danger',
+      onConfirm: () => deleteMut.mutate(id),
+    });
+  }
+
+  function handleCancelReserva(id: string) {
+    confirm({
+      title: 'Cancelar reserva',
+      message: '¿Seguro que queres cancelar esta reserva?',
+      confirmLabel: 'Cancelar reserva',
+      variant: 'warning',
+      onConfirm: () => updateEstadoMut.mutate({ id, estado: 'cancelada' }),
+    });
   }
 
   function openCreate() {
@@ -255,7 +271,21 @@ export default function ReservaList() {
 
   function closeModal() {
     const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
-    if (isDirty && !window.confirm('Hay cambios sin guardar. Seguro que queres cerrar?')) return;
+    if (isDirty) {
+      confirm({
+        title: 'Cambios sin guardar',
+        message: 'Hay cambios sin guardar. ¿Descartar los cambios?',
+        confirmLabel: 'Descartar',
+        variant: 'warning',
+        onConfirm: () => {
+          setModalOpen(false);
+          setEditingId(null);
+          setForm(EMPTY_FORM);
+          setModalError('');
+        },
+      });
+      return;
+    }
     setModalOpen(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -408,11 +438,12 @@ export default function ReservaList() {
             onEdit={() => openEdit(r)}
             onDelete={() => handleDelete(r.id)}
             onEstadoChange={(id, estado) => updateEstadoMut.mutate({ id, estado })}
+            onCancelReserva={handleCancelReserva}
             isPending={updateEstadoMut.isPending}
           />
         ))}
         {reservas?.length === 0 && (
-          <div className="text-center text-gray-400 py-8">No hay reservas</div>
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8">No hay reservas</div>
         )}
       </div>
 
@@ -427,15 +458,15 @@ export default function ReservaList() {
               <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">IN</th>
               <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">OUT</th>
               <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Dias</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Telefono</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">DNI</th>
-              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Tarifa</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Telefono</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">DNI</th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Tarifa</th>
               <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Total</th>
               <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Reserva</th>
               <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Saldo</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Origen</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Nro Fact.</th>
-              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">USD</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Origen</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Nro Fact.</th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">USD</th>
               <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Estado</th>
               <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Acciones</th>
             </tr>
@@ -453,15 +484,15 @@ export default function ReservaList() {
                   <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.fechaEntrada)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.fechaSalida)}</td>
                   <td className="px-3 py-2 text-center">{dias}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{telefono}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{r.dni ?? '-'}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{fmtMoney(r.tarifaNoche)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{telefono}</td>
+                  <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{r.dni ?? '-'}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap hidden xl:table-cell">{fmtMoney(r.tarifaNoche)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap font-medium">{fmtMoney(r.precioTotal)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{fmtMoney(r.montoReserva)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{fmtMoney(r.saldo)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{r.origenReserva ?? '-'}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{r.nroFactura ?? '-'}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{r.importeUsd != null ? `US$${r.importeUsd}` : '-'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{r.origenReserva ?? '-'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{r.nroFactura ?? '-'}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap hidden xl:table-cell">{r.importeUsd != null ? `US$${r.importeUsd}` : '-'}</td>
                   <td className="px-3 py-2 text-center">
                     <Badge color={estadoColor(r.estado)}>{estadoLabel(r.estado)}</Badge>
                   </td>
@@ -493,11 +524,7 @@ export default function ReservaList() {
                             Confirmar
                           </button>
                           <button
-                            onClick={() => {
-                              if (window.confirm('Seguro que queres cancelar esta reserva?')) {
-                                updateEstadoMut.mutate({ id: r.id, estado: 'cancelada' });
-                              }
-                            }}
+                            onClick={() => handleCancelReserva(r.id)}
                             disabled={updateEstadoMut.isPending}
                             className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
                           >
@@ -521,7 +548,7 @@ export default function ReservaList() {
             })}
             {reservas?.length === 0 && (
               <tr>
-                <td colSpan={17} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={17} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   No hay reservas
                 </td>
               </tr>
@@ -802,6 +829,16 @@ export default function ReservaList() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        variant={confirmState.variant}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }

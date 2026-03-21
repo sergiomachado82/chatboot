@@ -5,6 +5,7 @@ import { logger } from '../utils/logger.js';
 import { getFullContext, getFilteredContext } from '../data/accommodationContext.js';
 import { getArgentinaToday } from '../utils/dateUtils.js';
 import { getBotConfig } from './botConfigService.js';
+import { logIntegrationError } from './integrationLogService.js';
 import type { BotConfig } from '@prisma/client';
 
 let client: Anthropic | null = null;
@@ -122,6 +123,7 @@ Solo incluye en entities las claves que esten EXPLICITAMENTE presentes en el ult
     };
   } catch (err) {
     logger.error({ err }, 'Claude classification failed, using fallback');
+    logIntegrationError('claude', 'Clasificacion fallida', (err as Error).message).catch(() => {});
     return classifyIntentFallback(message);
   }
 }
@@ -289,6 +291,7 @@ Instrucciones segun intencion:
     return response.content[0]?.type === 'text' ? response.content[0].text : generateResponseFallback(intent, botConfig);
   } catch (err) {
     logger.error({ err }, 'Claude response generation failed, using fallback');
+    logIntegrationError('claude', 'Generacion de respuesta fallida', (err as Error).message).catch(() => {});
     return generateResponseFallback(intent, botConfig);
   }
 }

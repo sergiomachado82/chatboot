@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notify } from '../../utils/notify';
-import { Save, AlertTriangle, Info, Upload, Trash2, Building2, Plus, X, ChevronDown } from 'lucide-react';
-import { getBotConfig, updateBotConfig, uploadLogo, deleteLogo } from '../../api/botConfigApi';
-import type { BotConfigUpdate } from '../../api/botConfigApi';
+import { Save, AlertTriangle, Upload, Trash2, Building2, Plus, X, ChevronDown, History } from 'lucide-react';
+import { getBotConfig, updateBotConfig, uploadLogo, deleteLogo, getBotConfigHistory } from '../../api/botConfigApi';
+import type { BotConfigUpdate, BotConfigAuditEntry } from '../../api/botConfigApi';
+
+type BotTab = 'identidad' | 'comportamiento' | 'reglas' | 'mensajes';
+
+const BOT_TABS: { key: BotTab; label: string }[] = [
+  { key: 'identidad', label: 'Identidad' },
+  { key: 'comportamiento', label: 'Comportamiento' },
+  { key: 'reglas', label: 'Reglas' },
+  { key: 'mensajes', label: 'Mensajes' },
+];
 
 export default function BotConfigPage() {
   const queryClient = useQueryClient();
@@ -35,6 +44,8 @@ export default function BotConfigPage() {
   const [nuevaRegla, setNuevaRegla] = useState('');
   const [mostrarReglasBase, setMostrarReglasBase] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<BotTab>('identidad');
+  const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -165,134 +176,116 @@ export default function BotConfigPage() {
       <div className="max-w-2xl mx-auto space-y-6">
         <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Configuracion del Agente IA</h2>
 
-        {/* Section 0: Logo */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Logo del panel</h3>
-          <p className="text-xs text-gray-500">Se muestra en la pantalla de login y recuperacion de contraseña. Max 500KB, formato PNG/JPG/SVG.</p>
-
-          <div className="flex items-center gap-5">
-            {/* Preview */}
-            <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden flex-shrink-0">
-              {logoPreview ? (
-                <img src={logoPreview} alt="Logo" className="h-full w-full object-contain p-1" />
-              ) : (
-                <Building2 className="text-gray-300" size={32} />
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                onChange={handleLogoSelect}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={logoUploadMutation.isPending}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-              >
-                <Upload size={14} />
-                {logoUploadMutation.isPending ? 'Subiendo...' : 'Subir logo'}
-              </button>
-              {logoPreview && (
-                <button
-                  onClick={() => logoDeleteMutation.mutate()}
-                  disabled={logoDeleteMutation.isPending}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-red-300 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 disabled:opacity-50"
-                >
-                  <Trash2 size={14} />
-                  {logoDeleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
-                </button>
-              )}
-            </div>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
+          {BOT_TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              aria-pressed={activeTab === t.key}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === t.key
+                  ? 'border-blue-600 text-blue-700 dark:text-blue-300'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* Section 1: Identity */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Identidad del agente</h3>
+        {activeTab === 'identidad' && (
+          <>
+            {/* Logo */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Logo del panel</h3>
+              <p className="text-xs text-gray-500">Se muestra en la pantalla de login y recuperacion de contraseña. Max 500KB, formato PNG/JPG/SVG.</p>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Nombre del agente <span className="text-gray-400 font-normal">({nombreAgente.length}/200)</span>
-            </label>
-            <input
-              type="text"
-              value={nombreAgente}
-              onChange={(e) => setNombreAgente(e.target.value.slice(0, 200))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-            />
-          </div>
+              <div className="flex items-center gap-5">
+                <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden flex-shrink-0">
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" className="h-full w-full object-contain p-1" />
+                  ) : (
+                    <Building2 className="text-gray-300" size={32} />
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoSelect} className="hidden" />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={logoUploadMutation.isPending}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Upload size={14} />
+                    {logoUploadMutation.isPending ? 'Subiendo...' : 'Subir logo'}
+                  </button>
+                  {logoPreview && (
+                    <button
+                      onClick={() => logoDeleteMutation.mutate()}
+                      disabled={logoDeleteMutation.isPending}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-red-300 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <Trash2 size={14} />
+                      {logoDeleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ubicacion <span className="text-gray-400 font-normal">({ubicacion.length}/300)</span>
-            </label>
-            <input
-              type="text"
-              value={ubicacion}
-              onChange={(e) => setUbicacion(e.target.value.slice(0, 300))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-            />
-          </div>
+            {/* Identity */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Identidad del agente</h3>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Tono <span className="text-gray-400 font-normal">({tono.length}/200)</span>
-            </label>
-            <input
-              type="text"
-              value={tono}
-              onChange={(e) => setTono(e.target.value.slice(0, 200))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-              placeholder="amable, profesional y cercano"
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Nombre del agente <span className="text-gray-500 font-normal">({nombreAgente.length}/200)</span>
+                </label>
+                <input type="text" value={nombreAgente} onChange={(e) => setNombreAgente(e.target.value.slice(0, 200))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100" />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Idioma</label>
-            <select
-              value={idioma}
-              onChange={(e) => setIdioma(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-            >
-              <option value="es_AR">Espanol Argentina (voseo)</option>
-              <option value="es">Espanol neutro</option>
-              <option value="en">English</option>
-            </select>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Ubicacion <span className="text-gray-500 font-normal">({ubicacion.length}/300)</span>
+                </label>
+                <input type="text" value={ubicacion} onChange={(e) => setUbicacion(e.target.value.slice(0, 300))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100" />
+              </div>
 
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="usarEmojis"
-              checked={usarEmojis}
-              onChange={(e) => setUsarEmojis(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <label htmlFor="usarEmojis" className="text-sm text-gray-700 dark:text-gray-300">Usar emojis en las respuestas</label>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Tono <span className="text-gray-500 font-normal">({tono.length}/200)</span>
+                </label>
+                <input type="text" value={tono} onChange={(e) => setTono(e.target.value.slice(0, 200))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100" placeholder="amable, profesional y cercano" />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitud de respuesta</label>
-            <select
-              value={longitudRespuesta}
-              onChange={(e) => setLongitudRespuesta(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-            >
-              <option value="corta">Corta (3-4 frases)</option>
-              <option value="media">Media (5-7 frases)</option>
-              <option value="detallada">Detallada (8-10 frases)</option>
-            </select>
-          </div>
-        </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Idioma</label>
+                <select value={idioma} onChange={(e) => setIdioma(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100">
+                  <option value="es_AR">Espanol Argentina (voseo)</option>
+                  <option value="es">Espanol neutro</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
 
-        {/* Section 2: Behavior */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Comportamiento</h3>
+              <div className="flex items-center gap-3">
+                <input type="checkbox" id="usarEmojis" checked={usarEmojis} onChange={(e) => setUsarEmojis(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <label htmlFor="usarEmojis" className="text-sm text-gray-700 dark:text-gray-300">Usar emojis en las respuestas</label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitud de respuesta</label>
+                <select value={longitudRespuesta} onChange={(e) => setLongitudRespuesta(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100">
+                  <option value="corta">Corta (3-4 frases)</option>
+                  <option value="media">Media (5-7 frases)</option>
+                  <option value="detallada">Detallada (8-10 frases)</option>
+                </select>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'comportamiento' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
 
           <div className="flex items-center justify-between">
             <div>
@@ -392,8 +385,9 @@ export default function BotConfigPage() {
             />
           </div>
         </div>
+        )}
 
-        {/* Section: Reglas del Bot */}
+        {activeTab === 'reglas' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Reglas del bot</h3>
 
@@ -493,14 +487,15 @@ export default function BotConfigPage() {
             )}
           </div>
         </div>
+        )}
 
-        {/* Section 3: Custom Messages */}
+        {activeTab === 'mensajes' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Mensajes personalizados</h3>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje de bienvenida <span className="text-gray-400 font-normal">({mensajeBienvenida.length}/1000)</span>
+              Mensaje de bienvenida <span className="text-gray-500 font-normal">({mensajeBienvenida.length}/1000)</span>
             </label>
             <textarea
               value={mensajeBienvenida}
@@ -512,7 +507,7 @@ export default function BotConfigPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje de despedida <span className="text-gray-400 font-normal">({mensajeDespedida.length}/1000)</span>
+              Mensaje de despedida <span className="text-gray-500 font-normal">({mensajeDespedida.length}/1000)</span>
             </label>
             <textarea
               value={mensajeDespedida}
@@ -524,7 +519,7 @@ export default function BotConfigPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje fuera de horario <span className="text-gray-400 font-normal">({mensajeFueraHorario.length}/1000)</span>
+              Mensaje fuera de horario <span className="text-gray-500 font-normal">({mensajeFueraHorario.length}/1000)</span>
             </label>
             <textarea
               value={mensajeFueraHorario}
@@ -536,7 +531,7 @@ export default function BotConfigPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje espera humano <span className="text-gray-400 font-normal">({mensajeEsperaHumano.length}/1000)</span>
+              Mensaje espera humano <span className="text-gray-500 font-normal">({mensajeEsperaHumano.length}/1000)</span>
             </label>
             <textarea
               value={mensajeEsperaHumano}
@@ -546,42 +541,10 @@ export default function BotConfigPage() {
             />
           </div>
         </div>
-
-        {/* Section 4: Schedule */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Horario de atencion</h3>
-
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
-            <Info size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-blue-800">
-              Estos campos se almacenan para uso futuro. Actualmente el bot responde las 24 horas.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hora inicio</label>
-              <input
-                type="time"
-                value={horarioInicio}
-                onChange={(e) => setHorarioInicio(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hora fin</label>
-              <input
-                type="time"
-                value={horarioFin}
-                onChange={(e) => setHorarioFin(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-              />
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Save button */}
-        <div className="pb-6">
+        <div className="flex items-center gap-3 pb-6">
           <button
             onClick={handleSave}
             disabled={mutation.isPending}
@@ -590,7 +553,16 @@ export default function BotConfigPage() {
             <Save size={16} />
             {mutation.isPending ? 'Guardando...' : 'Guardar cambios'}
           </button>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
+          >
+            <History size={16} />
+            Historial
+          </button>
         </div>
+
+        {showHistory && <ConfigHistory />}
       </div>
     </div>
   );
@@ -613,5 +585,61 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         }`}
       />
     </button>
+  );
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  nombreAgente: 'Nombre agente',
+  ubicacion: 'Ubicacion',
+  tono: 'Tono',
+  idioma: 'Idioma',
+  usarEmojis: 'Usar emojis',
+  longitudRespuesta: 'Longitud respuesta',
+  autoPreReserva: 'Auto pre-reserva',
+  modoEnvioFotos: 'Envio fotos',
+  escalarSiQueja: 'Escalar quejas',
+  escalarSiPago: 'Escalar pagos',
+  mensajeBienvenida: 'Mensaje bienvenida',
+  mensajeDespedida: 'Mensaje despedida',
+  mensajeFueraHorario: 'Mensaje fuera horario',
+  mensajeEsperaHumano: 'Mensaje espera',
+  telefonoContacto: 'Telefono contacto',
+  titularesVerificados: 'Titulares verificados',
+  reglasPersonalizadas: 'Reglas personalizadas',
+  logo: 'Logo',
+};
+
+function ConfigHistory() {
+  const { data: history, isLoading } = useQuery({
+    queryKey: ['bot-config-history'],
+    queryFn: () => getBotConfigHistory(30),
+  });
+
+  if (isLoading) return <p className="text-sm text-gray-500 py-4">Cargando historial...</p>;
+  if (!history || history.length === 0) return <p className="text-sm text-gray-500 py-4">Sin cambios registrados.</p>;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 space-y-2">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">Ultimos cambios</h3>
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+        {history.map((entry: BotConfigAuditEntry) => (
+          <div key={entry.id} className="flex items-start gap-3 text-xs border-b border-gray-100 dark:border-gray-700 pb-2">
+            <span className="text-gray-400 whitespace-nowrap flex-shrink-0">
+              {new Date(entry.creadoEn).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <div className="min-w-0">
+              <span className="font-medium text-gray-700 dark:text-gray-300">{FIELD_LABELS[entry.campo] ?? entry.campo}</span>
+              {entry.valorAnterior != null && entry.valorAnterior.length < 80 && (
+                <span className="text-gray-400 ml-1">
+                  <span className="line-through">{entry.valorAnterior}</span>
+                  {' → '}
+                  <span className="text-gray-600 dark:text-gray-200">{entry.valorNuevo}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

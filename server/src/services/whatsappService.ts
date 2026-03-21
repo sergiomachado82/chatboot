@@ -1,6 +1,7 @@
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { getIO } from './socketManager.js';
+import { logIntegrationError } from './integrationLogService.js';
 
 export async function downloadMedia(mediaId: string): Promise<Buffer | null> {
   if (env.SIMULATOR_MODE) {
@@ -47,6 +48,7 @@ export async function sendWhatsAppMessage(to: string, body: string): Promise<{ s
     return { success: true, messageId: `msg_${Date.now()}` };
   } catch (err) {
     logger.error({ err, to }, 'sendWhatsAppMessage failed');
+    logIntegrationError('whatsapp', 'Error enviando mensaje', (err as Error).message).catch(() => {});
     return { success: false };
   }
 }

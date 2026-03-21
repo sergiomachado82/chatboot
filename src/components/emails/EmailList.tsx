@@ -7,6 +7,8 @@ import Badge from '../ui/Badge';
 import { TableSkeleton } from '../ui/Skeleton';
 import EmailDetailModal from './EmailDetailModal';
 import { Mail, CheckCircle, AlertTriangle, FileText, Search, Trash2 } from 'lucide-react';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { EmailProcesado } from '@shared/types/email';
 
 type Filtro = 'todos' | 'respondidos' | 'errores' | 'formularios';
@@ -64,7 +66,7 @@ function EmailCard({ email, onClick, onDelete }: { email: EmailProcesado; onClic
           </button>
         </div>
       </div>
-      <div className="flex items-center justify-between text-xs text-gray-400">
+      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>{email.esFormulario ? 'Formulario' : 'Email directo'}</span>
         <span>{fmtDateTime(email.creadoEn)}</span>
       </div>
@@ -99,10 +101,16 @@ export default function EmailList() {
     onError: (err: Error) => notify.error(err.message || 'Error al eliminar email'),
   });
 
+  const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
+
   function handleDelete(id: string) {
-    if (window.confirm('Seguro que queres eliminar este email?')) {
-      deleteMut.mutate(id);
-    }
+    confirm({
+      title: 'Eliminar email',
+      message: 'Se eliminara este email permanentemente. ¿Continuar?',
+      confirmLabel: 'Eliminar',
+      variant: 'danger',
+      onConfirm: () => deleteMut.mutate(id),
+    });
   }
 
   const emails = data?.emails;
@@ -146,10 +154,11 @@ export default function EmailList() {
               <button
                 key={key}
                 onClick={() => handleFiltroChange(key)}
+                aria-pressed={filtro === key}
                 className={`px-3 py-1.5 text-xs rounded-md font-medium ${
                   filtro === key
                     ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                 }`}
               >
                 {label}
@@ -190,7 +199,7 @@ export default function EmailList() {
           <EmailCard key={e.id} email={e} onClick={() => setSelectedId(e.id)} onDelete={() => handleDelete(e.id)} />
         ))}
         {emails?.length === 0 && (
-          <div className="text-center text-gray-400 py-8">No hay emails</div>
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8">No hay emails</div>
         )}
       </div>
 
@@ -284,6 +293,16 @@ export default function EmailList() {
           onClose={() => setSelectedId(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        variant={confirmState.variant}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }

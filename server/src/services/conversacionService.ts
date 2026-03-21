@@ -70,6 +70,16 @@ interface ListConversacionesParams {
   dateTo?: string;
 }
 
+export async function deleteConversaciones(ids: string[]) {
+  // 1. Delete messages belonging to these conversations
+  await prisma.mensaje.deleteMany({ where: { conversacionId: { in: ids } } });
+  // 2. Unlink reservations (keep them, just remove the reference)
+  await prisma.reserva.updateMany({ where: { conversacionId: { in: ids } }, data: { conversacionId: null } });
+  // 3. Delete the conversations themselves
+  const result = await prisma.conversacion.deleteMany({ where: { id: { in: ids } } });
+  return result.count;
+}
+
 export async function listConversaciones(params: ListConversacionesParams = {}) {
   const { estado, search, dateFrom, dateTo } = params;
 

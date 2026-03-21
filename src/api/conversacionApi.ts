@@ -66,6 +66,13 @@ export async function cerrarConversacion(conversacionId: string): Promise<Conver
   return apiFetch<Conversacion>(`/conversaciones/${conversacionId}/cerrar`, { method: 'POST' });
 }
 
+export async function deleteConversaciones(ids: string[]): Promise<{ deletedCount: number }> {
+  return apiFetch<{ deletedCount: number }>('/conversaciones/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export async function enviarMensajeAgente(conversacionId: string, contenido: string): Promise<Mensaje> {
   return apiFetch<Mensaje>(`/conversaciones/${conversacionId}/mensajes`, {
     method: 'POST',

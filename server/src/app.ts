@@ -28,6 +28,7 @@ import webchatRouter from './routes/webchat.js';
 import contactRouter from './routes/contact.js';
 import internalEmailRouter from './routes/internalEmail.js';
 import dashboardRouter from './routes/dashboard.js';
+import integrationLogsRouter from './routes/integrationLogs.js';
 
 const app = express();
 
@@ -93,6 +94,7 @@ protectedRouter.use(whatsappProfileRouter);
 protectedRouter.use(botConfigRouter);
 protectedRouter.use(emailsRouter);
 protectedRouter.use(dashboardRouter);
+protectedRouter.use(integrationLogsRouter);
 app.use('/api', protectedRouter);
 
 // In production, serve built frontend files (Vite output)

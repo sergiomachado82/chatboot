@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { listConversaciones, getConversacionById, updateConversacionEstado } from '../services/conversacionService.js';
+import { listConversaciones, getConversacionById, updateConversacionEstado, deleteConversaciones } from '../services/conversacionService.js';
 import { getByConversacion, createMensaje } from '../services/mensajeService.js';
 import { sendWhatsAppMessage } from '../services/whatsappService.js';
 
@@ -11,6 +11,21 @@ const conversacionesQuerySchema = z.object({
   search: z.string().min(1).max(200).optional(),
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD').optional(),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD').optional(),
+});
+
+// Bulk delete conversations
+const bulkDeleteSchema = z.object({
+  ids: z.array(z.string()).min(1).max(50),
+});
+
+router.post('/conversaciones/bulk-delete', async (req, res) => {
+  const parsed = bulkDeleteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const deletedCount = await deleteConversaciones(parsed.data.ids);
+  res.json({ deletedCount });
 });
 
 router.get('/conversaciones', async (req, res) => {

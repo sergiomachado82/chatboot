@@ -1,28 +1,29 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { logout, getStoredAgente } from '../../api/authApi';
-import { MessageCircle, Calendar, Building2, Smartphone, Bot, Mail, LayoutDashboard, Moon, Sun } from 'lucide-react';
-
-type View = 'dashboard' | 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot' | 'emails';
+import { useSocketStatus } from '../../hooks/useSocket';
+import { useHealth } from '../../hooks/useHealth';
+import { MessageCircle, Calendar, Building2, Smartphone, Bot, Mail, LayoutDashboard, Moon, Sun, Wifi, WifiOff } from 'lucide-react';
 
 interface HeaderProps {
-  view: View;
-  onViewChange: (view: View) => void;
   isDark: boolean;
   onToggleDark: () => void;
 }
 
-const NAV_ITEMS: { view: View; icon: typeof MessageCircle; label: string }[] = [
-  { view: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { view: 'chat', icon: MessageCircle, label: 'Chat' },
-  { view: 'reservas', icon: Calendar, label: 'Reservas' },
-  { view: 'complejos', icon: Building2, label: 'Complejos' },
-  { view: 'emails', icon: Mail, label: 'Emails' },
-  { view: 'whatsapp', icon: Smartphone, label: 'WhatsApp' },
-  { view: 'bot', icon: Bot, label: 'Bot' },
+const NAV_ITEMS: { path: string; icon: typeof MessageCircle; label: string }[] = [
+  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/chat', icon: MessageCircle, label: 'Chat' },
+  { path: '/reservas', icon: Calendar, label: 'Reservas' },
+  { path: '/propiedades', icon: Building2, label: 'Propiedades' },
+  { path: '/emails', icon: Mail, label: 'Emails' },
+  { path: '/whatsapp', icon: Smartphone, label: 'WhatsApp' },
+  { path: '/bot', icon: Bot, label: 'Bot' },
 ];
 
-export default function Header({ view, onViewChange, isDark, onToggleDark }: HeaderProps) {
+export default function Header({ isDark, onToggleDark }: HeaderProps) {
   const agente = getStoredAgente();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,9 +39,14 @@ export default function Header({ view, onViewChange, isDark, onToggleDark }: Hea
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
 
-  function handleNav(v: View) {
-    onViewChange(v);
+  function handleNav(path: string) {
+    navigate(path);
     setMenuOpen(false);
+  }
+
+  function isActive(path: string) {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
   }
 
   return (
@@ -50,12 +56,13 @@ export default function Header({ view, onViewChange, isDark, onToggleDark }: Hea
 
         {/* Desktop nav */}
         <nav className="hidden md:flex gap-1">
-          {NAV_ITEMS.map(({ view: v, icon: Icon, label }) => (
+          {NAV_ITEMS.map(({ path, icon: Icon, label }) => (
             <button
-              key={v}
-              onClick={() => handleNav(v)}
+              key={path}
+              onClick={() => handleNav(path)}
+              aria-current={isActive(path) ? 'page' : undefined}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium ${
-                view === v ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                isActive(path) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
               }`}
             >
               <Icon size={16} />
@@ -66,12 +73,13 @@ export default function Header({ view, onViewChange, isDark, onToggleDark }: Hea
 
         {/* Mobile: icon buttons for all */}
         <nav className="flex md:hidden gap-0.5">
-          {NAV_ITEMS.map(({ view: v, icon: Icon, label }) => (
+          {NAV_ITEMS.map(({ path, icon: Icon, label }) => (
             <button
-              key={v}
-              onClick={() => handleNav(v)}
+              key={path}
+              onClick={() => handleNav(path)}
+              aria-current={isActive(path) ? 'page' : undefined}
               className={`p-2 rounded-md ${
-                view === v ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                isActive(path) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
               }`}
               title={label}
               aria-label={label}
@@ -83,6 +91,7 @@ export default function Header({ view, onViewChange, isDark, onToggleDark }: Hea
       </div>
 
       <div className="flex items-center gap-2 md:gap-4">
+        <SocketIndicator />
         <button
           onClick={onToggleDark}
           className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -101,11 +110,6 @@ export default function Header({ view, onViewChange, isDark, onToggleDark }: Hea
   );
 }
 
-interface HealthData {
-  status: 'ok' | 'degraded';
-  services: Record<string, { status: 'ok' | 'error' | 'not_configured'; latencyMs?: number }>;
-}
-
 const SERVICE_LABELS: Record<string, string> = {
   database: 'BD',
   redis: 'Redis',
@@ -115,27 +119,9 @@ const SERVICE_LABELS: Record<string, string> = {
 };
 
 function HealthIndicator() {
-  const [health, setHealth] = useState<HealthData | null>(null);
+  const health = useHealth();
+  const navigate = useNavigate();
   const [showDetail, setShowDetail] = useState(false);
-
-  useEffect(() => {
-    async function fetchHealthWithRetry() {
-      for (let i = 0; i < 3; i++) {
-        try {
-          const r = await fetch('/api/health');
-          const data = await r.json();
-          setHealth(data);
-          return;
-        } catch {
-          if (i < 2) await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** i, 5000)));
-        }
-      }
-      setHealth(null);
-    }
-    fetchHealthWithRetry();
-    const id = setInterval(fetchHealthWithRetry, 30_000);
-    return () => clearInterval(id);
-  }, []);
 
   const dotColor = !health
     ? 'bg-gray-400'
@@ -181,8 +167,32 @@ function HealthIndicator() {
               </div>
             ))}
           </div>
+          <button
+            onClick={() => { setShowDetail(false); navigate('/logs'); }}
+            className="mt-2 w-full text-xs text-blue-600 dark:text-blue-400 hover:underline text-left"
+          >
+            Ver logs de integracion
+          </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function SocketIndicator() {
+  const status = useSocketStatus();
+
+  const config = {
+    connected: { icon: Wifi, color: 'text-green-500', label: 'Tiempo real: conectado' },
+    connecting: { icon: Wifi, color: 'text-amber-500 animate-pulse', label: 'Tiempo real: conectando...' },
+    disconnected: { icon: WifiOff, color: 'text-red-500', label: 'Tiempo real: desconectado' },
+  }[status];
+
+  const { icon: Icon, color, label } = config;
+
+  return (
+    <div className={`p-1.5 rounded-md ${color}`} title={label} aria-label={label}>
+      <Icon size={14} />
     </div>
   );
 }

@@ -20,16 +20,43 @@ export async function getBotConfig(): Promise<BotConfig> {
   return config;
 }
 
-export async function updateBotConfig(data: Partial<Omit<BotConfig, 'id' | 'creadoEn' | 'actualizadoEn'>>): Promise<BotConfig> {
+export async function updateBotConfig(
+  data: Partial<Omit<BotConfig, 'id' | 'creadoEn' | 'actualizadoEn'>>,
+  agenteId?: string,
+): Promise<BotConfig> {
   const current = await getBotConfig();
+
+  // Build audit entries for changed fields
+  const auditEntries: { agenteId: string | null; campo: string; valorAnterior: string | null; valorNuevo: string | null }[] = [];
+  for (const [key, newVal] of Object.entries(data)) {
+    const oldVal = (current as Record<string, unknown>)[key];
+    const oldStr = oldVal == null ? null : typeof oldVal === 'object' ? JSON.stringify(oldVal) : String(oldVal);
+    const newStr = newVal == null ? null : typeof newVal === 'object' ? JSON.stringify(newVal) : String(newVal);
+    if (oldStr !== newStr) {
+      auditEntries.push({ agenteId: agenteId ?? null, campo: key, valorAnterior: oldStr, valorNuevo: newStr });
+    }
+  }
+
   const updated = await prisma.botConfig.update({
     where: { id: current.id },
     data,
   });
 
+  // Save audit entries (non-blocking)
+  if (auditEntries.length > 0) {
+    prisma.botConfigAudit.createMany({ data: auditEntries }).catch(() => {});
+  }
+
   cachedConfig = updated;
   cacheTime = Date.now();
   return updated;
+}
+
+export async function getBotConfigHistory(limit = 50) {
+  return prisma.botConfigAudit.findMany({
+    orderBy: { creadoEn: 'desc' },
+    take: limit,
+  });
 }
 
 export function invalidateBotConfigCache(): void {

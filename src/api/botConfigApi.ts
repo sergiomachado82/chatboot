@@ -54,3 +54,32 @@ export function deleteLogo() {
     method: 'DELETE',
   });
 }
+
+export interface BotConfigAuditEntry {
+  id: string;
+  agenteId: string | null;
+  campo: string;
+  valorAnterior: string | null;
+  valorNuevo: string | null;
+  creadoEn: string;
+}
+
+export function getBotConfigHistory(limit = 50) {
+  return apiFetch<BotConfigAuditEntry[]>(`/bot/config/history?limit=${limit}`);
+}
+
+export interface IntegrationLogEntry {
+  id: string;
+  servicio: string;
+  nivel: string;
+  mensaje: string;
+  detalle: string | null;
+  creadoEn: string;
+}
+
+export function getIntegrationLogs(servicio?: string, limit = 100) {
+  const params = new URLSearchParams();
+  if (servicio) params.set('servicio', servicio);
+  params.set('limit', String(limit));
+  return apiFetch<IntegrationLogEntry[]>(`/integration-logs?${params}`);
+}
