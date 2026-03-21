@@ -25,7 +25,7 @@ export async function getDashboardStats() {
     prisma.conversacion.groupBy({
       by: ['estado'],
       _count: { id: true },
-    }),
+    }).catch(() => []),
     // Reservas this month by estado
     prisma.reserva.groupBy({
       by: ['estado'],
@@ -34,30 +34,30 @@ export async function getDashboardStats() {
         fechaSalida: { gte: monthStart },
       },
       _count: { id: true },
-    }),
+    }).catch(() => []),
     // Total reservas this month
     prisma.reserva.count({
       where: {
         fechaEntrada: { lte: monthEnd },
         fechaSalida: { gte: monthStart },
       },
-    }),
+    }).catch(() => 0),
     // Emails today
     prisma.emailProcesado.count({
       where: { creadoEn: { gte: todayStart } },
-    }),
+    }).catch(() => 0),
     // Emails respondidos (all time)
     prisma.emailProcesado.count({
       where: { respondido: true },
-    }),
+    }).catch(() => 0),
     // Emails with errors
     prisma.emailProcesado.count({
       where: { error: { not: null } },
-    }),
+    }).catch(() => 0),
     // Emails formularios
     prisma.emailProcesado.count({
       where: { esFormulario: true },
-    }),
+    }).catch(() => 0),
     // Recent active conversations
     prisma.conversacion.findMany({
       where: { estado: { in: ['espera_humano', 'humano_activo', 'bot'] } },
@@ -67,7 +67,7 @@ export async function getDashboardStats() {
         huesped: { select: { nombre: true, waId: true } },
         agente: { select: { nombre: true } },
       },
-    }),
+    }).catch(() => []),
     // Upcoming reservas
     prisma.reserva.findMany({
       where: {
@@ -79,7 +79,7 @@ export async function getDashboardStats() {
       include: {
         huesped: { select: { nombre: true } },
       },
-    }),
+    }).catch(() => []),
     // Reservas in next 7 days (for occupancy)
     prisma.reserva.findMany({
       where: {
@@ -92,12 +92,12 @@ export async function getDashboardStats() {
         fechaEntrada: true,
         fechaSalida: true,
       },
-    }),
+    }).catch(() => []),
     // Active complejos with capacity
     prisma.complejo.findMany({
       where: { activo: true },
       select: { nombre: true, cantidadUnidades: true },
-    }),
+    }).catch(() => []),
   ]);
 
   // Build conversation stats
