@@ -16,6 +16,28 @@ const ESTADO_COLORS: Record<string, { bg: string; text: string }> = {
   completada: { bg: 'bg-blue-300', text: 'text-blue-900' },
 };
 
+const COMPLEJO_COLORS = [
+  'bg-blue-600',
+  'bg-emerald-600',
+  'bg-purple-600',
+  'bg-amber-600',
+  'bg-rose-600',
+  'bg-cyan-600',
+  'bg-indigo-600',
+  'bg-orange-600',
+];
+
+const COMPLEJO_BORDER_COLORS = [
+  'border-l-blue-600',
+  'border-l-emerald-600',
+  'border-l-purple-600',
+  'border-l-amber-600',
+  'border-l-rose-600',
+  'border-l-cyan-600',
+  'border-l-indigo-600',
+  'border-l-orange-600',
+];
+
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -29,6 +51,7 @@ interface CalendarRow {
   label: string;
   habitacion: string;
   unitIndex: number;
+  complejoIndex: number;
 }
 
 interface ReservaSpan {
@@ -39,15 +62,15 @@ interface ReservaSpan {
 
 function buildRows(complejos: Complejo[]): CalendarRow[] {
   const rows: CalendarRow[] = [];
-  for (const c of complejos) {
+  complejos.forEach((c, ci) => {
     if (c.cantidadUnidades > 1) {
       for (let i = 1; i <= c.cantidadUnidades; i++) {
-        rows.push({ label: `${c.nombre} dpto.${i}`, habitacion: c.nombre, unitIndex: i });
+        rows.push({ label: `${c.nombre} dpto.${i}`, habitacion: c.nombre, unitIndex: i, complejoIndex: ci });
       }
     } else {
-      rows.push({ label: c.nombre, habitacion: c.nombre, unitIndex: 1 });
+      rows.push({ label: c.nombre, habitacion: c.nombre, unitIndex: 1, complejoIndex: ci });
     }
-  }
+  });
   return rows;
 }
 
@@ -56,15 +79,12 @@ function distributeReservas(
   spans: ReservaSpan[],
   numUnits: number
 ): Map<number, ReservaSpan[]> {
-  // unit index (1-based) -> spans assigned to it
   const units = new Map<number, ReservaSpan[]>();
   for (let i = 1; i <= numUnits; i++) units.set(i, []);
 
-  // Sort by start day
   const sorted = [...spans].sort((a, b) => a.startDay - b.startDay);
 
   for (const span of sorted) {
-    // Find first unit with no overlap
     let assigned = false;
     for (let i = 1; i <= numUnits; i++) {
       const existing = units.get(i)!;
@@ -77,7 +97,6 @@ function distributeReservas(
         break;
       }
     }
-    // If all units are full, put in first unit anyway (shouldn't happen normally)
     if (!assigned) {
       units.get(1)!.push(span);
     }
@@ -112,7 +131,6 @@ export default function ReservaCalendar() {
 
     for (const r of reservas) {
       if (!r.habitacion) continue;
-      // Parse as local dates to avoid UTC timezone shift
       const [ey, em, ed] = r.fechaEntrada.slice(0, 10).split('-').map(Number);
       const [sy, sm, sd] = r.fechaSalida.slice(0, 10).split('-').map(Number);
       const entrada = new Date(ey, em - 1, ed);
@@ -163,44 +181,57 @@ export default function ReservaCalendar() {
   }
 
   const days = Array.from({ length: numDays }, (_, i) => i + 1);
+  const showComplejoLegend = activeComplejos.length > 1;
 
   return (
     <div className="p-6">
       {/* Navigation */}
       <div className="flex items-center gap-4 mb-4">
-        <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded">
+        <button onClick={prevMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
           <ChevronLeft size={20} />
         </button>
-        <h2 className="text-lg font-bold text-gray-800 min-w-[200px] text-center">
+        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 min-w-[200px] text-center">
           {MONTH_NAMES[month]} {year}
         </h2>
-        <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded">
+        <button onClick={nextMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
           <ChevronRight size={20} />
         </button>
       </div>
 
-      {/* Legend */}
-      <div className="flex gap-4 mb-3 text-xs">
+      {/* Estado Legend */}
+      <div className="flex flex-wrap gap-4 mb-3 text-xs">
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-300" /> Pre-reserva</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-400" /> Confirmada</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-300" /> Completada</span>
       </div>
 
+      {/* Complejo color legend */}
+      {showComplejoLegend && (
+        <div className="flex flex-wrap gap-3 mb-3 text-xs text-gray-600 dark:text-gray-300">
+          {activeComplejos.map((c, i) => (
+            <span key={c.id} className="flex items-center gap-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${COMPLEJO_COLORS[i % COMPLEJO_COLORS.length]}`} />
+              {c.nombre}
+            </span>
+          ))}
+        </div>
+      )}
+
       {isLoading && <p className="text-gray-400 text-sm mb-2">Cargando...</p>}
 
       {/* Grid */}
-      <div className="overflow-x-auto bg-white rounded-lg shadow">
+      <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow">
         <table className="border-collapse text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-gray-100 px-3 py-2 text-left text-gray-600 font-medium border-r min-w-[160px]">
+              <th className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-left text-gray-600 dark:text-gray-300 font-medium border-r dark:border-gray-600 min-w-[160px]">
                 Departamento
               </th>
               {days.map((d) => (
                 <th
                   key={d}
                   className={`px-1 py-2 text-center font-medium min-w-[28px] ${
-                    isWeekend(year, month, d) ? 'bg-gray-200 text-gray-500' : 'bg-gray-100 text-gray-600'
+                    isWeekend(year, month, d) ? 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                   }`}
                 >
                   {d}
@@ -210,9 +241,12 @@ export default function ReservaCalendar() {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={`${row.habitacion}-${row.unitIndex}`} className="border-b">
-                <td className="sticky left-0 z-10 bg-white px-3 py-2 font-medium text-gray-700 border-r whitespace-nowrap">
-                  {row.label}
+              <tr key={`${row.habitacion}-${row.unitIndex}`} className="border-b dark:border-gray-700">
+                <td className={`sticky left-0 z-10 bg-white dark:bg-gray-800 px-3 py-2 font-medium text-gray-700 dark:text-gray-200 border-r dark:border-gray-600 whitespace-nowrap border-l-3 ${COMPLEJO_BORDER_COLORS[row.complejoIndex % COMPLEJO_BORDER_COLORS.length]}`}>
+                  <span className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${COMPLEJO_COLORS[row.complejoIndex % COMPLEJO_COLORS.length]}`} />
+                    {row.label}
+                  </span>
                 </td>
                 {days.map((d) => {
                   const r = getReservaForCell(row.habitacion, row.unitIndex, d);
@@ -226,8 +260,8 @@ export default function ReservaCalendar() {
                   return (
                     <td
                       key={d}
-                      className={`px-0 py-0 text-center border-l ${
-                        isWeekend(year, month, d) ? 'bg-gray-50' : ''
+                      className={`px-0 py-0 text-center border-l dark:border-gray-700 ${
+                        isWeekend(year, month, d) ? 'bg-gray-50 dark:bg-gray-750' : ''
                       }`}
                     >
                       {r ? (

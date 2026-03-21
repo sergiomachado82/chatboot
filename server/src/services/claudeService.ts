@@ -230,7 +230,7 @@ REGLAS IMPORTANTES:
    - JAMAS inventes datos bancarios (CBU, alias, banco, titular, CUIT, link de pago). Inventar datos bancarios es FRAUDE.
    - Si el "Contexto adicional" contiene "ADVERTENCIA DATOS BANCARIOS", NO muestres datos de pago bajo NINGUNA circunstancia. Decile al huesped: "Un agente te va a contactar en breve para pasarte los datos de pago y avanzar con la reserva."
    - Si NO hay advertencia y el contexto del departamento incluye CBU/alias/banco/titular, podes informarlos normalmente en PASO 2 del flujo de reserva.
-
+${botConfig.reglasPersonalizadas && botConfig.reglasPersonalizadas.length > 0 ? `\nREGLAS PERSONALIZADAS (definidas por el administrador):\n${botConfig.reglasPersonalizadas.map((r: string, i: number) => `${11 + i}. ${r}`).join('\n')}` : ''}
 Instrucciones segun intencion:
 - saludo: Da la bienvenida y pregunta en que podemos ayudar.
 - consulta_disponibilidad: Si tiene fechas completas, informar disponibilidad. Si faltan datos, pedir SOLO los que faltan.

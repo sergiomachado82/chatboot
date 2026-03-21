@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import toast from 'react-hot-toast';
+import { notify } from '../../utils/notify';
 import { useChat } from '../../hooks/useChat';
 import { enviarMensajeAgente } from '../../api/conversacionApi';
 import type { SearchMensajesParams } from '../../api/conversacionApi';
@@ -48,7 +48,7 @@ export default function ChatWindow({ conversacion, onConversacionUpdate }: ChatW
     try {
       await enviarMensajeAgente(conversacion.id, contenido);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al enviar mensaje');
+      notify.error(err instanceof Error ? err.message : 'Error al enviar mensaje');
     } finally {
       setSending(false);
     }
@@ -63,7 +63,7 @@ export default function ChatWindow({ conversacion, onConversacionUpdate }: ChatW
         isLoading={isSearchActive && isLoading}
       />
 
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
@@ -74,7 +74,13 @@ export default function ChatWindow({ conversacion, onConversacionUpdate }: ChatW
           <EmptyState title={isSearchActive ? 'Sin resultados' : 'Sin mensajes'} />
         )}
         {mensajes?.map((msg) => (
-          <MessageBubble key={msg.id} mensaje={msg} highlightText={searchParams?.search} />
+          <MessageBubble
+            key={msg.id}
+            mensaje={msg}
+            highlightText={searchParams?.search}
+            senderName={conversacion.huesped?.nombre ?? conversacion.huesped?.waId}
+            senderIdentifier={conversacion.huesped?.waId ?? conversacion.id}
+          />
         ))}
         <div ref={messagesEndRef} />
       </div>

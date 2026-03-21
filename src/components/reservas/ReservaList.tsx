@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useReservas } from '../../hooks/useReservas';
 import { useComplejos } from '../../hooks/useComplejos';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { notify } from '../../utils/notify';
 import { createReservaManual, deleteReserva, updateReserva, updateReservaEstado } from '../../api/reservaApi';
 import Badge, { estadoColor, estadoLabel } from '../ui/Badge';
 import type { Reserva, CrearReservaManualRequest, UpdateReservaRequest } from '@shared/types/reserva';
@@ -91,10 +91,10 @@ function ReservaCard({
   const dias = calcDias(r.fechaEntrada, r.fechaSalida);
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 space-y-2">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-2">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-medium text-sm text-gray-900">{nombre}</p>
+          <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{nombre}</p>
           <p className="text-xs text-gray-500">{r.habitacion ?? 'Sin asignar'}</p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -221,13 +221,13 @@ export default function ReservaList() {
   const updateEstadoMut = useMutation({
     mutationFn: ({ id, estado }: { id: string; estado: string }) => updateReservaEstado(id, estado),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reservas'] }),
-    onError: (err: Error) => toast.error(err.message || 'Error al cambiar estado'),
+    onError: (err: Error) => notify.error(err.message || 'Error al cambiar estado'),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteReserva(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reservas'] }),
-    onError: (err: Error) => toast.error(err.message || 'Error al eliminar reserva'),
+    onError: (err: Error) => notify.error(err.message || 'Error al eliminar reserva'),
   });
 
   function handleDelete(id: string) {
@@ -332,7 +332,7 @@ export default function ReservaList() {
     return (
       <div>
         <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-6 pb-0">
-          <h2 className="text-lg font-bold text-gray-800">Reservas</h2>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Reservas</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode('table')}
@@ -359,7 +359,7 @@ export default function ReservaList() {
     <div className="p-4 md:p-6">
       {/* Header toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-bold text-gray-800">Reservas</h2>
+        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Reservas</h2>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="flex items-center gap-1">
             <button
@@ -380,7 +380,7 @@ export default function ReservaList() {
           <select
             value={filtro}
             onChange={(e) => { setFiltro(e.target.value); setPage(1); }}
-            className="text-sm border border-gray-300 rounded-md px-2 py-1"
+            className="text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-700 dark:text-gray-100"
           >
             <option value="">Todas</option>
             <option value="pre_reserva">Validar transferencia</option>
@@ -417,27 +417,27 @@ export default function ReservaList() {
       </div>
 
       {/* Desktop: Table view */}
-      <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
+      <div className="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
             <tr>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Nombre</th>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">DTO</th>
-              <th className="text-center px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Pers</th>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">IN</th>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">OUT</th>
-              <th className="text-center px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Dias</th>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Telefono</th>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">DNI</th>
-              <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Tarifa</th>
-              <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Total</th>
-              <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Reserva</th>
-              <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Saldo</th>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Origen</th>
-              <th className="text-left px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Nro Fact.</th>
-              <th className="text-right px-3 py-2 text-gray-600 font-medium whitespace-nowrap">USD</th>
-              <th className="text-center px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Estado</th>
-              <th className="text-center px-3 py-2 text-gray-600 font-medium whitespace-nowrap">Acciones</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Nombre</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">DTO</th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Pers</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">IN</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">OUT</th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Dias</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Telefono</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">DNI</th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Tarifa</th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Total</th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Reserva</th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Saldo</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Origen</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Nro Fact.</th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">USD</th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Estado</th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -446,7 +446,7 @@ export default function ReservaList() {
               const telefono = r.telefonoHuesped ?? r.huesped?.telefono ?? '-';
               const dias = calcDias(r.fechaEntrada, r.fechaSalida);
               return (
-                <tr key={r.id} className="border-b hover:bg-gray-50">
+                <tr key={r.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-3 py-2 whitespace-nowrap">{nombre}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{r.habitacion ?? '-'}</td>
                   <td className="px-3 py-2 text-center">{r.numHuespedes}</td>
@@ -532,7 +532,7 @@ export default function ReservaList() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-white border-t rounded-b-lg mt-0 md:mt-0">
+        <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 rounded-b-lg mt-0 md:mt-0">
           <span className="text-xs text-gray-500">
             Pag {page}/{totalPages} ({data?.total ?? 0})
           </span>
@@ -540,14 +540,14 @@ export default function ReservaList() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 dark:text-gray-300"
             >
               Anterior
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 dark:text-gray-300"
             >
               Siguiente
             </button>

@@ -1388,7 +1388,7 @@ Modal de edicion con 7 tabs:
 |-----|-----------|
 | **Datos** | Nombre, tipo, superficie, direccion, ubicacion, capacidad, unidades, dormitorios, banos, estadia minima, check-in/out, video tour |
 | **Amenities** | Agregar/eliminar tags de amenities (WiFi, A/C, parrilla, etc.) |
-| **Politicas** | Toggles: mascotas, ninos, fumar, fiestas |
+| **Politicas** | Toggles: mascotas, fumar, fiestas (ninos eliminado — todos aceptan ninos, ver 45.12) |
 | **Tarifas** | Tarifas estacionales (baja/media/alta) + Tarifas especiales (rango de fechas) + Bloqueos de disponibilidad |
 | **Reserva** | Datos bancarios: titular cuenta, CUIT, banco, CBU, alias CBU, link MercadoPago |
 | **Media** | Galeria de fotos/videos: agregar, eliminar, reordenar por drag |
@@ -2558,6 +2558,7 @@ model BotConfig {
   horarioFin          String?  // HH:mm (uso futuro)
   telefonoContacto    String   @default("+54 2920 561033")
   titularesVerificados String[] @default([])  // Nombres de titulares bancarios autorizados (comparacion case-insensitive)
+  reglasPersonalizadas String[] @default([])  // Reglas custom del admin, inyectadas en prompt despues de R10 (max 20, 500 chars c/u)
   creadoEn            DateTime @default(now())
   actualizadoEn       DateTime @updatedAt
 }
@@ -2570,7 +2571,7 @@ model BotConfig {
 | `server/src/services/botConfigService.ts` | `getBotConfig()` con cache 5 min, `updateBotConfig()`, `invalidateBotConfigCache()` |
 | `server/src/routes/botConfig.ts` | `GET /api/bot/config`, `PATCH /api/bot/config` con Zod validation |
 | `src/api/botConfigApi.ts` | Cliente API frontend |
-| `src/components/bot/BotConfigPage.tsx` | Pagina admin con 5 secciones (Logo, Identidad, Comportamiento con titulares verificados, Mensajes, Horario) |
+| `src/components/bot/BotConfigPage.tsx` | Pagina admin con 6 secciones (Logo, Identidad, Comportamiento con titulares verificados, Reglas personalizadas, Mensajes, Horario) |
 
 ### 25.3 Archivos modificados
 
@@ -2653,6 +2654,8 @@ Las 10 reglas de negocio del prompt (R1-R10 en seccion 7.2) son fijas y NO se pu
 - Flujo de reserva (PASO 1-4)
 - Terminologia ("reserva" vs "pre-reserva")
 - Seguridad de datos bancarios (whitelist de titulares)
+
+**Nota:** Desde la seccion 46, el admin puede agregar hasta 20 **reglas personalizadas** que se inyectan despues de R10. Las R1-R10 siguen sin poder modificarse.
 
 ## 26. Fix Health Check — Claude Status (2026-03-10)
 
@@ -2950,6 +2953,7 @@ Modelo `BotConfig` para personalizar el comportamiento del bot desde el panel de
 | `horarioInicio/Fin` | null | Horario de atencion (opcional) |
 | `telefonoContacto` | +54 2920 561033 | Telefono de contacto |
 | `logo` | null | URL del logo del bot |
+| `reglasPersonalizadas` | [] | Reglas custom del admin, inyectadas en prompt despues de R10 (max 20, 500 chars c/u). Ver seccion 46 |
 
 ### 31.3 Endpoints
 
@@ -4054,3 +4058,120 @@ POST /api/contact (chatbot backend)
 2. **Auto-respuesta al visitante**: De `info@lasgrutasdepartamentos.com` al email que ingreso el visitante, con respuesta generada por Claude
 
 Ambos emails se firman con DKIM (OpenDKIM) y pasan SPF (IPv4 66.97.40.119 autorizada).
+
+### 45.11 Logo en plantillas de email
+
+Se agrego el logo de la empresa en las 3 plantillas HTML de email (`server/src/services/emailService.ts`):
+
+| Plantilla | Funcion | Descripcion |
+|-----------|---------|-------------|
+| `sendResetEmail` | Recuperacion de contrasena | Header azul (#1e40af) con logo centrado |
+| `sendContactEmail` | Notificacion al admin | Header azul con logo + subtitulo "Nueva consulta desde el formulario web" |
+| `sendAutoReplyEmail` | Auto-respuesta al visitante | Header azul con logo + subtitulo del alojamiento |
+
+La URL del logo es `https://lasgrutasdepartamentos.com/logo.png` (servido desde la landing page).
+
+### 45.12 Eliminacion del toggle "Ninos permitidos"
+
+Se elimino la opcion de restringir "Ninos permitidos" en la configuracion de complejos, ya que todos los departamentos turisticos aceptan ninos sin excepcion.
+
+**Cambios:**
+- `src/components/complejos/ComplejoEditModal.tsx`: eliminado el toggle de la pestana Politicas, el campo del estado inicial del formulario y del payload de envio
+- `server/src/data/accommodationContext.ts`: se hardcodeo `Ninos: permitidos` en lugar de leer el campo `ninos` de la BD
+- La columna `ninos` en la BD se mantiene (default `true`) para no requerir migracion
+
+### 45.13 Correccion del calculo de capacidad total
+
+En `src/components/complejos/ResumenPanel.tsx` el calculo de capacidad total era incorrecto:
+
+```typescript
+// ANTES (incorrecto — sumaba capacidad por complejo sin considerar unidades):
+const capacidadTotal = activos.reduce((sum, c) => sum + c.capacidad, 0); // → 15
+
+// DESPUES (correcto — multiplica capacidad × cantidad de unidades):
+const capacidadTotal = activos.reduce((sum, c) => sum + c.capacidad * c.cantidadUnidades, 0); // → 39
+```
+
+Ejemplo: Complejo LG tiene capacidad 4 personas × 5 unidades = 20 (antes sumaba solo 4).
+
+### 45.14 Fotos faltantes de Luminar Monoambiente
+
+Ademas de las 44 imagenes de la landing page (descargadas del hosting cPanel), se detectaron 4 fotos adicionales del complejo Luminar Monoambiente referenciadas en la BD del chatbot que apuntaban a variantes de tamaño (`-805x453.jpg`) no incluidas en la descarga inicial.
+
+Se descargaron las 4 imagenes desde el hosting cPanel (198.54.114.136) a `/var/www/lasgrutasdepartamentos.com/wp-content/uploads/`:
+- `Luminar-Monoambiente-cocina-1-805x453.jpg`
+- `Luminar-Monoambiente-dormitorio-1-805x453.jpg`
+- `Luminar-Monoambiente-exterior-1-805x453.jpg`
+- `Luminar-Monoambiente-bano-1-805x453.jpg`
+
+Total de imagenes en el VPS: 48 (44 de la landing + 4 del chatbot).
+
+---
+
+## 46. Reglas Personalizadas del Bot (2026-03-21)
+
+### 46.1 Descripcion
+
+Las 10 reglas core del bot (R1-R10: fotos, precios, capacidad, flujo de reserva, datos bancarios, etc.) estan hardcodeadas en el system prompt de `claudeService.ts` y no se pueden modificar. Esta feature agrega la posibilidad de crear **reglas adicionales** desde el panel admin que el bot sigue junto a las R1-R10, sin necesidad de tocar codigo ni re-deployar.
+
+### 46.2 Modelo de datos
+
+Nuevo campo en `BotConfig`:
+
+```prisma
+reglasPersonalizadas String[] @default([]) @map("reglas_personalizadas")
+```
+
+- Cada regla es un string de texto libre, max 500 caracteres
+- Maximo 20 reglas
+- Migracion: `20260321033119_add_reglas_personalizadas`
+
+### 46.3 Inyeccion en el system prompt
+
+Las reglas se inyectan en el prompt de Claude despues de la regla 10 (datos bancarios) y antes de "Instrucciones segun intencion:", numeradas continuando desde R10:
+
+```
+REGLAS PERSONALIZADAS (definidas por el administrador):
+11. No ofrecer descuentos sin autorizacion de un agente humano.
+12. Siempre recomendar el depto Arrayanes para familias de 5+ personas.
+13. Mencionar que el check-in es a las 14hs y el check-out a las 10hs.
+```
+
+Si no hay reglas personalizadas, el bloque no se agrega al prompt.
+
+### 46.4 Validacion backend
+
+En `server/src/routes/botConfig.ts`, el campo se valida con Zod:
+
+```typescript
+reglasPersonalizadas: z.array(z.string().min(1).max(500)).max(20).optional()
+```
+
+### 46.5 UI en BotConfigPage
+
+Nueva seccion "Reglas personalizadas" ubicada entre "Comportamiento" y "Mensajes personalizados":
+
+- **Banner informativo**: explica que las R1-R10 son fijas y estas son adicionales
+- **Lista numerada**: cada regla con boton de eliminar (X)
+- **Input + boton "Agregar"**: para agregar nueva regla (se oculta si ya hay 20)
+- **Contador de caracteres**: muestra N/500 mientras se escribe
+- **Contador de reglas**: muestra N/20 reglas
+- **Ejemplos de formato**: 3 ejemplos como guia para el administrador
+
+Las reglas se guardan junto con el resto de la configuracion al presionar "Guardar cambios".
+
+### 46.6 Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `server/prisma/schema.prisma` | Agregado campo `reglasPersonalizadas String[]` a `BotConfig` |
+| `server/src/routes/botConfig.ts` | Agregada validacion Zod para `reglasPersonalizadas` |
+| `server/src/services/claudeService.ts` | Inyeccion de reglas personalizadas en el system prompt despues de R10 |
+| `src/api/botConfigApi.ts` | Agregado `reglasPersonalizadas: string[]` al interface `BotConfig` |
+| `src/components/bot/BotConfigPage.tsx` | Nueva seccion UI con lista, input, agregar/eliminar, ejemplos y contadores |
+
+### 46.7 Que NO cambia
+
+- Las reglas R1-R10 siguen hardcodeadas y no se pueden editar desde el panel
+- El cache de `botConfigService.ts` (5 min TTL) aplica igual que para los demas campos
+- Las reglas personalizadas se incluyen en el bloque de system prompt cacheado (`cache_control: ephemeral`)

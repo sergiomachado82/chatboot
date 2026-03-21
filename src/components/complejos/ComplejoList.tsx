@@ -32,7 +32,7 @@ export default function ComplejoList() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-800">Complejos</h2>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Complejos</h2>
           <button
             onClick={handleCreate}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -51,7 +51,7 @@ export default function ComplejoList() {
             ))}
           </div>
           {complejos?.length === 0 && (
-            <div className="text-center text-gray-400 py-12">
+            <div className="text-center text-gray-400 dark:text-gray-500 py-12">
               <p className="text-sm">No hay departamentos registrados</p>
               <button
                 onClick={handleCreate}

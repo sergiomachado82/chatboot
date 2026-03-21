@@ -13,14 +13,19 @@ import BotConfigPage from './components/bot/BotConfigPage';
 import EmailList from './components/emails/EmailList';
 import WhatsAppSimulator from './components/simulator/WhatsAppSimulator';
 import EmptyState from './components/ui/EmptyState';
+import DashboardPage from './components/dashboard/DashboardPage';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
+import { useDarkMode } from './hooks/useDarkMode';
 import type { Conversacion } from '@shared/types/conversacion';
 
-type View = 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot' | 'emails';
+type View = 'dashboard' | 'chat' | 'reservas' | 'complejos' | 'whatsapp' | 'bot' | 'emails';
 
 export default function App() {
   const [authed, setAuthed] = useState(isAuthenticated());
-  const [view, setView] = useState<View>('chat');
+  const [view, setView] = useState<View>('dashboard');
   const [selectedConv, setSelectedConv] = useState<Conversacion | null>(null);
+  const { isDark, toggle: toggleDark } = useDarkMode();
+  useDocumentTitle(view);
 
   // Handle /reset-password?token=xxx route
   const urlParams = new URLSearchParams(window.location.search);
@@ -42,13 +47,16 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      <Header view={view} onViewChange={setView} />
+    <div className={`h-screen flex flex-col ${isDark ? 'dark' : ''}`}>
+      <Header view={view} onViewChange={setView} isDark={isDark} onToggleDark={toggleDark} />
 
-      {view === 'chat' ? (
+      <div key={view} className="view-transition flex-1 flex flex-col overflow-hidden">
+      {view === 'dashboard' ? (
+        <DashboardPage />
+      ) : view === 'chat' ? (
         <div className="flex-1 flex overflow-hidden">
           {/* Chat List — hidden on mobile when conv selected */}
-          <div className={`w-full md:w-80 border-r border-gray-200 bg-white flex-shrink-0 ${selectedConv ? 'hidden md:block' : ''}`}>
+          <div className={`w-full md:w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0 ${selectedConv ? 'hidden md:block' : ''}`}>
             <ChatList
               selectedId={selectedConv?.id ?? null}
               onSelect={setSelectedConv}
@@ -61,7 +69,7 @@ export default function App() {
               <>
                 <button
                   onClick={() => setSelectedConv(null)}
-                  className="md:hidden px-4 py-2 text-sm text-blue-600 border-b border-gray-200 bg-white flex items-center gap-1"
+                  className="md:hidden px-4 py-2 text-sm text-blue-600 dark:text-blue-400 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center gap-1"
                   aria-label="Volver a la lista de conversaciones"
                 >
                   &larr; Volver
@@ -69,13 +77,13 @@ export default function App() {
                 <ChatWindow conversacion={selectedConv} onConversacionUpdate={setSelectedConv} />
               </>
             ) : (
-              <EmptyState title="Selecciona una conversacion" description="Elige una conversacion de la lista para ver los mensajes" />
+              <EmptyState title="Selecciona una conversacion" description="Elige una conversacion de la lista para ver los mensajes" illustration="chat" />
             )}
           </div>
 
           {/* Guest Sidebar — hidden below lg */}
           {selectedConv && (
-            <div className="hidden lg:block w-72 border-l border-gray-200 bg-white flex-shrink-0 overflow-y-auto">
+            <div className="hidden lg:block w-72 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0 overflow-y-auto">
               <GuestCard huespedId={selectedConv.huespedId} />
             </div>
           )}
@@ -96,6 +104,7 @@ export default function App() {
       ) : (
         <WhatsAppProfilePage />
       )}
+      </div>
     </div>
   );
 }

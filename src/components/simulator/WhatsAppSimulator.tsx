@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import toast from 'react-hot-toast';
+import { notify } from '../../utils/notify';
 import { sendSimulatorMessage, sendSimulatorAudio } from '../../api/simulatorApi';
 
 interface SimMessage {
@@ -57,7 +57,7 @@ export default function WhatsAppSimulator() {
     try {
       await sendSimulatorMessage(text);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al enviar mensaje');
+      notify.error(err instanceof Error ? err.message : 'Error al enviar mensaje');
     } finally {
       setSending(false);
     }
@@ -75,7 +75,7 @@ export default function WhatsAppSimulator() {
       const result = await sendSimulatorAudio(file);
       setMessages((prev) => [...prev, { from: 'user', type: 'text', body: `Transcripcion: "${result.transcripcion}"`, timestamp: new Date().toISOString() }]);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al procesar audio');
+      notify.error(err instanceof Error ? err.message : 'Error al procesar audio');
       setMessages((prev) => [...prev, { from: 'user', type: 'text', body: '[Error al procesar audio]', timestamp: new Date().toISOString() }]);
     } finally {
       setSending(false);

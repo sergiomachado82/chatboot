@@ -15,11 +15,11 @@ export default function ComplejoCard({ complejo, onEdit }: ComplejoCardProps) {
 
   return (
     <div
-      className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
       onClick={onEdit}
     >
       {/* Image */}
-      <div className="h-36 bg-gray-100 relative">
+      <div className="h-36 bg-gray-100 dark:bg-gray-700 relative">
         {mainImage ? (
           <img src={mainImage} alt={complejo.nombre} className="w-full h-full object-cover" />
         ) : (
@@ -43,9 +43,9 @@ export default function ComplejoCard({ complejo, onEdit }: ComplejoCardProps) {
       <div className="p-3">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="font-semibold text-gray-800">{complejo.nombre}</h3>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-100">{complejo.nombre}</h3>
             {complejo.tipo && (
-              <p className="text-xs text-gray-500">{complejo.tipo}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{complejo.tipo}</p>
             )}
           </div>
           <button
@@ -56,7 +56,7 @@ export default function ComplejoCard({ complejo, onEdit }: ComplejoCardProps) {
           </button>
         </div>
 
-        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
+        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
           <span>{complejo.cantidadUnidades} dpto{complejo.cantidadUnidades > 1 ? 's' : ''}</span>
           <span>{complejo.capacidad} pers.</span>
           <span>{complejo.dormitorios} dorm.</span>

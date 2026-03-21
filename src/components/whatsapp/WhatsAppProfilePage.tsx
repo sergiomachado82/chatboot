@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { notify } from '../../utils/notify';
 import { Save, AlertTriangle } from 'lucide-react';
 import { getWhatsAppProfile, updateWhatsAppProfile } from '../../api/whatsappProfileApi';
 import type { WhatsAppProfileUpdate } from '../../api/whatsappProfileApi';
@@ -63,11 +63,11 @@ export default function WhatsAppProfilePage() {
   const mutation = useMutation({
     mutationFn: (data: WhatsAppProfileUpdate) => updateWhatsAppProfile(data),
     onSuccess: () => {
-      toast.success('Perfil actualizado correctamente');
+      notify.success('Perfil actualizado correctamente');
       queryClient.invalidateQueries({ queryKey: ['whatsapp-profile'] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Error al actualizar el perfil');
+      notify.error(err.message || 'Error al actualizar el perfil');
     },
   });
 
@@ -101,7 +101,7 @@ export default function WhatsAppProfilePage() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-2xl mx-auto">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Perfil de WhatsApp Business</h2>
+        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Perfil de WhatsApp Business</h2>
 
         {isSimulator && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
@@ -123,77 +123,77 @@ export default function WhatsAppProfilePage() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow p-6 space-y-5">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
           {/* About */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Acerca de <span className="text-gray-400 font-normal">({about.length}/139)</span>
             </label>
             <input
               type="text"
               value={about}
               onChange={(e) => setAbout(e.target.value.slice(0, 139))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
               placeholder="Texto breve de 'Acerca de'"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Descripcion <span className="text-gray-400 font-normal">({description.length}/512)</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value.slice(0, 512))}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
               placeholder="Descripcion del negocio"
             />
           </div>
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Direccion <span className="text-gray-400 font-normal">({address.length}/256)</span>
             </label>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value.slice(0, 256))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
               placeholder="Direccion fisica"
             />
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email de contacto</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email de contacto</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
               placeholder="contacto@ejemplo.com"
             />
           </div>
 
           {/* Websites */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sitios web (max 2)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sitios web (max 2)</label>
             <div className="space-y-2">
               <input
                 type="url"
                 value={website1}
                 onChange={(e) => setWebsite1(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
                 placeholder="https://www.ejemplo.com"
               />
               <input
                 type="url"
                 value={website2}
                 onChange={(e) => setWebsite2(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
                 placeholder="https://www.otro-sitio.com (opcional)"
               />
             </div>
@@ -201,11 +201,11 @@ export default function WhatsAppProfilePage() {
 
           {/* Vertical */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Industria</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Industria</label>
             <select
               value={vertical}
               onChange={(e) => setVertical(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
             >
               {VERTICALS.map((v) => (
                 <option key={v} value={v}>{VERTICAL_LABELS[v] ?? v}</option>

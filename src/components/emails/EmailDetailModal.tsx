@@ -55,11 +55,11 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
 
   return (
     <div ref={modalRef} tabIndex={-1} className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 outline-none">
-      <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto dark:bg-gray-800">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b sticky top-0 bg-white z-10">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b sticky top-0 bg-white z-10 dark:bg-gray-800 dark:border-gray-700">
           <div className="flex items-center gap-2 min-w-0">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate dark:text-gray-100">
               {isLoading ? 'Cargando...' : email?.subject || 'Sin asunto'}
             </h3>
             {email && (
@@ -68,33 +68,33 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
               </Badge>
             )}
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0" aria-label="Cerrar modal">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 dark:text-gray-500 dark:hover:text-gray-300" aria-label="Cerrar modal">
             <X size={20} />
           </button>
         </div>
 
         {isLoading ? (
-          <div className="p-6 text-center text-gray-400">Cargando...</div>
+          <div className="p-6 text-center text-gray-400 dark:text-gray-500">Cargando...</div>
         ) : email ? (
           <div className="p-4 sm:p-6 space-y-5">
             {/* Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-gray-400 text-xs">De</span>
-                <p className="text-gray-800">{email.fromEmail}</p>
+                <p className="text-gray-800 dark:text-gray-100">{email.fromEmail}</p>
               </div>
               <div>
                 <span className="text-gray-400 text-xs">Fecha</span>
-                <p className="text-gray-800">{fmtDateTime(email.creadoEn)}</p>
+                <p className="text-gray-800 dark:text-gray-100">{fmtDateTime(email.creadoEn)}</p>
               </div>
               <div>
                 <span className="text-gray-400 text-xs">Tipo</span>
-                <p className="text-gray-800">{email.esFormulario ? 'Formulario web' : 'Email directo'}</p>
+                <p className="text-gray-800 dark:text-gray-100">{email.esFormulario ? 'Formulario web' : 'Email directo'}</p>
               </div>
               {email.complejoId && (
                 <div>
                   <span className="text-gray-400 text-xs">Complejo ID</span>
-                  <p className="text-gray-800 text-xs break-all">{email.complejoId}</p>
+                  <p className="text-gray-800 text-xs break-all dark:text-gray-100">{email.complejoId}</p>
                 </div>
               )}
             </div>
@@ -110,21 +110,21 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
             {/* Email original */}
             {email.bodyOriginal && (
               <div>
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Email original</h4>
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 dark:text-gray-400">Email original</h4>
                 {formFields ? (
-                  <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 dark:bg-gray-700">
                     {Object.entries(formFields).map(([key, value]) => (
                       value ? (
                         <div key={key} className="text-sm">
-                          <span className="text-gray-500">{FORM_FIELD_LABELS[key] || key}: </span>
-                          <span className="text-gray-800">{value}</span>
+                          <span className="text-gray-500 dark:text-gray-400">{FORM_FIELD_LABELS[key] || key}: </span>
+                          <span className="text-gray-800 dark:text-gray-100">{value}</span>
                         </div>
                       ) : null
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans">{email.bodyOriginal}</pre>
+                  <div className="bg-gray-50 rounded-lg p-3 dark:bg-gray-700">
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans dark:text-gray-300">{email.bodyOriginal}</pre>
                   </div>
                 )}
               </div>
@@ -133,15 +133,15 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
             {/* Respuesta enviada */}
             {email.respuestaEnviada && (
               <div>
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Respuesta enviada</h4>
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 dark:text-gray-400">Respuesta enviada</h4>
                 <div className="bg-blue-50 rounded-lg p-3">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans">{email.respuestaEnviada}</pre>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans dark:text-gray-300">{email.respuestaEnviada}</pre>
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="p-6 text-center text-gray-400">Email no encontrado</div>
+          <div className="p-6 text-center text-gray-400 dark:text-gray-500">Email no encontrado</div>
         )}
       </div>
     </div>

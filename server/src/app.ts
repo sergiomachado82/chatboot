@@ -27,6 +27,7 @@ import icalRouter from './routes/ical.js';
 import webchatRouter from './routes/webchat.js';
 import contactRouter from './routes/contact.js';
 import internalEmailRouter from './routes/internalEmail.js';
+import dashboardRouter from './routes/dashboard.js';
 
 const app = express();
 
@@ -91,6 +92,7 @@ protectedRouter.use(complejosRouter);
 protectedRouter.use(whatsappProfileRouter);
 protectedRouter.use(botConfigRouter);
 protectedRouter.use(emailsRouter);
+protectedRouter.use(dashboardRouter);
 app.use('/api', protectedRouter);
 
 // In production, serve built frontend files (Vite output)

@@ -1,6 +1,6 @@
 import type { Conversacion } from '@shared/types/conversacion';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { notify } from '../../utils/notify';
 import { tomarControl, devolverBot, cerrarConversacion } from '../../api/conversacionApi';
 import Badge, { estadoColor, estadoLabel } from '../ui/Badge';
 
@@ -18,15 +18,15 @@ export default function ChatHeader({ conversacion, onConversacionUpdate }: ChatH
     onConversacionUpdate?.(updated);
   };
 
-  const onError = (err: Error) => toast.error(err.message || 'Error en la operacion');
+  const onError = (err: Error) => notify.error(err.message || 'Error en la operacion');
   const tomar = useMutation({ mutationFn: () => tomarControl(conversacion.id), onSuccess: invalidate, onError });
   const devolver = useMutation({ mutationFn: () => devolverBot(conversacion.id), onSuccess: invalidate, onError });
   const cerrar = useMutation({ mutationFn: () => cerrarConversacion(conversacion.id), onSuccess: invalidate, onError });
 
   return (
-    <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
+    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between">
       <div>
-        <h2 className="font-semibold text-gray-800">{nombre}</h2>
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100">{nombre}</h2>
         <div className="flex items-center gap-2 mt-0.5">
           <Badge color={estadoColor(conversacion.estado)}>{estadoLabel(conversacion.estado)}</Badge>
           {conversacion.agente && (

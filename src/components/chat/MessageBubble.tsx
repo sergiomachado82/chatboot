@@ -1,8 +1,11 @@
 import type { Mensaje } from '@shared/types/mensaje';
+import Avatar from '../ui/Avatar';
 
 interface MessageBubbleProps {
   mensaje: Mensaje;
   highlightText?: string;
+  senderName?: string;
+  senderIdentifier?: string;
 }
 
 function highlightContent(text: string, highlight?: string): React.ReactNode {
@@ -17,14 +20,14 @@ function highlightContent(text: string, highlight?: string): React.ReactNode {
   );
 }
 
-export default function MessageBubble({ mensaje, highlightText }: MessageBubbleProps) {
+export default function MessageBubble({ mensaje, highlightText, senderName, senderIdentifier }: MessageBubbleProps) {
   const time = new Date(mensaje.creadoEn).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 
   // System messages
   if (mensaje.origen === 'sistema' || mensaje.tipo === 'system') {
     return (
       <div className="flex justify-center my-2">
-        <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+        <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-3 py-1 rounded-full">
           {highlightContent(mensaje.contenido, highlightText)}
         </span>
       </div>
@@ -47,8 +50,13 @@ export default function MessageBubble({ mensaje, highlightText }: MessageBubbleP
     agente: 'Agente',
   };
 
+  const showAvatar = mensaje.origen === 'huesped' && senderName;
+
   return (
-    <div className={`flex ${align} mb-2`}>
+    <div className={`flex ${align} mb-2 ${showAvatar ? 'gap-2' : ''}`}>
+      {showAvatar && (
+        <Avatar name={senderName!} identifier={senderIdentifier} size="sm" />
+      )}
       <div className={`max-w-[75%] px-3 py-2 rounded-lg ${colorClass}`}>
         {originLabel[mensaje.origen] && (
           <p className={`text-[10px] font-semibold mb-0.5 ${mensaje.origen === 'agente' ? 'text-blue-100' : 'text-gray-400'}`}>

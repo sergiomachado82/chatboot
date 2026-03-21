@@ -29,8 +29,8 @@ export default function MediaUploadForm({ complejoId }: MediaUploadFormProps) {
   }
 
   return (
-    <div className="border border-dashed border-gray-300 rounded-lg p-3 space-y-2">
-      <h4 className="text-sm font-semibold text-gray-700">Agregar multimedia</h4>
+    <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 space-y-2">
+      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Agregar multimedia</h4>
       <div className="flex gap-2">
         <input
           type="url"
@@ -38,12 +38,12 @@ export default function MediaUploadForm({ complejoId }: MediaUploadFormProps) {
           onChange={(e) => { setUrl(e.target.value); setShowPreview(false); }}
           onBlur={handleUrlBlur}
           placeholder="URL de imagen o video"
-          className="flex-1 text-sm border border-gray-300 rounded px-2 py-1"
+          className="flex-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
         />
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
-          className="text-sm border border-gray-300 rounded px-2 py-1"
+          className="text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
         >
           <option value="image">Imagen</option>
           <option value="video">Video</option>
@@ -54,7 +54,7 @@ export default function MediaUploadForm({ complejoId }: MediaUploadFormProps) {
         value={caption}
         onChange={(e) => setCaption(e.target.value)}
         placeholder="Caption (opcional)"
-        className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+        className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
       />
       {showPreview && url && tipo === 'image' && (
         <div className="w-32 h-20 rounded overflow-hidden bg-gray-100">

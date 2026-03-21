@@ -30,13 +30,13 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-8 text-center">
-          <h1 className="text-2xl font-bold text-red-600">Algo salio mal</h1>
-          <p className="text-gray-600 max-w-md">
+        <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-8 text-center dark:bg-gray-900">
+          <h1 className="text-2xl font-bold text-red-600 dark:text-red-400">Algo salio mal</h1>
+          <p className="text-gray-600 max-w-md dark:text-gray-400">
             Ocurrio un error inesperado. Por favor, recarga la pagina para continuar.
           </p>
           {this.state.error && (
-            <pre className="text-sm text-gray-500 max-w-lg overflow-auto p-2 bg-gray-100 rounded">
+            <pre className="text-sm text-gray-500 max-w-lg overflow-auto p-2 bg-gray-100 rounded dark:bg-gray-800 dark:text-gray-400">
               {this.state.error.message}
             </pre>
           )}

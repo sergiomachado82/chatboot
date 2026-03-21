@@ -59,17 +59,17 @@ export default function ResetPasswordPage({ token, onBack }: ResetPasswordPagePr
         </div>
       ) : (
         <>
-          <h2 className="text-lg font-semibold text-gray-700 text-center mb-4">Restablecer contraseña</h2>
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 text-center mb-4">Restablecer contraseña</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Nueva contraseña</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Nueva contraseña</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors dark:text-gray-100"
                   placeholder="Minimo 6 caracteres"
                   required
                   minLength={6}
@@ -77,14 +77,14 @@ export default function ResetPasswordPage({ token, onBack }: ResetPasswordPagePr
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Confirmar contraseña</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Confirmar contraseña</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors dark:text-gray-100"
                   placeholder="Repeti la contraseña"
                   required
                   minLength={6}
@@ -92,7 +92,7 @@ export default function ResetPasswordPage({ token, onBack }: ResetPasswordPagePr
               </div>
             </div>
             {error && (
-              <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+              <p className="text-red-500 text-sm bg-red-50 dark:bg-red-900/30 px-3 py-2 rounded-lg">{error}</p>
             )}
             <button
               type="submit"
@@ -104,7 +104,7 @@ export default function ResetPasswordPage({ token, onBack }: ResetPasswordPagePr
           </form>
           <button
             onClick={onBack}
-            className="mt-4 w-full text-sm text-gray-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-1"
+            className="mt-4 w-full text-sm text-gray-400 dark:text-gray-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-1"
           >
             <ArrowLeft size={14} /> Volver al login
           </button>

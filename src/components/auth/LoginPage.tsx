@@ -67,35 +67,35 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Email</label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors dark:text-gray-100"
                   placeholder="agente@email.com"
                   required
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Password</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Password</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors dark:text-gray-100"
                   placeholder="Tu contraseña"
                   required
                 />
               </div>
             </div>
             {error && (
-              <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+              <p className="text-red-500 text-sm bg-red-50 dark:bg-red-900/30 px-3 py-2 rounded-lg">{error}</p>
             )}
             <button
               type="submit"
@@ -128,14 +128,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               Ingresá tu email y te enviaremos un enlace para restablecer tu contraseña.
             </p>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Email</label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="email"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors dark:text-gray-100"
                   placeholder="agente@email.com"
                   required
                 />
@@ -145,7 +145,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <p className="text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">{forgotMsg}</p>
             )}
             {forgotError && (
-              <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{forgotError}</p>
+              <p className="text-red-500 text-sm bg-red-50 dark:bg-red-900/30 px-3 py-2 rounded-lg">{forgotError}</p>
             )}
             <button
               type="submit"

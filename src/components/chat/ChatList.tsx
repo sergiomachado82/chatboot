@@ -61,7 +61,7 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Filters */}
-      <div className="px-3 py-2 border-b border-gray-200 flex gap-1 flex-wrap">
+      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex gap-1 flex-wrap">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -69,7 +69,7 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
             className={`px-2 py-1 text-xs rounded-full ${
               filter === f.key
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             {f.label}
@@ -81,13 +81,13 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
       {!searchOpen ? (
         <button
           onClick={() => setSearchOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-200 w-full"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700 w-full"
         >
           <Search size={14} />
           Buscar en conversaciones
         </button>
       ) : (
-        <div className="border-b border-gray-200 bg-white px-3 py-2 space-y-2">
+        <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 space-y-2">
           <div className="flex items-center gap-2">
             <Search size={16} className="text-gray-400 shrink-0" />
             <input

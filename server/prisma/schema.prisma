@@ -260,6 +260,7 @@ model BotConfig {
   horarioFin          String?  @map("horario_fin")
   telefonoContacto    String   @default("+54 2920 561033") @map("telefono_contacto")
   titularesVerificados String[] @default([]) @map("titulares_verificados")
+  reglasPersonalizadas String[] @default([]) @map("reglas_personalizadas")
   logo                String?
   creadoEn            DateTime @default(now()) @map("creado_en")
   actualizadoEn       DateTime @updatedAt @map("actualizado_en")

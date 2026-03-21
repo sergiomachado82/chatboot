@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useEmails, useEmailStats } from '../../hooks/useEmails';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { notify } from '../../utils/notify';
 import { deleteEmail } from '../../api/emailApi';
 import Badge from '../ui/Badge';
 import { TableSkeleton } from '../ui/Skeleton';
@@ -28,13 +28,13 @@ function StatCard({ label, value, icon: Icon, color }: {
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-lg shadow p-3 sm:p-4 flex items-center gap-3">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex items-center gap-3">
       <div className={`p-2 rounded-lg ${color}`}>
         <Icon size={18} />
       </div>
       <div>
-        <p className="text-xl sm:text-2xl font-bold text-gray-800">{value ?? '-'}</p>
-        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">{value ?? '-'}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
       </div>
     </div>
   );
@@ -44,7 +44,7 @@ function EmailCard({ email, onClick, onDelete }: { email: EmailProcesado; onClic
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg shadow p-4 space-y-2 cursor-pointer hover:shadow-md transition-shadow"
+      className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-2 cursor-pointer hover:shadow-md transition-shadow"
     >
       <div className="flex items-start justify-between">
         <div className="min-w-0">
@@ -96,7 +96,7 @@ export default function EmailList() {
       queryClient.invalidateQueries({ queryKey: ['emails'] });
       queryClient.invalidateQueries({ queryKey: ['emailStats'] });
     },
-    onError: (err: Error) => toast.error(err.message || 'Error al eliminar email'),
+    onError: (err: Error) => notify.error(err.message || 'Error al eliminar email'),
   });
 
   function handleDelete(id: string) {
@@ -138,7 +138,7 @@ export default function EmailList() {
 
       {/* Header toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-bold text-gray-800">Emails</h2>
+        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Emails</h2>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Filtros */}
           <div className="flex gap-1">
@@ -166,7 +166,7 @@ export default function EmailList() {
                 placeholder="Email o asunto..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="text-sm border border-gray-300 rounded-md pl-8 pr-3 py-1.5 w-48"
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded-md pl-8 pr-3 py-1.5 w-48 dark:bg-gray-700 dark:text-gray-100"
               />
             </div>
             {search && (
@@ -196,9 +196,9 @@ export default function EmailList() {
 
       {/* Desktop: Table view */}
       {!isLoading && (
-        <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
+        <div className="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
               <tr>
                 <th className="text-left px-3 py-2 text-gray-600 font-medium">De</th>
                 <th className="text-left px-3 py-2 text-gray-600 font-medium">Asunto</th>
@@ -213,7 +213,7 @@ export default function EmailList() {
                 <tr
                   key={e.id}
                   onClick={() => setSelectedId(e.id)}
-                  className="border-b hover:bg-gray-50 cursor-pointer"
+                  className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                 >
                   <td className="px-3 py-2 whitespace-nowrap max-w-[200px] truncate">{e.fromEmail}</td>
                   <td className="px-3 py-2 whitespace-nowrap max-w-[250px] truncate">{e.subject || 'Sin asunto'}</td>
@@ -254,22 +254,22 @@ export default function EmailList() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-white border-t rounded-b-lg">
-          <span className="text-xs text-gray-500">
+        <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 rounded-b-lg">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             Pag {page}/{totalPages} ({data?.total ?? 0})
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
               Anterior
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
               Siguiente
             </button>

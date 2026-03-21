@@ -21,7 +21,17 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <App />
-        <Toaster position="top-right" />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              borderRadius: '10px',
+              padding: '12px 16px',
+              fontSize: '14px',
+            },
+            duration: 4000,
+          }}
+        />
       </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>,

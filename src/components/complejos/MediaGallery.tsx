@@ -20,16 +20,16 @@ export default function MediaGallery({ complejoId, media }: MediaGalleryProps) {
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-semibold text-gray-700">Multimedia ({media.length})</h4>
+      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Multimedia ({media.length})</h4>
 
       {media.length > 0 ? (
         <div className="grid grid-cols-3 gap-2">
           {media.map((m) => (
-            <div key={m.id} className="relative rounded overflow-hidden bg-gray-100">
+            <div key={m.id} className="relative rounded overflow-hidden bg-gray-100 dark:bg-gray-700">
               {m.tipo === 'image' ? (
                 <img src={m.url} alt={m.caption ?? ''} className="w-full h-24 object-cover" />
               ) : (
-                <div className="w-full h-24 flex items-center justify-center bg-gray-200 text-xs text-gray-500">
+                <div className="w-full h-24 flex items-center justify-center bg-gray-200 dark:bg-gray-600 text-xs text-gray-500 dark:text-gray-400">
                   Video
                 </div>
               )}
@@ -55,7 +55,7 @@ export default function MediaGallery({ complejoId, media }: MediaGalleryProps) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-400">Sin imagenes</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">Sin imagenes</p>
       )}
 
       <MediaUploadForm complejoId={complejoId} />
