@@ -48,6 +48,8 @@ const envSchema = z.object({
   EMAIL_POLL_INTERVAL_MS: z.coerce.number().default(180_000),
   EMAIL_AUTO_RESPONDER_ENABLED: z.string().transform(v => v === 'true').default('false'),
 
+  INTERNAL_EMAIL_KEY: z.string().default(''),
+
   FRONTEND_URL: z.string().default('http://localhost:5173'),
 
   ALLOWED_ORIGINS: z.string().default('*'),

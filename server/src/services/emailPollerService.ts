@@ -100,16 +100,11 @@ function getReplyToAddress(parsed: ParsedMail): string | null {
   return replyTo || null;
 }
 
-// ── Main polling logic ──
+// ── Reusable email processing (used by IMAP poller and Postfix pipe endpoint) ──
 
-async function pollEmails(): Promise<void> {
-  if (isPolling) {
-    logger.debug('Email poll already in progress, skipping');
-    return;
-  }
-
+export async function processRawEmailSource(source: Buffer): Promise<{ processed: boolean; error?: string }> {
   if (!env.EMAIL_AUTO_RESPONDER_ENABLED) {
-    return;
+    return { processed: false, error: 'Auto-responder disabled' };
   }
 
   const activeComplejos = await prisma.complejo.findMany({
@@ -118,7 +113,150 @@ async function pollEmails(): Promise<void> {
   });
 
   if (activeComplejos.length === 0) {
-    logger.debug('No complejos with autoResponderEmail enabled, skipping poll');
+    return { processed: false, error: 'No complejos with autoResponderEmail enabled' };
+  }
+
+  const parsed = await simpleParser(source);
+
+  const messageId = parsed.messageId || `pipe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const fromAddress = parsed.from?.value?.[0]?.address?.toLowerCase() || '';
+  const subject = parsed.subject || '';
+
+  logger.info({ from: fromAddress, subject, messageId }, 'processRawEmailSource: processing email');
+
+  // ── Detect contact form submissions ──
+  const isForm = isContactFormEmail(parsed);
+  let replyTo = fromAddress;
+  let formFields: ContactFormFields | null = null;
+
+  if (isForm) {
+    const visitorEmail = getReplyToAddress(parsed);
+    if (!visitorEmail) {
+      logger.warn({ subject }, 'Contact form email without Reply-To, skipping');
+      return { processed: false, error: 'Contact form without Reply-To' };
+    }
+    replyTo = visitorEmail;
+    formFields = extractContactFormFields(parsed);
+    logger.info({ replyTo, formFields }, 'Contact form detected, extracted fields');
+  } else {
+    // Regular email — apply anti-loop filters
+    if (fromAddress.includes('info@lasgrutasdepartamentos') ||
+        fromAddress.includes('lasgrutasdepartamentos@gmail')) {
+      logger.debug({ from: fromAddress }, 'Skipping own email');
+      return { processed: false, error: 'Own email (loop prevention)' };
+    }
+
+    const skipDomains = [
+      'booking.com', 'airbnb.com', 'invertironline.com', 'iol.invertironline.com',
+      'mercadolibre.com', 'mercadopago.com', 'bna.com.ar', 'mailing.bna.com.ar',
+      'noreply', 'no-reply', 'mailer-daemon', 'postmaster',
+      'newsletter', 'notifications', 'alert', 'billing',
+    ];
+    if (skipDomains.some(d => fromAddress.includes(d))) {
+      logger.debug({ from: fromAddress }, 'Skipping notification sender');
+      return { processed: false, error: 'Notification sender' };
+    }
+
+    const autoSubmitted = parsed.headers.get('auto-submitted');
+    if (autoSubmitted && autoSubmitted !== 'no') {
+      logger.debug({ from: fromAddress, autoSubmitted }, 'Skipping auto-submitted email');
+      return { processed: false, error: 'Auto-submitted email' };
+    }
+
+    const precedence = parsed.headers.get('precedence');
+    if (precedence && ['bulk', 'junk', 'list'].includes(String(precedence).toLowerCase())) {
+      logger.debug({ from: fromAddress, precedence }, 'Skipping bulk/list email');
+      return { processed: false, error: 'Bulk/list email' };
+    }
+
+    if (parsed.headers.get('x-auto-responded-message')) {
+      logger.debug({ from: fromAddress }, 'Skipping already auto-responded email');
+      return { processed: false, error: 'Already auto-responded' };
+    }
+  }
+
+  // ── Dedup ──
+  const existing = await prisma.emailProcesado.findUnique({
+    where: { messageId },
+  });
+  if (existing) {
+    logger.debug({ messageId }, 'Email already processed, skipping');
+    return { processed: false, error: 'Duplicate messageId' };
+  }
+
+  // ── Rate limit: max 5 replies per recipient in 24h ──
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const recentReplies = await prisma.emailProcesado.count({
+    where: {
+      fromEmail: replyTo,
+      respondido: true,
+      creadoEn: { gte: oneDayAgo },
+    },
+  });
+  if (recentReplies >= 5) {
+    logger.warn({ replyTo, count: recentReplies }, 'Rate limit reached for recipient');
+    await prisma.emailProcesado.create({
+      data: { messageId, fromEmail: replyTo, subject, error: 'Rate limit exceeded' },
+    });
+    return { processed: false, error: 'Rate limit exceeded' };
+  }
+
+  // ── Process the email ──
+  const bodyText = parsed.text || '';
+  logger.info({ replyTo, subject, messageId, isForm }, 'Delegating to auto-responder');
+
+  try {
+    const { complejoId, replyBody } = await processIncomingEmail({
+      messageId,
+      from: replyTo,
+      subject,
+      body: bodyText,
+      inReplyTo: parsed.messageId,
+      activeComplejos: activeComplejos.map(c => ({ id: c.id, nombre: c.nombre })),
+      formFields: formFields || undefined,
+    });
+
+    await prisma.emailProcesado.create({
+      data: {
+        messageId,
+        fromEmail: replyTo,
+        subject,
+        complejoId,
+        respondido: true,
+        bodyOriginal: isForm && formFields ? JSON.stringify(formFields) : bodyText.slice(0, 5000),
+        respuestaEnviada: replyBody,
+        esFormulario: isForm,
+      },
+    });
+
+    logger.info({ replyTo, subject, complejoId, isForm }, 'Email auto-reply sent successfully');
+    return { processed: true };
+  } catch (err: any) {
+    logger.error({ err, replyTo, subject }, 'Failed to process email');
+    await prisma.emailProcesado.create({
+      data: {
+        messageId,
+        fromEmail: replyTo,
+        subject,
+        respondido: false,
+        error: err.message?.slice(0, 500),
+        bodyOriginal: isForm && formFields ? JSON.stringify(formFields) : bodyText.slice(0, 5000),
+        esFormulario: isForm,
+      },
+    });
+    return { processed: false, error: err.message?.slice(0, 200) };
+  }
+}
+
+// ── IMAP polling logic ──
+
+async function pollEmails(): Promise<void> {
+  if (isPolling) {
+    logger.debug('Email poll already in progress, skipping');
+    return;
+  }
+
+  if (!env.EMAIL_AUTO_RESPONDER_ENABLED) {
     return;
   }
 
@@ -169,147 +307,8 @@ async function pollEmails(): Promise<void> {
             continue;
           }
 
-          const parsed = await simpleParser(msg.source);
-
-          const messageId = parsed.messageId || `unknown-${uid}-${Date.now()}`;
-          const fromAddress = parsed.from?.value?.[0]?.address?.toLowerCase() || '';
-          const subject = parsed.subject || '';
-
-          logger.info({ uid, from: fromAddress, subject }, 'Processing email');
-
-          // ── Detect contact form submissions ──
-          const isForm = isContactFormEmail(parsed);
-          let replyTo = fromAddress; // default: reply to sender
-          let formFields: ContactFormFields | null = null;
-
-          if (isForm) {
-            // Contact form: from is our own address, replyTo is the visitor
-            const visitorEmail = getReplyToAddress(parsed);
-            if (!visitorEmail) {
-              logger.warn({ uid, subject }, 'Contact form email without Reply-To, skipping');
-              await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-              continue;
-            }
-            replyTo = visitorEmail;
-            formFields = extractContactFormFields(parsed);
-            logger.info({ uid, replyTo, formFields }, 'Contact form detected, extracted fields');
-          } else {
-            // Regular email — apply anti-loop filters
-            if (fromAddress.includes('info@lasgrutasdepartamentos') ||
-                fromAddress.includes('lasgrutasdepartamentos@gmail')) {
-              logger.debug({ from: fromAddress }, 'Skipping own email');
-              await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-              continue;
-            }
-
-            // Skip known notification senders (never reply to these)
-            const skipDomains = [
-              'booking.com', 'airbnb.com', 'invertironline.com', 'iol.invertironline.com',
-              'mercadolibre.com', 'mercadopago.com', 'bna.com.ar', 'mailing.bna.com.ar',
-              'noreply', 'no-reply', 'mailer-daemon', 'postmaster',
-              'newsletter', 'notifications', 'alert', 'billing',
-            ];
-            if (skipDomains.some(d => fromAddress.includes(d))) {
-              logger.debug({ from: fromAddress }, 'Skipping notification sender');
-              await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-              continue;
-            }
-
-            const autoSubmitted = parsed.headers.get('auto-submitted');
-            if (autoSubmitted && autoSubmitted !== 'no') {
-              logger.debug({ from: fromAddress, autoSubmitted }, 'Skipping auto-submitted email');
-              await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-              continue;
-            }
-
-            const precedence = parsed.headers.get('precedence');
-            if (precedence && ['bulk', 'junk', 'list'].includes(String(precedence).toLowerCase())) {
-              logger.debug({ from: fromAddress, precedence }, 'Skipping bulk/list email');
-              await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-              continue;
-            }
-
-            if (parsed.headers.get('x-auto-responded-message')) {
-              logger.debug({ from: fromAddress }, 'Skipping already auto-responded email');
-              await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-              continue;
-            }
-          }
-
-          // ── Dedup (applies to both form and regular emails) ──
-          const existing = await prisma.emailProcesado.findUnique({
-            where: { messageId },
-          });
-          if (existing) {
-            logger.debug({ messageId }, 'Email already processed, skipping');
-            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-            continue;
-          }
-
-          // ── Rate limit: max 5 replies per recipient in 24h ──
-          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          const recentReplies = await prisma.emailProcesado.count({
-            where: {
-              fromEmail: replyTo,
-              respondido: true,
-              creadoEn: { gte: oneDayAgo },
-            },
-          });
-          if (recentReplies >= 5) {
-            logger.warn({ replyTo, count: recentReplies }, 'Rate limit reached for recipient');
-            await prisma.emailProcesado.create({
-              data: { messageId, fromEmail: replyTo, subject, error: 'Rate limit exceeded' },
-            });
-            await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-            continue;
-          }
-
-          // ── Process the email ──
-          const bodyText = parsed.text || '';
-          logger.info({ replyTo, subject, messageId, isForm }, 'Delegating to auto-responder');
-
-          try {
-            const { complejoId, replyBody } = await processIncomingEmail({
-              messageId,
-              from: replyTo,
-              subject,
-              body: bodyText,
-              inReplyTo: parsed.messageId,
-              activeComplejos: activeComplejos.map(c => ({ id: c.id, nombre: c.nombre })),
-              formFields: formFields || undefined,
-            });
-
-            await prisma.emailProcesado.create({
-              data: {
-                messageId,
-                fromEmail: replyTo,
-                subject,
-                complejoId,
-                respondido: true,
-                bodyOriginal: isForm && formFields ? JSON.stringify(formFields) : bodyText.slice(0, 5000),
-                respuestaEnviada: replyBody,
-                esFormulario: isForm,
-              },
-            });
-
-            logger.info({ replyTo, subject, complejoId, isForm }, 'Email auto-reply sent successfully');
-          } catch (err: any) {
-            logger.error({ err, replyTo, subject }, 'Failed to process email');
-            await prisma.emailProcesado.create({
-              data: {
-                messageId,
-                fromEmail: replyTo,
-                subject,
-                respondido: false,
-                error: err.message?.slice(0, 500),
-                bodyOriginal: isForm && formFields ? JSON.stringify(formFields) : bodyText.slice(0, 5000),
-                esFormulario: isForm,
-              },
-            });
-          }
-
+          await processRawEmailSource(msg.source);
           await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-
         } catch (msgErr) {
           logger.error({ err: msgErr, uid }, 'Error processing individual email');
         }
