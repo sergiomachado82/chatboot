@@ -1535,8 +1535,10 @@ El caption se obtiene del campo `caption` de la tabla `MediaFile`. Si no tiene c
 | `GOOGLE_PRIVATE_KEY` | No | `""` | Private key de la service account |
 | `GOOGLE_SHEET_ID` | No | `""` | ID de la hoja de Google Sheets |
 | `GOOGLE_CALENDAR_ID` | No | `""` | ID del calendario de Google (para sync bidireccional) |
-| `SMTP_USER` | No | `""` | Email SMTP para envio de correos (Gmail) |
-| `SMTP_PASS` | No | `""` | Contrasena de aplicacion SMTP |
+| `SMTP_HOST` | No | `""` | Host SMTP. Usar `host.docker.internal` en produccion (Postfix local) o servidor SMTP externo |
+| `SMTP_PORT` | No | `25` | Puerto SMTP |
+| `SMTP_USER` | No | `""` | Email SMTP para envio de correos. Vacio si se usa Postfix local |
+| `SMTP_PASS` | No | `""` | Contrasena de aplicacion SMTP. Vacio si se usa Postfix local |
 | `FRONTEND_URL` | No | `http://localhost:5173` | URL del frontend (para links en emails) |
 | `SIMULATOR_MODE` | No | `true` | Habilita simulador local |
 | `ALLOWED_ORIGINS` | No | `*` | Origenes CORS permitidos (separados por coma) |
@@ -2899,11 +2901,23 @@ Al importar eventos de GCal, el sistema intenta determinar a que complejo perten
 
 ### 30.3 Configuracion SMTP
 
+**Opcion A — Postfix local (produccion actual):**
+
+En produccion se usa Postfix instalado en el host con OpenDKIM para firma DKIM. No requiere autenticacion:
+```
+SMTP_HOST=host.docker.internal
+SMTP_PORT=25
+SMTP_USER=
+SMTP_PASS=
+```
+
+**Opcion B — Gmail SMTP (alternativa):**
+
 Requiere una cuenta de Gmail con "Contrasena de aplicacion":
 1. Habilitar verificacion en 2 pasos en la cuenta de Google
 2. Ir a myaccount.google.com > Seguridad > Contrasenas de aplicacion
 3. Generar contrasena para "Correo" / "Otro"
-4. Configurar `SMTP_USER` y `SMTP_PASS` en `.env`
+4. Configurar `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER` y `SMTP_PASS` en `.env`
 
 ---
 
@@ -2952,7 +2966,7 @@ Modelo `BotConfig` para personalizar el comportamiento del bot desde el panel de
 
 ### 32.1 Descripcion
 
-Endpoint publico REST que permite integrar el bot como widget de chat en la landing page (`lasgrutasdepartamentos.com/nueva`). Los mensajes pasan por el mismo pipeline del bot (clasificacion + respuesta + acumulacion de entidades) pero sin requerir WhatsApp.
+Endpoint publico REST que permite integrar el bot como widget de chat en la landing page (`lasgrutasdepartamentos.com`). Los mensajes pasan por el mismo pipeline del bot (clasificacion + respuesta + acumulacion de entidades) pero sin requerir WhatsApp.
 
 ### 32.2 Endpoint
 
@@ -3761,3 +3775,282 @@ curl -X POST https://chatbot.lasgrutasdepartamentos.com/api/contact \
   -d '{"nombre":"Test","email":"tu@email.com","telefono":"123","complejo":"Pewmafe"}'
 # Verificar en logs: docker logs chatboot-app --since 1m | grep "Auto-reply email sent"
 ```
+
+---
+
+## 45. Migracion de infraestructura — Todo en VPS DonWeb (2026-03-20)
+
+### 45.1 Contexto
+
+El sitio `lasgrutasdepartamentos.com` estaba distribuido en 3 proveedores:
+- **DonWeb**: dominio + VPS Ubuntu (66.97.40.119) con el chatbot
+- **Hosting externo** (cPanel 198.54.114.136): WordPress (sitio viejo) + email
+- **Cloudflare**: DNS (controlado por la persona del hosting externo)
+
+Esto causaba que no se pudiera configurar SPF/DKIM correctamente, los emails auto-respuesta del chatbot no llegaban (Gmail los rechazaba como spam). Ademas habia dependencia de un tercero para cualquier cambio de DNS.
+
+### 45.2 Que se migro
+
+Se consolido **todo** en el VPS de DonWeb:
+
+| Componente | Antes | Despues |
+|------------|-------|---------|
+| Landing page | WordPress en cPanel externo | **React SPA (Vite) en Nginx** del VPS |
+| DNS | Cloudflare (ns kate/tim) | **DonWeb** (ns1/ns2.donweb.com) |
+| Email saliente | Sin DKIM, rechazado por Gmail | **Postfix + OpenDKIM** en el VPS |
+| Chatbot | Docker en VPS (sin cambios) | Docker en VPS (sin cambios) |
+
+### 45.3 Landing page — React SPA
+
+La landing page es una SPA React/Vite (NO WordPress). Incluye:
+- Formulario de contacto con auto-respuesta por email
+- Widget webchat integrado con el chatbot (`chatbot.lasgrutasdepartamentos.com`)
+- Links a WhatsApp, Instagram, Facebook
+- Google Maps embed
+- Galeria de fotos de los departamentos
+
+**Ubicacion en el servidor:**
+```
+/var/www/lasgrutasdepartamentos.com/
+├── index.html                    # Entry point React SPA
+├── favicon.jpg
+├── favicon.svg
+├── icons.svg
+├── logo.jpg / logo.png / logo-white.png
+├── assets/
+│   ├── index-C4En0H4e.js        # Bundle JS activo
+│   ├── index-DXEtPZQ1.css       # Bundle CSS activo
+│   └── (otros bundles de versiones anteriores)
+└── wp-content/uploads/           # Imagenes de propiedades (migradas del WordPress viejo)
+    ├── 2016/08/                  # 32 imagenes
+    └── 2019/09/                  # 12 imagenes
+```
+
+**Total: 59 archivos, 4.8 MB.** Las imagenes estan en `wp-content/uploads/` porque el JS bundle las referencia con esas rutas absolutas (heredadas del WordPress original).
+
+**Nginx config** (`/etc/nginx/sites-available/lasgrutasdepartamentos`):
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name lasgrutasdepartamentos.com www.lasgrutasdepartamentos.com;
+    root /var/www/lasgrutasdepartamentos.com;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    location ~* \.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    # SSL gestionado por Certbot
+    listen [::]:443 ssl;
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/lasgrutasdepartamentos.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/lasgrutasdepartamentos.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+```
+
+### 45.4 Email — Postfix + OpenDKIM
+
+**Stack de email saliente (solo envio, no recepcion):**
+
+| Servicio | Funcion |
+|----------|---------|
+| Postfix | MTA — envia emails al exterior |
+| OpenDKIM | Firma DKIM en emails salientes (milter en puerto 12301) |
+
+**Configuracion Postfix** (`/etc/postfix/main.cf` — claves):
+```
+myhostname = lasgrutasdepartamentos.com
+mydomain = lasgrutasdepartamentos.com
+myorigin = lasgrutasdepartamentos.com
+milter_protocol = 6
+milter_default_action = accept
+smtpd_milters = inet:localhost:12301
+non_smtpd_milters = inet:localhost:12301
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.17.0.0/16 172.18.0.0/16
+inet_protocols = ipv4
+virtual_alias_maps = hash:/etc/postfix/virtual
+```
+
+**Virtual aliases** (`/etc/postfix/virtual`):
+```
+info@lasgrutasdepartamentos.com sergiomachado82@gmail.com
+```
+Esto reenvía todos los emails dirigidos a `info@` hacia Gmail. Ejecutar `postmap /etc/postfix/virtual` despues de editar.
+
+**Configuracion OpenDKIM** (`/etc/opendkim.conf`):
+```
+Syslog          yes
+UMask           007
+Socket          inet:12301@localhost
+Canonicalization relaxed/simple
+Mode            sv
+KeyTable        /etc/opendkim/KeyTable
+SigningTable    refile:/etc/opendkim/SigningTable
+TrustedHosts    /etc/opendkim/TrustedHosts
+```
+
+**TrustedHosts** (`/etc/opendkim/TrustedHosts`):
+```
+127.0.0.1
+localhost
+lasgrutasdepartamentos.com
+*.lasgrutasdepartamentos.com
+172.17.0.0/16
+172.18.0.0/16
+```
+Las redes Docker (`172.17/18`) deben estar incluidas para que OpenDKIM firme los emails enviados desde el container.
+
+**Archivos DKIM:**
+- Clave privada: `/etc/opendkim/keys/lasgrutasdepartamentos.com/default.private`
+- KeyTable: `default._domainkey.lasgrutasdepartamentos.com lasgrutasdepartamentos.com:default:/etc/opendkim/keys/lasgrutasdepartamentos.com/default.private`
+- SigningTable: `*@lasgrutasdepartamentos.com default._domainkey.lasgrutasdepartamentos.com`
+
+### 45.5 DNS — Registros en DonWeb
+
+| Tipo | Nombre | Contenido |
+|------|--------|-----------|
+| A | `@` | `66.97.40.119` |
+| A | `www` | `66.97.40.119` |
+| A | `chatbot` | `66.97.40.119` |
+| MX | `@` | `10 lasgrutasdepartamentos.com` |
+| TXT (SPF) | `@` | `v=spf1 +ip4:66.97.40.119 ~all` |
+| TXT (DKIM) | `default._domainkey` | `v=DKIM1; h=rsa-sha256; k=rsa; s=email; p=MIIBIjAN...` |
+| TXT (DMARC) | `_dmarc` | `v=DMARC1; p=none; rua=mailto:info@lasgrutasdepartamentos.com` |
+
+**Nameservers:** `ns1.donweb.com` / `ns2.donweb.com`
+
+### 45.6 Arquitectura completa del VPS
+
+```
+Internet
+  │
+  ▼
+Nginx del HOST (:80/:443 SSL, Certbot)
+  │
+  ├── lasgrutasdepartamentos.com → Static SPA (/var/www/lasgrutasdepartamentos.com/)
+  │
+  ├── chatbot.lasgrutasdepartamentos.com → proxy_pass http://localhost:5050
+  │     │
+  │     ▼
+  │   Docker: chatboot-app (:5050)
+  │     ├── Docker: chatboot-postgres (:5432)
+  │     └── Docker: chatboot-redis (:6379)
+  │
+  └── Postfix (:25) + OpenDKIM (:12301)
+        ↑
+        Container envia email via host.docker.internal:25
+```
+
+**Servicios activos:**
+| Servicio | Gestionado por | Estado |
+|----------|----------------|--------|
+| Nginx | systemd | enabled |
+| Postfix | systemd | enabled |
+| OpenDKIM | systemd | enabled |
+| chatboot-app | docker-compose | restart: unless-stopped |
+| chatboot-postgres | docker-compose | restart: unless-stopped |
+| chatboot-redis | docker-compose | restart: unless-stopped |
+
+**Servicios eliminados (ya no necesarios):**
+| Servicio | Razon |
+|----------|-------|
+| MariaDB | Se instalo para WordPress. WordPress eliminado. Paquetes purgados |
+| PHP 8.3-FPM | Se instalo para WordPress. WordPress eliminado. Paquetes purgados |
+
+### 45.7 Recursos del VPS
+
+| Recurso | Valor |
+|---------|-------|
+| IP | 66.97.40.119 |
+| SSH | Puerto 5748 |
+| OS | Ubuntu 24.04 LTS |
+| CPU | 2 cores |
+| RAM | 1.9 GB + 2 GB swap |
+| Disco | 15 GB total, ~6 GB libre |
+
+### 45.8 Verificacion post-migracion
+
+```bash
+# Verificar servicios
+systemctl is-active nginx postfix opendkim
+docker ps --format 'table {{.Names}}\t{{.Status}}'
+
+# Verificar landing page
+curl -sk -H 'Host: lasgrutasdepartamentos.com' https://localhost/ | head -5
+
+# Verificar chatbot
+curl -s http://localhost:5050/api/health | python3 -m json.tool
+
+# Verificar DKIM
+opendkim-testkey -d lasgrutasdepartamentos.com -s default -vvv
+
+# Verificar DNS
+dig +short lasgrutasdepartamentos.com @8.8.8.8
+dig TXT lasgrutasdepartamentos.com @8.8.8.8
+dig TXT default._domainkey.lasgrutasdepartamentos.com @8.8.8.8
+
+# Verificar email (enviar test desde el container)
+docker exec chatboot-app sh -c 'echo QUIT | nc host.docker.internal 25'
+
+# Verificar SSL
+echo | openssl s_client -connect lasgrutasdepartamentos.com:443 -servername lasgrutasdepartamentos.com 2>/dev/null | openssl x509 -noout -dates
+```
+
+### 45.9 Archivos de configuracion en el servidor
+
+| Archivo | Funcion |
+|---------|---------|
+| `/etc/nginx/sites-available/lasgrutasdepartamentos` | Nginx para landing page SPA + SSL |
+| `/etc/nginx/sites-available/chatbot-lasgrutas` | Nginx reverse proxy chatbot + SSL |
+| `/etc/postfix/main.cf` | Configuracion Postfix |
+| `/etc/opendkim.conf` | Configuracion OpenDKIM |
+| `/etc/opendkim/keys/lasgrutasdepartamentos.com/default.private` | Clave privada DKIM |
+| `/etc/opendkim/KeyTable` | Mapeo selector → clave DKIM |
+| `/etc/opendkim/SigningTable` | Mapeo dominio → selector |
+| `/etc/opendkim/TrustedHosts` | Hosts que firman con DKIM (incluye redes Docker) |
+| `/etc/postfix/virtual` | Alias virtuales (info@ → sergiomachado82@gmail.com) |
+| `/var/www/chatboot/.env` | Variables de entorno del chatbot (SMTP_HOST=host.docker.internal) |
+| `/var/www/chatboot/docker-compose.prod.yml` | Docker Compose produccion |
+
+### 45.10 Flujo de emails del formulario de contacto
+
+Cuando un visitante completa el formulario en la landing page:
+
+```
+Visitante completa formulario
+  │
+  ▼
+POST /api/contact (chatbot backend)
+  │
+  ├── 1. Responde { ok: true } al frontend (inmediato)
+  │
+  └── 2. Background (fire-and-forget):
+      │
+      ├── sendContactEmail() → Postfix → info@lasgrutasdepartamentos.com
+      │     │                              (virtual alias)
+      │     │                                    ↓
+      │     └──────────────────────────── sergiomachado82@gmail.com
+      │
+      └── processIncomingEmail() → Claude genera auto-respuesta
+            │
+            └── sendAutoReplyEmail() → Postfix → email del visitante
+```
+
+**Emails que se envian:**
+1. **Notificacion al admin**: De `info@lasgrutasdepartamentos.com` a `info@lasgrutasdepartamentos.com` → reenviado a `sergiomachado82@gmail.com` via virtual alias de Postfix
+2. **Auto-respuesta al visitante**: De `info@lasgrutasdepartamentos.com` al email que ingreso el visitante, con respuesta generada por Claude
+
+Ambos emails se firman con DKIM (OpenDKIM) y pasan SPF (IPv4 66.97.40.119 autorizada).

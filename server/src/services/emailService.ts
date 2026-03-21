@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 
 const useLocalMta = env.SMTP_HOST === 'localhost' || env.SMTP_HOST === '127.0.0.1' || env.SMTP_HOST === 'host.docker.internal';
 const smtpFrom = env.SMTP_USER || 'info@lasgrutasdepartamentos.com';
+const logoUrl = 'https://lasgrutasdepartamentos.com/logo.png';
 
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST || undefined,
@@ -30,7 +31,11 @@ export async function sendResetEmail(to: string, resetUrl: string): Promise<void
     to,
     subject: 'Recuperar contraseña - Panel de Agentes',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <div style="background-color: #1e40af; padding: 20px 24px; border-radius: 8px 8px 0 0; text-align: center;">
+          <img src="${logoUrl}" alt="Las Grutas Departamentos" style="max-width: 180px; max-height: 60px;" />
+        </div>
+        <div style="padding: 24px;">
         <h2 style="color: #1e40af;">Recuperar contraseña</h2>
         <p>Recibimos una solicitud para restablecer tu contraseña del Panel de Agentes.</p>
         <p>Hacé clic en el siguiente botón para crear una nueva contraseña:</p>
@@ -39,6 +44,7 @@ export async function sendResetEmail(to: string, resetUrl: string): Promise<void
         </a>
         <p style="color: #6b7280; font-size: 14px;">Este enlace expira en 1 hora.</p>
         <p style="color: #6b7280; font-size: 14px;">Si no solicitaste este cambio, puedes ignorar este email.</p>
+        </div>
       </div>
     `,
   });
@@ -66,8 +72,13 @@ export async function sendContactEmail(data: ContactFormData): Promise<void> {
   const { nombre, email, telefono, complejo, huespedes, fechaIngreso, fechaSalida, mensaje } = data;
 
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f9fafb; border-radius: 12px;">
-      <h2 style="color: #1e40af; margin-bottom: 20px;">Nueva consulta de disponibilidad</h2>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; border-radius: 12px; overflow: hidden;">
+      <div style="background-color: #1e40af; padding: 20px 24px; text-align: center;">
+        <img src="${logoUrl}" alt="Las Grutas Departamentos" style="max-width: 180px; max-height: 60px; margin-bottom: 8px;" />
+        <p style="color: #bfdbfe; margin: 0; font-size: 13px;">Nueva consulta desde el formulario web</p>
+      </div>
+      <div style="padding: 24px;">
+      <h2 style="color: #1e40af; margin: 0 0 20px 0;">Consulta de disponibilidad</h2>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
           <td style="padding: 8px 12px; font-weight: bold; color: #374151; border-bottom: 1px solid #e5e7eb;">Nombre</td>
@@ -106,6 +117,7 @@ export async function sendContactEmail(data: ContactFormData): Promise<void> {
       <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
         Enviado desde el formulario de contacto de lasgrutasdepartamentos.com
       </p>
+      </div>
     </div>
     <!-- FORM_DATA:${JSON.stringify({ nombre, email, telefono, complejo: complejo || null, huespedes: huespedes || null, fechaIngreso: fechaIngreso || null, fechaSalida: fechaSalida || null, mensaje: mensaje || null })} -->
   `;
@@ -145,9 +157,9 @@ export async function sendAutoReplyEmail(data: AutoReplyData): Promise<void> {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background-color: #1e40af; padding: 20px 24px; border-radius: 8px 8px 0 0;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Las Grutas Departamentos</h1>
-        <p style="color: #bfdbfe; margin: 4px 0 0 0; font-size: 13px;">Alojamiento en Las Grutas, Rio Negro, Patagonia Argentina</p>
+      <div style="background-color: #1e40af; padding: 20px 24px; border-radius: 8px 8px 0 0; text-align: center;">
+        <img src="${logoUrl}" alt="Las Grutas Departamentos" style="max-width: 200px; max-height: 70px; margin-bottom: 10px;" />
+        <p style="color: #bfdbfe; margin: 0; font-size: 13px;">Alojamiento en Las Grutas, Rio Negro, Patagonia Argentina</p>
       </div>
       <div style="padding: 24px; background-color: #ffffff; border: 1px solid #e5e7eb; border-top: none;">
         ${bodyHtml}
