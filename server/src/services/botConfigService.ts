@@ -5,6 +5,7 @@ let cachedConfig: BotConfig | null = null;
 let cacheTime = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+/** Retrieves the current bot configuration, using a 5-minute in-memory cache. @returns The active BotConfig record */
 export async function getBotConfig(): Promise<BotConfig> {
   if (cachedConfig && Date.now() - cacheTime < CACHE_TTL_MS) {
     return cachedConfig;
@@ -20,6 +21,12 @@ export async function getBotConfig(): Promise<BotConfig> {
   return config;
 }
 
+/**
+ * Updates the bot configuration and records audit entries for changed fields.
+ * @param data - Partial config fields to update
+ * @param agenteId - Optional ID of the agent making the change (for audit trail)
+ * @returns The updated BotConfig record
+ */
 export async function updateBotConfig(
   data: Partial<Omit<BotConfig, 'id' | 'creadoEn' | 'actualizadoEn'>>,
   agenteId?: string,
@@ -61,6 +68,11 @@ export async function updateBotConfig(
   return updated;
 }
 
+/**
+ * Retrieves the most recent bot configuration audit history entries.
+ * @param limit - Maximum number of audit entries to return (default 50)
+ * @returns An array of audit records ordered by most recent first, or an empty array on failure
+ */
 export async function getBotConfigHistory(limit = 50) {
   try {
     return await prisma.botConfigAudit.findMany({
@@ -72,6 +84,7 @@ export async function getBotConfigHistory(limit = 50) {
   }
 }
 
+/** Invalidates the in-memory bot configuration cache, forcing a fresh DB read on next access. */
 export function invalidateBotConfigCache(): void {
   cachedConfig = null;
   cacheTime = 0;

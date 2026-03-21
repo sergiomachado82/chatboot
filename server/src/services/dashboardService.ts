@@ -1,5 +1,8 @@
 import { prisma } from '../lib/prisma.js';
 
+/** Aggregates dashboard statistics including conversations, reservations, emails, and 7-day occupancy.
+ * @returns Dashboard stats object with conversaciones, reservas, emails, ocupacion, and recientes.
+ */
 export async function getDashboardStats() {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());

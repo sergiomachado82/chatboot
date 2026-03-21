@@ -9,6 +9,7 @@ import {
 import { getByConversacion, createMensaje } from '../services/mensajeService.js';
 import { sendWhatsAppMessage } from '../services/whatsappService.js';
 
+/** Conversaciones (conversations) API routes. */
 const router = Router();
 
 const conversacionesQuerySchema = z.object({

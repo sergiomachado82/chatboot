@@ -7,6 +7,7 @@ import { logger } from '../utils/logger.js';
 import { z } from 'zod';
 import { passwordSchema } from '../utils/passwordPolicy.js';
 
+/** Authentication API routes. */
 const router = Router();
 
 const loginSchema = z.object({

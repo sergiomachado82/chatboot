@@ -22,6 +22,7 @@ import { recalcDisponible, dateRange } from '../services/inventarioService.js';
 import { prisma } from '../lib/prisma.js';
 import { pushBloqueoToGCal, deleteBloqueoFromGCal } from '../services/googleCalendarService.js';
 
+/** Complejos (properties) API routes. */
 const router = Router();
 
 // LIST

@@ -348,7 +348,7 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
     return;
   }
 
-  // 7. Handle farewell
+  // 7. Handle farewell — ask for CSAT rating
   if (classification.intent === 'despedida') {
     const respuesta = await generateResponse(classification.intent, classification.entities, [
       ...conversationHistory,
@@ -368,6 +368,18 @@ export async function handleBotMessage(ctx: BotContext): Promise<void> {
     });
 
     await sendWhatsAppMessage(huespedWaId, respuesta);
+
+    // Send CSAT survey
+    const csatMsg = '¿Cómo calificarías tu experiencia del 1 al 5? (1=Mala, 5=Excelente)';
+    await createMensaje({
+      conversacionId,
+      direccion: 'saliente',
+      origen: 'bot',
+      contenido: csatMsg,
+      metadata: { intent: 'csat_request' },
+    });
+    await sendWhatsAppMessage(huespedWaId, csatMsg);
+
     await updateConversacionEstado(conversacionId, 'cerrado');
     return;
   }

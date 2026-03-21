@@ -55,6 +55,7 @@ model Conversacion {
   agente          Agente?   @relation(fields: [agenteId], references: [id])
   mensajes        Mensaje[]
   reservas        Reserva[]
+  csatRating      CsatRating?
 
   @@index([estado])
   @@map("conversaciones")
@@ -293,6 +294,17 @@ model IntegrationLog {
 
   @@index([servicio, creadoEn])
   @@map("integration_logs")
+}
+
+model CsatRating {
+  id              String       @id @default(cuid())
+  conversacionId  String       @unique @map("conversacion_id")
+  puntuacion      Int
+  comentario      String?
+  creadoEn        DateTime     @default(now()) @map("creado_en")
+  conversacion    Conversacion @relation(fields: [conversacionId], references: [id])
+
+  @@map("csat_ratings")
 }
 
 model EmailProcesado {

@@ -11,6 +11,7 @@ import {
 } from '../services/reservaService.js';
 import { z } from 'zod';
 
+/** Reservas (bookings) API routes. */
 const router = Router();
 
 const reservaQuerySchema = z.object({

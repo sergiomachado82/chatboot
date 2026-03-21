@@ -7,6 +7,7 @@ import { handleBotMessage } from './botEngine.js';
 import { downloadMedia, sendWhatsAppMessage } from './whatsappService.js';
 import { transcribeAudio } from './claudeService.js';
 import { isRateLimited } from '../middleware/rateLimitWhatsApp.js';
+import { saveCsatRating } from './csatService.js';
 
 interface WhatsAppMessage {
   from: string;
@@ -126,7 +127,20 @@ export async function processIncomingMessage(message: WhatsAppMessage, contactNa
     ...(metadata ? { metadata } : {}),
   });
 
-  // 5. Route based on conversation state (skip if audio failed)
+  // 5. Intercept CSAT ratings (1-5) on closed conversations
+  if (conversacion.estado === 'cerrado' && /^[1-5]$/.test(body.trim())) {
+    const puntuacion = parseInt(body.trim(), 10);
+    try {
+      await saveCsatRating(conversacion.id, puntuacion);
+      await sendWhatsAppMessage(from, '¡Gracias por tu calificación! Nos ayuda a mejorar.');
+      logger.info({ conversacionId: conversacion.id, puntuacion }, 'CSAT rating saved');
+    } catch (err) {
+      logger.error({ err, conversacionId: conversacion.id }, 'Error saving CSAT rating');
+    }
+    return;
+  }
+
+  // 6. Route based on conversation state (skip if audio failed)
   if (conversacion.estado === 'bot' && body !== '[Audio no procesado]') {
     await handleBotMessage({
       conversacionId: conversacion.id,

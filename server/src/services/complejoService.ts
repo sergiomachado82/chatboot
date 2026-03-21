@@ -26,6 +26,10 @@ function serializeComplejo(c: any) {
   };
 }
 
+/**
+ * Lists all complejos with their related tarifas, media, bloqueos, and iCal feeds.
+ * @returns An array of serialized complejo records ordered by creation date
+ */
 export async function listComplejos() {
   const complejos = await prisma.complejo.findMany({
     include: includeRelations,
@@ -34,6 +38,11 @@ export async function listComplejos() {
   return complejos.map(serializeComplejo);
 }
 
+/**
+ * Retrieves a single complejo by its ID with all related data.
+ * @param id - The complejo's unique identifier
+ * @returns The serialized complejo record, or null if not found
+ */
 export async function getComplejoById(id: string) {
   const complejo = await prisma.complejo.findUnique({
     where: { id },
@@ -42,6 +51,11 @@ export async function getComplejoById(id: string) {
   return complejo ? serializeComplejo(complejo) : null;
 }
 
+/**
+ * Creates a new complejo with the provided configuration and invalidates the context cache.
+ * @param data - The complejo properties including nombre, capacity, amenities, and payment details
+ * @returns The newly created serialized complejo record
+ */
 export async function createComplejo(data: {
   nombre: string;
   aliases?: string[];
@@ -105,6 +119,12 @@ export async function createComplejo(data: {
   return serializeComplejo(complejo);
 }
 
+/**
+ * Updates an existing complejo's fields and invalidates the context cache.
+ * @param id - The complejo's unique identifier
+ * @param data - The fields to update on the complejo
+ * @returns The updated serialized complejo record
+ */
 export async function updateComplejo(
   id: string,
   data: {
@@ -146,6 +166,11 @@ export async function updateComplejo(
   return serializeComplejo(complejo);
 }
 
+/**
+ * Soft-deletes a complejo by setting it as inactive and invalidates the context cache.
+ * @param id - The complejo's unique identifier
+ * @returns The deactivated serialized complejo record
+ */
 export async function deleteComplejo(id: string) {
   const complejo = await prisma.complejo.update({
     where: { id },
@@ -156,6 +181,14 @@ export async function deleteComplejo(id: string) {
   return serializeComplejo(complejo);
 }
 
+/**
+ * Creates or updates a seasonal rate for a complejo and invalidates the context cache.
+ * @param complejoId - The complejo's unique identifier
+ * @param temporada - The season name (e.g., 'alta', 'baja')
+ * @param precioNoche - The nightly price for the season
+ * @param estadiaMinima - Optional minimum stay requirement in nights
+ * @returns The upserted tarifa record with serialized price
+ */
 export async function upsertTarifa(
   complejoId: string,
   temporada: string,
@@ -173,6 +206,11 @@ export async function upsertTarifa(
 
 // --- TarifaEspecial CRUD ---
 
+/**
+ * Lists all special rates for a complejo ordered by start date.
+ * @param complejoId - The complejo's unique identifier
+ * @returns An array of special rate records with serialized prices
+ */
 export async function listTarifasEspeciales(complejoId: string) {
   const items = await prisma.tarifaEspecial.findMany({
     where: { complejoId },
@@ -181,6 +219,12 @@ export async function listTarifasEspeciales(complejoId: string) {
   return items.map((te) => ({ ...te, precioNoche: Number(te.precioNoche) }));
 }
 
+/**
+ * Creates a new special rate for a complejo within a date range and invalidates the context cache.
+ * @param complejoId - The complejo's unique identifier
+ * @param data - The special rate details including date range, price, and optional reason
+ * @returns The created special rate record with serialized price
+ */
 export async function createTarifaEspecial(
   complejoId: string,
   data: {
@@ -205,6 +249,12 @@ export async function createTarifaEspecial(
   return { ...te, precioNoche: Number(te.precioNoche) };
 }
 
+/**
+ * Updates an existing special rate's fields and invalidates the context cache.
+ * @param id - The special rate's unique identifier
+ * @param data - The fields to update on the special rate
+ * @returns The updated special rate record with serialized price
+ */
 export async function updateTarifaEspecial(
   id: string,
   data: {
@@ -224,12 +274,26 @@ export async function updateTarifaEspecial(
   return { ...te, precioNoche: Number(te.precioNoche) };
 }
 
+/**
+ * Deletes a special rate by ID and invalidates the context cache.
+ * @param id - The special rate's unique identifier
+ * @returns The deleted special rate record
+ */
 export async function deleteTarifaEspecial(id: string) {
   const result = await prisma.tarifaEspecial.delete({ where: { id } });
   invalidateContextCache();
   return result;
 }
 
+/**
+ * Adds a media file to a complejo, auto-assigning order if not specified, and invalidates the context cache.
+ * @param complejoId - The complejo's unique identifier
+ * @param url - The media file URL
+ * @param tipo - The media type (defaults to 'image')
+ * @param caption - Optional caption for the media
+ * @param orden - Optional display order; auto-increments if omitted
+ * @returns The created media record
+ */
 export async function addMedia(complejoId: string, url: string, tipo = 'image', caption?: string, orden?: number) {
   if (orden === undefined) {
     const last = await prisma.mediaFile.findFirst({
@@ -245,12 +309,23 @@ export async function addMedia(complejoId: string, url: string, tipo = 'image', 
   return media;
 }
 
+/**
+ * Removes a media file by ID and invalidates the context cache.
+ * @param mediaId - The media file's unique identifier
+ * @returns The deleted media record
+ */
 export async function removeMedia(mediaId: string) {
   const result = await prisma.mediaFile.delete({ where: { id: mediaId } });
   invalidateContextCache();
   return result;
 }
 
+/**
+ * Reorders media files for a complejo by assigning sequential order values and invalidates the context cache.
+ * @param complejoId - The complejo's unique identifier
+ * @param orderedIds - An array of media IDs in the desired display order
+ * @returns The reordered array of media records
+ */
 export async function reorderMedia(complejoId: string, orderedIds: string[]) {
   const updates = orderedIds.map((id, index) => prisma.mediaFile.update({ where: { id }, data: { orden: index } }));
   await prisma.$transaction(updates);
@@ -263,6 +338,11 @@ export async function reorderMedia(complejoId: string, orderedIds: string[]) {
 
 // --- Bloqueo CRUD ---
 
+/**
+ * Lists all date blocks for a complejo ordered by start date.
+ * @param complejoId - The complejo's unique identifier
+ * @returns An array of bloqueo records
+ */
 export async function listBloqueos(complejoId: string) {
   return prisma.bloqueo.findMany({
     where: { complejoId },
@@ -270,6 +350,12 @@ export async function listBloqueos(complejoId: string) {
   });
 }
 
+/**
+ * Creates a new date block for a complejo within the specified date range.
+ * @param complejoId - The complejo's unique identifier
+ * @param data - The block details including start date, end date, and optional reason
+ * @returns The created bloqueo record
+ */
 export async function createBloqueo(
   complejoId: string,
   data: { fechaInicio: Date; fechaFin: Date; motivo?: string | null },
@@ -284,6 +370,11 @@ export async function createBloqueo(
   });
 }
 
+/**
+ * Deletes a date block by ID.
+ * @param id - The bloqueo's unique identifier
+ * @returns The deleted bloqueo record
+ */
 export async function deleteBloqueo(id: string) {
   return prisma.bloqueo.delete({ where: { id } });
 }

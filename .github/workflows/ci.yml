@@ -28,8 +28,14 @@ jobs:
       - name: Lint
         run: npx eslint .
 
+      - name: Type-check frontend
+        run: npx tsc --noEmit
+
+      - name: Type-check server
+        run: cd server && npx tsc --noEmit
+
       - name: Run server tests
-        run: cd server && npm test
+        run: cd server && npm run test:coverage
         env:
           JWT_SECRET: ci-test-secret-that-is-at-least-32-chars
           DATABASE_URL: postgresql://unused:unused@localhost:5432/unused

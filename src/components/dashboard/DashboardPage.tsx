@@ -2,8 +2,22 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useDashboard } from '../../hooks/useDashboard';
-import { getMetrics, getFunnel } from '../../api/metricsApi';
-import type { BotMetrics, FunnelStage } from '../../api/metricsApi';
+import {
+  getMetrics,
+  getFunnel,
+  getIntentAnalytics,
+  getCsatMetrics,
+  getTrends,
+  getAgentMetrics,
+} from '../../api/metricsApi';
+import type {
+  BotMetrics,
+  FunnelStage,
+  IntentAnalytics,
+  CsatMetrics,
+  TrendPoint,
+  AgentMetric,
+} from '../../api/metricsApi';
 import {
   MessageCircle,
   Calendar,
@@ -14,6 +28,10 @@ import {
   CheckCircle,
   BarChart3,
   TrendingUp,
+  Target,
+  Star,
+  Activity,
+  UserCheck,
 } from 'lucide-react';
 import Badge, { estadoColor, estadoLabel } from '../ui/Badge';
 
@@ -146,9 +164,16 @@ function FunnelSection({ funnel }: { funnel: FunnelStage[] }) {
           <div key={stage.label}>
             <div className="flex items-center justify-between text-sm mb-1">
               <span className="text-gray-600 dark:text-gray-300">{stage.label}</span>
-              <span className="text-gray-500 dark:text-gray-400">
-                {stage.count} ({stage.rate}%)
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 dark:text-gray-400">
+                  {stage.count} ({stage.rate}%)
+                </span>
+                {stage.dropoff > 0 && (
+                  <span className="text-xs text-red-500">
+                    -{stage.dropoff} ({stage.dropoffPct}%)
+                  </span>
+                )}
+              </div>
             </div>
             <div className="w-full bg-gray-100 dark:bg-gray-700 rounded h-3">
               <div
@@ -156,6 +181,210 @@ function FunnelSection({ funnel }: { funnel: FunnelStage[] }) {
                 style={{ width: `${Math.max(stage.rate, 1)}%` }}
               />
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function IntentSection({ data }: { data: IntentAnalytics }) {
+  const { t } = useTranslation();
+  const maxCount = data.distribution.length > 0 ? data.distribution[0].count : 1;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
+        <Target size={16} />
+        {t('dashboard.intentTitle')}
+      </h3>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div>
+          <p className="text-lg font-bold text-blue-600">{data.total}</p>
+          <p className="text-xs text-gray-500">{t('dashboard.intentTotal')}</p>
+        </div>
+        <div>
+          <p className="text-lg font-bold text-emerald-600">{data.avgConfidence}</p>
+          <p className="text-xs text-gray-500">{t('dashboard.intentAvgConfidence')}</p>
+        </div>
+        <div>
+          <p className="text-lg font-bold text-red-500">{data.lowConfidenceCount}</p>
+          <p className="text-xs text-gray-500">{t('dashboard.intentLowConfidence')}</p>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        {data.distribution.slice(0, 8).map((item) => (
+          <div key={item.intent} className="flex items-center gap-2">
+            <span className="text-xs text-gray-600 dark:text-gray-300 w-28 truncate" title={item.intent}>
+              {item.intent}
+            </span>
+            <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded h-4">
+              <div
+                className="bg-indigo-500 h-4 rounded transition-all"
+                style={{ width: `${(item.count / maxCount) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-500 w-16 text-right">
+              {item.count} ({item.pct}%)
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrendsSection({ data }: { data: TrendPoint[] }) {
+  const { t } = useTranslation();
+  const maxVal = Math.max(
+    ...data.map((d) => Math.max(d.conversations, d.escalations, d.resolutions, d.reservations)),
+    1,
+  );
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
+        <Activity size={16} />
+        {t('dashboard.trendsTitle')}
+      </h3>
+      <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-blue-500 inline-block" /> {t('dashboard.trendsConversations')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-amber-500 inline-block" /> {t('dashboard.trendsEscalations')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> {t('dashboard.trendsResolutions')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-purple-500 inline-block" /> {t('dashboard.trendsReservations')}
+        </span>
+      </div>
+      <div className="flex gap-1 items-end" style={{ height: '120px' }}>
+        {data.map((point) => {
+          const dayNum = new Date(point.date + 'T12:00:00').getDate();
+          return (
+            <div key={point.date} className="flex-1 flex flex-col items-center gap-0.5">
+              <div className="w-full flex gap-px items-end" style={{ height: '100px' }}>
+                <div
+                  className="flex-1 bg-blue-500 rounded-t transition-all"
+                  style={{
+                    height: `${(point.conversations / maxVal) * 100}%`,
+                    minHeight: point.conversations > 0 ? '2px' : 0,
+                  }}
+                  title={`${t('dashboard.trendsConversations')}: ${point.conversations}`}
+                />
+                <div
+                  className="flex-1 bg-amber-500 rounded-t transition-all"
+                  style={{
+                    height: `${(point.escalations / maxVal) * 100}%`,
+                    minHeight: point.escalations > 0 ? '2px' : 0,
+                  }}
+                  title={`${t('dashboard.trendsEscalations')}: ${point.escalations}`}
+                />
+                <div
+                  className="flex-1 bg-emerald-500 rounded-t transition-all"
+                  style={{
+                    height: `${(point.resolutions / maxVal) * 100}%`,
+                    minHeight: point.resolutions > 0 ? '2px' : 0,
+                  }}
+                  title={`${t('dashboard.trendsResolutions')}: ${point.resolutions}`}
+                />
+                <div
+                  className="flex-1 bg-purple-500 rounded-t transition-all"
+                  style={{
+                    height: `${(point.reservations / maxVal) * 100}%`,
+                    minHeight: point.reservations > 0 ? '2px' : 0,
+                  }}
+                  title={`${t('dashboard.trendsReservations')}: ${point.reservations}`}
+                />
+              </div>
+              <span className="text-[9px] text-gray-400">{dayNum}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AgentMetricsSection({ data }: { data: AgentMetric[] }) {
+  const { t } = useTranslation();
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
+        <UserCheck size={16} />
+        {t('dashboard.agentMetricsTitle')}
+      </h3>
+      {data.length === 0 ? (
+        <p className="text-sm text-gray-400 py-4 text-center">{t('dashboard.agentMetricsNoData')}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                <th className="pb-2 font-medium">{t('dashboard.agentMetricsName')}</th>
+                <th className="pb-2 font-medium text-center">{t('dashboard.agentMetricsConvs')}</th>
+                <th className="pb-2 font-medium text-center">{t('dashboard.agentMetricsResolved')}</th>
+                <th className="pb-2 font-medium text-center">{t('dashboard.agentMetricsAvgTime')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((a) => (
+                <tr key={a.agenteId} className="border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+                  <td className="py-2 text-gray-800 dark:text-gray-100">{a.nombre}</td>
+                  <td className="py-2 text-center text-gray-600 dark:text-gray-300">{a.conversaciones}</td>
+                  <td className="py-2 text-center text-gray-600 dark:text-gray-300">{a.resueltas}</td>
+                  <td className="py-2 text-center text-gray-600 dark:text-gray-300">
+                    {a.tiempoRespuestaPromMs != null ? `${(a.tiempoRespuestaPromMs / 1000).toFixed(1)}s` : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CsatSection({ data }: { data: CsatMetrics }) {
+  const { t } = useTranslation();
+  const maxDist = Math.max(...Object.values(data.distribution), 1);
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
+        <Star size={16} />
+        {t('dashboard.csatTitle')}
+      </h3>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div>
+          <p className="text-lg font-bold text-amber-500">{data.avgScore || '-'}</p>
+          <p className="text-xs text-gray-500">{t('dashboard.csatAvgScore')}</p>
+        </div>
+        <div>
+          <p className="text-lg font-bold text-blue-600">{data.totalRatings}</p>
+          <p className="text-xs text-gray-500">{t('dashboard.csatTotalRatings')}</p>
+        </div>
+        <div>
+          <p className={`text-lg font-bold ${data.nps >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{data.nps}%</p>
+          <p className="text-xs text-gray-500">NPS</p>
+        </div>
+      </div>
+      <div className="space-y-1">
+        {[5, 4, 3, 2, 1].map((score) => (
+          <div key={score} className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 w-4 text-center">{score}</span>
+            <Star size={12} className="text-amber-400" />
+            <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded h-3">
+              <div
+                className="bg-amber-400 h-3 rounded transition-all"
+                style={{ width: `${((data.distribution[score] ?? 0) / maxDist) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-500 w-8 text-right">{data.distribution[score] ?? 0}</span>
           </div>
         ))}
       </div>
@@ -180,6 +409,30 @@ export default function DashboardPage() {
   const { data: funnel } = useQuery({
     queryKey: ['funnel', dateFrom, dateTo],
     queryFn: () => getFunnel(dateFrom, dateTo),
+    refetchInterval: 120_000,
+  });
+
+  const { data: intentData } = useQuery({
+    queryKey: ['intents', dateFrom, dateTo],
+    queryFn: () => getIntentAnalytics(dateFrom, dateTo),
+    refetchInterval: 120_000,
+  });
+
+  const { data: csatData } = useQuery({
+    queryKey: ['csat', dateFrom, dateTo],
+    queryFn: () => getCsatMetrics(dateFrom, dateTo),
+    refetchInterval: 120_000,
+  });
+
+  const { data: trendsData } = useQuery({
+    queryKey: ['trends', dateFrom, dateTo],
+    queryFn: () => getTrends(dateFrom, dateTo),
+    refetchInterval: 120_000,
+  });
+
+  const { data: agentData } = useQuery({
+    queryKey: ['agent-metrics', dateFrom, dateTo],
+    queryFn: () => getAgentMetrics(dateFrom, dateTo),
     refetchInterval: 120_000,
   });
 
@@ -294,6 +547,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {metrics && <MetricsSection metrics={metrics} />}
         {funnel && <FunnelSection funnel={funnel} />}
+      </div>
+
+      {/* Intent Analytics + CSAT */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {intentData && <IntentSection data={intentData} />}
+        {csatData && <CsatSection data={csatData} />}
+      </div>
+
+      {/* Trends + Agent Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {trendsData && trendsData.length > 0 && <TrendsSection data={trendsData} />}
+        {agentData && <AgentMetricsSection data={agentData} />}
       </div>
 
       {/* Recent sections */}

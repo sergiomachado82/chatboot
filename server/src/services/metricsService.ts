@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 
+/** Bot performance metrics for a given date range. */
 export interface BotMetrics {
   tasaResolucionBot: number;
   tasaEscalacion: number;
@@ -9,6 +10,11 @@ export interface BotMetrics {
   razonesEscalacion: Record<string, number>;
 }
 
+/** Computes bot performance metrics for the specified date range.
+ * @param from - Start of the date range (inclusive).
+ * @param to - End of the date range (inclusive).
+ * @returns Aggregated bot metrics including resolution rate, escalation rate, response time, and more.
+ */
 export async function getMetrics(from: Date, to: Date): Promise<BotMetrics> {
   const where = { creadoEn: { gte: from, lte: to } };
 

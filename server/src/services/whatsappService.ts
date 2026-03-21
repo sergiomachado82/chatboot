@@ -3,6 +3,11 @@ import { logger } from '../utils/logger.js';
 import { getIO } from './socketManager.js';
 import { logIntegrationError } from './integrationLogService.js';
 
+/**
+ * Downloads a media file from the WhatsApp Cloud API by its media ID.
+ * @param mediaId - The WhatsApp media ID to download
+ * @returns The file contents as a Buffer, or null if download fails or in simulator mode
+ */
 export async function downloadMedia(mediaId: string): Promise<Buffer | null> {
   if (env.SIMULATOR_MODE) {
     logger.debug({ mediaId }, 'Simulator: no real media to download');
@@ -32,6 +37,12 @@ export async function downloadMedia(mediaId: string): Promise<Buffer | null> {
   return Buffer.from(arrayBuffer);
 }
 
+/**
+ * Sends a WhatsApp message, automatically extracting and sending inline image URLs as separate image messages.
+ * @param to - The recipient phone number or web chat ID
+ * @param body - The message body, which may contain inline image URLs
+ * @returns An object indicating success and an optional message ID
+ */
 export async function sendWhatsAppMessage(to: string, body: string): Promise<{ success: boolean; messageId?: string }> {
   try {
     const { text, imageUrls } = extractImages(body);
@@ -114,6 +125,12 @@ async function sendText(to: string, body: string) {
   }
 }
 
+/**
+ * Sends an image message via WhatsApp Cloud API or the simulator.
+ * @param to - The recipient phone number or web chat ID
+ * @param imageUrl - The publicly accessible URL of the image to send
+ * @param caption - Optional caption text for the image
+ */
 export async function sendImage(to: string, imageUrl: string, caption?: string) {
   if (to.startsWith('web_')) {
     logger.debug({ to }, 'Web chat: skip image send');

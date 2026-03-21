@@ -11,6 +11,11 @@ let io: Server<ClientToServerEvents, ServerToClientEvents> | null = null;
 let pubClient: Redis | null = null;
 let subClient: Redis | null = null;
 
+/**
+ * Initializes the Socket.IO server with CORS, Redis adapter, and JWT authentication middleware.
+ * @param server - The HTTP server instance to attach Socket.IO to
+ * @returns The configured Socket.IO server instance
+ */
 export function initSocketIO(server: HttpServer) {
   const origins = env.ALLOWED_ORIGINS;
   io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
@@ -69,18 +74,31 @@ export function initSocketIO(server: HttpServer) {
   return io;
 }
 
+/** Returns the current Socket.IO server instance, or null if not yet initialized. @returns The Socket.IO server instance or null */
 export function getIO() {
   return io;
 }
 
+/**
+ * Emits a WebSocket event to all clients in a specific conversation room.
+ * @param conversacionId - The conversation ID to target
+ * @param event - The event name to emit
+ * @param data - The payload to send with the event
+ */
 export function emitToConversacion(conversacionId: string, event: string, data: unknown) {
   io?.to(`conv:${conversacionId}`).emit(event as keyof ServerToClientEvents, data as never);
 }
 
+/**
+ * Emits a WebSocket event to all connected clients.
+ * @param event - The event name to emit
+ * @param data - The payload to send with the event
+ */
 export function emitToAll(event: string, data: unknown) {
   io?.emit(event as keyof ServerToClientEvents, data as never);
 }
 
+/** Disconnects the Redis pub/sub clients used by the Socket.IO adapter. */
 export async function closeSocketAdapter() {
   if (pubClient) {
     pubClient.disconnect();
