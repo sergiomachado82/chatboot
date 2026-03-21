@@ -59,12 +59,24 @@ function OccupancyBar({ ocupacion }: { ocupacion: { fecha: string; reservas: num
 }
 
 export default function DashboardPage() {
-  const { data, isLoading } = useDashboard();
+  const { data, isLoading, isError, error } = useDashboard();
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="mx-auto mb-2 text-red-500" size={32} />
+          <p className="text-red-600 dark:text-red-400">Error al cargar el dashboard</p>
+          <p className="text-sm text-gray-500 mt-1">{(error as Error)?.message ?? 'No se pudo obtener los datos'}</p>
+        </div>
       </div>
     );
   }
