@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notify } from '../../utils/notify';
-import { Save, AlertTriangle, Info, Upload, Trash2, Building2, Plus, X } from 'lucide-react';
+import { Save, AlertTriangle, Info, Upload, Trash2, Building2, Plus, X, ChevronDown } from 'lucide-react';
 import { getBotConfig, updateBotConfig, uploadLogo, deleteLogo } from '../../api/botConfigApi';
 import type { BotConfigUpdate } from '../../api/botConfigApi';
 
@@ -33,6 +33,7 @@ export default function BotConfigPage() {
   const [nuevoTitular, setNuevoTitular] = useState('');
   const [reglasPersonalizadas, setReglasPersonalizadas] = useState<string[]>([]);
   const [nuevaRegla, setNuevaRegla] = useState('');
+  const [mostrarReglasBase, setMostrarReglasBase] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -392,82 +393,104 @@ export default function BotConfigPage() {
           </div>
         </div>
 
-        {/* Section: Reglas Personalizadas */}
+        {/* Section: Reglas del Bot */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Reglas personalizadas</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Reglas del bot</h3>
 
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
-            <Info size={18} className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              Las 10 reglas base del bot (precios, capacidad, flujo de reservas, datos bancarios, etc.) estan integradas en el sistema y no se pueden modificar. Aca podes agregar reglas adicionales que el bot va a seguir.
-            </p>
+          {/* Reglas base R1-R10 (solo lectura, colapsable) */}
+          <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setMostrarReglasBase(!mostrarReglasBase)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-650 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Reglas base del sistema (R1-R10)</span>
+                <span className="text-xs text-gray-400 bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full">Solo lectura</span>
+              </div>
+              <ChevronDown size={16} className={`text-gray-400 transition-transform ${mostrarReglasBase ? 'rotate-180' : ''}`} />
+            </button>
+            {mostrarReglasBase && (
+              <div className="px-4 py-3 space-y-2 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-600">
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">1.</span><span><strong>Fotos:</strong> Nunca incluir URLs de imagenes en texto. Las fotos se envian como adjuntos automaticamente.</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">2.</span><span><strong>Precios:</strong> Usar exclusivamente las tarifas del contexto. Nunca inventar precios.</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">3.</span><span><strong>Capacidad:</strong> Respetar capacidad por unidad. No ofrecer mas unidades de las disponibles.</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">4.</span><span><strong>Datos:</strong> No inventar datos. Estadia minima solo si hay advertencia en el contexto.</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">5.</span><span><strong>Informacion:</strong> Solo mencionar departamentos cuya informacion aparece en el contexto.</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">6.</span><span><strong>Conversacion:</strong> No re-pedir datos ya conocidos. Preguntas progresivas, una a la vez.</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">7.</span><span><strong>Flujo:</strong> Pedir personas, fechas, noches, nombre, celular y DNI (uno a la vez).</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">8.</span><span><strong>Reservas:</strong> Flujo completo en 4 pasos (resumen → datos bancarios → comprobante → confirmacion por agente).</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">9.</span><span><strong>Terminologia:</strong> Siempre decir "reserva", nunca "pre-reserva" al huesped.</span></div>
+                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">10.</span><span><strong>Datos bancarios:</strong> Jamas inventar CBU/alias/banco. Si hay advertencia, no mostrar datos de pago.</span></div>
+              </div>
+            )}
           </div>
 
-          {reglasPersonalizadas.length > 0 && (
-            <div className="space-y-2">
-              {reglasPersonalizadas.map((regla, i) => (
-                <div key={i} className="flex items-start gap-2 group">
-                  <span className="flex-shrink-0 w-6 text-right text-xs font-mono text-gray-400 mt-2">{i + 1}.</span>
-                  <span className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200">{regla}</span>
-                  <button
-                    type="button"
-                    onClick={() => setReglasPersonalizadas(prev => prev.filter((_, idx) => idx !== i))}
-                    className="p-1 text-red-400 hover:text-red-600 opacity-50 group-hover:opacity-100 transition-opacity"
-                    title="Eliminar regla"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
+          {/* Reglas personalizadas (editables) */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Reglas adicionales</p>
+              <span className="text-xs text-gray-400">{reglasPersonalizadas.length}/20 reglas</span>
             </div>
-          )}
 
-          {reglasPersonalizadas.length < 20 && (
-            <div className="flex items-start gap-2">
-              <input
-                type="text"
-                value={nuevaRegla}
-                onChange={(e) => setNuevaRegla(e.target.value.slice(0, 500))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && nuevaRegla.trim()) {
-                    e.preventDefault();
-                    setReglasPersonalizadas(prev => [...prev, nuevaRegla.trim()]);
-                    setNuevaRegla('');
-                  }
-                }}
-                placeholder="Ej: No ofrecer descuentos sin autorizacion de un agente humano"
-                className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (nuevaRegla.trim()) {
-                    setReglasPersonalizadas(prev => [...prev, nuevaRegla.trim()]);
-                    setNuevaRegla('');
-                  }
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex-shrink-0"
-              >
-                <Plus size={14} />
-                Agregar
-              </button>
-            </div>
-          )}
+            {reglasPersonalizadas.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {reglasPersonalizadas.map((regla, i) => (
+                  <div key={i} className="flex items-start gap-2 group">
+                    <span className="flex-shrink-0 w-6 text-right text-xs font-mono text-gray-400 mt-2">{11 + i}.</span>
+                    <span className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200">{regla}</span>
+                    <button
+                      type="button"
+                      onClick={() => setReglasPersonalizadas(prev => prev.filter((_, idx) => idx !== i))}
+                      className="p-1 text-red-400 hover:text-red-600 opacity-50 group-hover:opacity-100 transition-opacity"
+                      title="Eliminar regla"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
-          {nuevaRegla.length > 0 && (
-            <p className="text-xs text-gray-400 text-right">{nuevaRegla.length}/500 caracteres</p>
-          )}
+            {reglasPersonalizadas.length === 0 && (
+              <p className="text-sm text-gray-400 dark:text-gray-500 italic mb-3">No hay reglas adicionales. Podes agregar hasta 20.</p>
+            )}
 
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <div>
-              <p className="font-medium mb-1">Ejemplos:</p>
-              <ul className="space-y-0.5 text-gray-400">
-                <li>"No ofrecer descuentos sin autorizacion de un agente humano"</li>
-                <li>"El check-in es a las 14hs y el check-out a las 10hs"</li>
-                <li>"Recomendar el depto Arrayanes para familias de 5+ personas"</li>
-              </ul>
-            </div>
-            <span className="flex-shrink-0 ml-4">{reglasPersonalizadas.length}/20 reglas</span>
+            {reglasPersonalizadas.length < 20 && (
+              <div className="flex items-start gap-2">
+                <input
+                  type="text"
+                  value={nuevaRegla}
+                  onChange={(e) => setNuevaRegla(e.target.value.slice(0, 500))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && nuevaRegla.trim()) {
+                      e.preventDefault();
+                      setReglasPersonalizadas(prev => [...prev, nuevaRegla.trim()]);
+                      setNuevaRegla('');
+                    }
+                  }}
+                  placeholder="Ej: No ofrecer descuentos sin autorizacion de un agente humano"
+                  className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (nuevaRegla.trim()) {
+                      setReglasPersonalizadas(prev => [...prev, nuevaRegla.trim()]);
+                      setNuevaRegla('');
+                    }
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex-shrink-0"
+                >
+                  <Plus size={14} />
+                  Agregar
+                </button>
+              </div>
+            )}
+
+            {nuevaRegla.length > 0 && (
+              <p className="text-xs text-gray-400 text-right mt-1">{nuevaRegla.length}/500 caracteres</p>
+            )}
           </div>
         </div>
 
