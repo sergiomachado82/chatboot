@@ -38,7 +38,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
     estadiaMinima: 0,
     videoTour: '',
     mascotas: false,
-    ninos: true,
     fumar: false,
     fiestas: false,
     autoResponderEmail: false,
@@ -79,7 +78,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
         estadiaMinima: complejo.estadiaMinima ?? 0,
         videoTour: complejo.videoTour ?? '',
         mascotas: complejo.mascotas,
-        ninos: complejo.ninos,
         fumar: complejo.fumar,
         fiestas: complejo.fiestas,
         autoResponderEmail: complejo.autoResponderEmail ?? false,
@@ -130,7 +128,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
         checkOut: form.checkOut || undefined,
         estadiaMinima: form.estadiaMinima || undefined,
         mascotas: form.mascotas,
-        ninos: form.ninos,
         fumar: form.fumar,
         fiestas: form.fiestas,
         autoResponderEmail: form.autoResponderEmail,
@@ -418,7 +415,6 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
             <div className="space-y-3">
               {([
                 { key: 'mascotas', label: 'Mascotas permitidas' },
-                { key: 'ninos', label: 'Ninos permitidos' },
                 { key: 'fumar', label: 'Se permite fumar' },
                 { key: 'fiestas', label: 'Fiestas permitidas' },
                 { key: 'autoResponderEmail', label: 'Responder emails automaticamente' },

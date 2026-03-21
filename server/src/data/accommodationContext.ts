@@ -147,7 +147,7 @@ function buildDetalle(c: ComplejoWithRelations): string {
       lines.push(desc);
     }
   }
-  lines.push(`- Ninos: ${c.ninos ? 'permitidos' : 'NO permitidos'}`);
+  lines.push(`- Ninos: permitidos`);
   lines.push(`- Mascotas: ${c.mascotas ? 'permitidas' : 'NO permitidas'}`);
   lines.push(`- Fumar: ${c.fumar ? 'permitido' : 'NO permitido'}`);
   lines.push(`- Fiestas: ${c.fiestas ? 'permitidas' : 'NO permitidas'}`);
