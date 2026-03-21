@@ -27,7 +27,9 @@ const PHONES = {
   SIM_10: '5491100010010',
 };
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function send(from: string, body: string, name: string): Promise<void> {
   await fetch(`${BASE_URL}/api/simulator/send`, {
@@ -38,6 +40,7 @@ async function send(from: string, body: string, name: string): Promise<void> {
   await sleep(WAIT_MS);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getLastBotMsg(waId: string): Promise<{ contenido: string; metadata: any } | null> {
   const huesped = await prisma.huesped.findFirst({ where: { waId } });
   if (!huesped) return null;
@@ -50,6 +53,7 @@ async function getLastBotMsg(waId: string): Promise<{ contenido: string; metadat
     where: { conversacionId: conv.id, origen: 'bot' },
     orderBy: { creadoEn: 'desc' },
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return msg ? { contenido: msg.contenido, metadata: msg.metadata as any } : null;
 }
 
@@ -101,8 +105,14 @@ async function conv01_Saludo() {
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assert('respuesta contiene bienvenida', text.includes('bienvenid') || text.includes('hola') || text.includes('ayudar'));
-    assert('NO menciona estadia minima en saludo', !text.includes('estadía mínima') && !text.includes('estadia minima'));
+    assert(
+      'respuesta contiene bienvenida',
+      text.includes('bienvenid') || text.includes('hola') || text.includes('ayudar'),
+    );
+    assert(
+      'NO menciona estadia minima en saludo',
+      !text.includes('estadía mínima') && !text.includes('estadia minima'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 200)}`);
   }
 }
@@ -128,21 +138,39 @@ async function conv02_UnaNocheSinMinimo() {
     const text = msg.contenido.toLowerCase();
     const lines = text.split('\n');
     // CRITICAL: should NOT say all departments require minimum stay
-    assert('NO dice "todos nuestros departamentos requieren estadia minima"',
-      !text.includes('todos nuestros departamentos') || !text.includes('mínima'));
+    assert(
+      'NO dice "todos nuestros departamentos requieren estadia minima"',
+      !text.includes('todos nuestros departamentos') || !text.includes('mínima'),
+    );
     // Check per LINE: a line mentioning a depto should NOT also mention "mínimo" on the same line
-    const monoLineHasMin = lines.some(l => l.includes('luminar mono') && (l.includes('mínimo') || l.includes('minimo') || l.includes('mínima') || l.includes('minima')));
+    const monoLineHasMin = lines.some(
+      (l) =>
+        l.includes('luminar mono') &&
+        (l.includes('mínimo') || l.includes('minimo') || l.includes('mínima') || l.includes('minima')),
+    );
     assert('NO inventa minimo para Luminar Mono (en su linea)', !monoLineHasMin);
-    const dosAmbLineHasMin = lines.some(l => l.includes('luminar 2amb') && (l.includes('mínimo') || l.includes('minimo') || l.includes('mínima') || l.includes('minima')));
+    const dosAmbLineHasMin = lines.some(
+      (l) =>
+        l.includes('luminar 2amb') &&
+        (l.includes('mínimo') || l.includes('minimo') || l.includes('mínima') || l.includes('minima')),
+    );
     assert('NO inventa minimo para Luminar 2Amb (en su linea)', !dosAmbLineHasMin);
-    const lgLineHasMin = lines.some(l => l.includes(' lg') && (l.includes('mínimo') || l.includes('minimo') || l.includes('mínima') || l.includes('minima')));
+    const lgLineHasMin = lines.some(
+      (l) =>
+        l.includes(' lg') &&
+        (l.includes('mínimo') || l.includes('minimo') || l.includes('mínima') || l.includes('minima')),
+    );
     assert('NO inventa minimo para LG (en su linea)', !lgLineHasMin);
     // Should NOT mention estadia minima generically (it wasn't asked)
-    assert('NO menciona estadia minima proactivamente',
-      !text.includes('estadía mínima') && !text.includes('estadia minima'));
+    assert(
+      'NO menciona estadia minima proactivamente',
+      !text.includes('estadía mínima') && !text.includes('estadia minima'),
+    );
     // Should offer at least some departments
-    assert('ofrece opciones de alojamiento',
-      text.includes('luminar') || text.includes('pewmafe') || text.includes(' lg') || text.includes('departamento'));
+    assert(
+      'ofrece opciones de alojamiento',
+      text.includes('luminar') || text.includes('pewmafe') || text.includes(' lg') || text.includes('departamento'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 500)}`);
   }
 }
@@ -152,23 +180,35 @@ async function conv03_DiezPersonasUnaNoche() {
   section('CONV-03: 10 PERSONAS / 1 NOCHE — Bug reportado');
   const phone = PHONES.SIM_03;
   await send(phone, 'Hola buenas tardes', 'Pedro Martinez');
-  await send(phone, 'Consulta por alojamiento, somos 10 personas, es para la noche de manana solamente', 'Pedro Martinez');
+  await send(
+    phone,
+    'Consulta por alojamiento, somos 10 personas, es para la noche de manana solamente',
+    'Pedro Martinez',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // CRITICAL BUG TEST: should NOT generalize minimum stay
-    assert('NO dice "todos nuestros departamentos requieren estadia minima"',
-      !text.includes('todos nuestros departamentos') || !text.includes('mínima'));
-    assert('NO dice "entre 2 y 5 noches"',
-      !text.includes('entre 2 y 5'));
+    assert(
+      'NO dice "todos nuestros departamentos requieren estadia minima"',
+      !text.includes('todos nuestros departamentos') || !text.includes('mínima'),
+    );
+    assert('NO dice "entre 2 y 5 noches"', !text.includes('entre 2 y 5'));
     // Should explain that no single dept fits 10 people, suggest combining
-    assert('menciona la necesidad de combinar departamentos o capacidad',
-      text.includes('combin') || text.includes('capacidad') || text.includes('no contamos') || text.includes('varios') || text.includes('múltiples') || text.includes('telefono') || text.includes('contactar'));
+    assert(
+      'menciona la necesidad de combinar departamentos o capacidad',
+      text.includes('combin') ||
+        text.includes('capacidad') ||
+        text.includes('no contamos') ||
+        text.includes('varios') ||
+        text.includes('múltiples') ||
+        text.includes('telefono') ||
+        text.includes('contactar'),
+    );
     // BUG FIX: Bot must NOT invent wrong dates. "mañana" should resolve to tomorrow, not a random date
-    assert('NO inventa fecha de enero (huesped dijo "mañana", no enero)',
-      !text.includes('enero'));
+    assert('NO inventa fecha de enero (huesped dijo "mañana", no enero)', !text.includes('enero'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 500)}`);
   }
 }
@@ -184,13 +224,24 @@ async function conv04_ConsultaPrecio() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Bot should NOT list all seasonal tariffs — instead should ask for dates first
-    assert('NO lista tarifas por temporada baja/media/alta',
-      !(text.includes('temporada baja') && text.includes('temporada media') && text.includes('temporada alta'))
-      && !(text.includes('baja') && text.includes('media') && text.includes('alta')));
-    assert('pregunta fechas', text.includes('fecha') || text.includes('cuando') || text.includes('cuándo') || text.includes('qué fecha') || text.includes('que fecha'));
+    assert(
+      'NO lista tarifas por temporada baja/media/alta',
+      !(text.includes('temporada baja') && text.includes('temporada media') && text.includes('temporada alta')) &&
+        !(text.includes('baja') && text.includes('media') && text.includes('alta')),
+    );
+    assert(
+      'pregunta fechas',
+      text.includes('fecha') ||
+        text.includes('cuando') ||
+        text.includes('cuándo') ||
+        text.includes('qué fecha') ||
+        text.includes('que fecha'),
+    );
     assert('menciona LG', text.includes('lg'));
-    assert('NO inventa estadia minima para LG',
-      !text.includes('estadía mínima') && !text.includes('estadia minima') && !text.includes('mínimo'));
+    assert(
+      'NO inventa estadia minima para LG',
+      !text.includes('estadía mínima') && !text.includes('estadia minima') && !text.includes('mínimo'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -205,7 +256,9 @@ async function conv05_ConsultaZona() {
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    const realActivities = ['buceo', 'kayak', 'playa', 'pesca', 'pinguinera', 'snorkel', 'mountain bike'].filter(a => text.includes(a));
+    const realActivities = ['buceo', 'kayak', 'playa', 'pesca', 'pinguinera', 'snorkel', 'mountain bike'].filter((a) =>
+      text.includes(a),
+    );
     assert('menciona actividades reales (>= 2)', realActivities.length >= 2, `found: ${realActivities.join(', ')}`);
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
@@ -224,9 +277,16 @@ async function conv06_PewmafeUnaNoche() {
     assert('menciona Pewmafe', text.includes('pewmafe'));
     // Pewmafe HAS a real minimum stay — bot SHOULD mention it OR say not available
     // If Pewmafe is not available for those dates, bot may say "no disponible" instead of mentioning min stay
-    assert('menciona estadia minima o no disponible para Pewmafe',
-      text.includes('mínima') || text.includes('minima') || text.includes('mínimo') || text.includes('minimo') ||
-      text.includes('no disponible') || text.includes('no tenemos disponibilidad') || text.includes('noches'));
+    assert(
+      'menciona estadia minima o no disponible para Pewmafe',
+      text.includes('mínima') ||
+        text.includes('minima') ||
+        text.includes('mínimo') ||
+        text.includes('minimo') ||
+        text.includes('no disponible') ||
+        text.includes('no tenemos disponibilidad') ||
+        text.includes('noches'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -242,9 +302,11 @@ async function conv07_ConsultaAlojamientoLG() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     assert('menciona LG', text.includes('lg'));
-    assert('menciona amenities', text.includes('wifi') || text.includes('cocina') || text.includes('aire') || text.includes('amenities'));
-    assert('NO inventa estadia minima para LG',
-      !text.includes('estadía mínima') && !text.includes('estadia minima'));
+    assert(
+      'menciona amenities',
+      text.includes('wifi') || text.includes('cocina') || text.includes('aire') || text.includes('amenities'),
+    );
+    assert('NO inventa estadia minima para LG', !text.includes('estadía mínima') && !text.includes('estadia minima'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -263,7 +325,10 @@ async function conv08_ReservaPasoAPaso() {
     assert('retiene num_personas=3', entities.num_personas === '3', `got: ${entities.num_personas}`);
     // Should ask for dates since they are missing
     const text = msg.contenido.toLowerCase();
-    assert('pide fechas', text.includes('fecha') || text.includes('cuando') || text.includes('días') || text.includes('noches'));
+    assert(
+      'pide fechas',
+      text.includes('fecha') || text.includes('cuando') || text.includes('días') || text.includes('noches'),
+    );
   }
 
   await send(phone, 'Del 20 al 25 de abril', 'Diego Morales');
@@ -272,7 +337,11 @@ async function conv08_ReservaPasoAPaso() {
   assert('bot respondio despues de fechas', !!msg);
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
-    assert('retiene num_personas despues de dar fechas', entities.num_personas === '3', `got: ${entities.num_personas}`);
+    assert(
+      'retiene num_personas despues de dar fechas',
+      entities.num_personas === '3',
+      `got: ${entities.num_personas}`,
+    );
     assert('tiene fecha_entrada', !!entities.fecha_entrada, `got: ${entities.fecha_entrada}`);
     assert('tiene fecha_salida', !!entities.fecha_salida, `got: ${entities.fecha_salida}`);
     // Should NOT re-ask for personas
@@ -287,14 +356,21 @@ async function conv09_QuejaEscalacion() {
   section('CONV-09: QUEJA — Escalacion a humano');
   const phone = PHONES.SIM_09;
   await send(phone, 'Hola', 'Marta Gimenez');
-  await send(phone, 'Estoy muy molesta, hace horas que espero una respuesta y nadie me atiende. Es inaceptable.', 'Marta Gimenez');
+  await send(
+    phone,
+    'Estoy muy molesta, hace horas que espero una respuesta y nadie me atiende. Es inaceptable.',
+    'Marta Gimenez',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     assert('pide disculpas', text.includes('disculp') || text.includes('lament') || text.includes('perdón'));
-    assert('menciona agente o persona', text.includes('agente') || text.includes('persona') || text.includes('atender'));
+    assert(
+      'menciona agente o persona',
+      text.includes('agente') || text.includes('persona') || text.includes('atender'),
+    );
   }
 
   // Verify conversation was escalated
@@ -318,9 +394,15 @@ async function conv10_Despedida() {
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assert('se despide amablemente',
-      text.includes('gracias') || text.includes('saludos') || text.includes('buen') || text.includes('suerte') ||
-      text.includes('placer') || text.includes('excelente'));
+    assert(
+      'se despide amablemente',
+      text.includes('gracias') ||
+        text.includes('saludos') ||
+        text.includes('buen') ||
+        text.includes('suerte') ||
+        text.includes('placer') ||
+        text.includes('excelente'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 200)}`);
   }
 
@@ -348,10 +430,15 @@ async function conv11_ReservaSinTarjeta() {
     assert('menciona Luminar', text.includes('luminar'));
     // Should NOT proactively mention credit card / MercadoPago
     assert('NO menciona MercadoPago proactivamente', !text.includes('mercadopago') && !text.includes('mercado pago'));
-    assert('NO menciona tarjeta de credito proactivamente', !text.includes('tarjeta de crédito') && !text.includes('tarjeta de credito'));
+    assert(
+      'NO menciona tarjeta de credito proactivamente',
+      !text.includes('tarjeta de crédito') && !text.includes('tarjeta de credito'),
+    );
     // Should mention transfer as payment method
-    assert('menciona transferencia como medio de pago',
-      text.includes('transferencia') || text.includes('datos') || text.includes('reserva'));
+    assert(
+      'menciona transferencia como medio de pago',
+      text.includes('transferencia') || text.includes('datos') || text.includes('reserva'),
+    );
     // Should NOT confirm reservation (but "te confirmo que está disponible" is ok — that's confirming availability, not reservation)
     assert('NO confirma la reserva', !text.includes('reserva confirmada') && !text.includes('te confirmo la reserva'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 500)}`);
@@ -399,7 +486,9 @@ async function main() {
   // Summary
   console.log(`\n${'═'.repeat(65)}`);
   console.log(`\n╔═════════════════════════════════════════════════════════════╗`);
-  console.log(`║   RESULTADOS: ${passed} passed, ${failed} failed${' '.repeat(Math.max(0, 40 - String(passed).length - String(failed).length))}║`);
+  console.log(
+    `║   RESULTADOS: ${passed} passed, ${failed} failed${' '.repeat(Math.max(0, 40 - String(passed).length - String(failed).length))}║`,
+  );
   console.log(`╚═════════════════════════════════════════════════════════════╝`);
 
   if (failures.length > 0) {
@@ -430,7 +519,7 @@ if (process.argv.includes('--cleanup')) {
       process.exit(1);
     });
 } else {
-  main().catch(e => {
+  main().catch((e) => {
     console.error('Error:', e);
     process.exit(1);
   });

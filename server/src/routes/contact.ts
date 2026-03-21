@@ -39,7 +39,7 @@ router.post('/contact', contactRateLimiter, async (req, res) => {
   // Everything below runs in the background (fire-and-forget)
   (async () => {
     // Send admin notification email (best-effort)
-    sendContactEmail(data).catch(err => {
+    sendContactEmail(data).catch((err) => {
       logger.error({ err }, 'Failed to send contact notification email');
     });
 
@@ -72,7 +72,7 @@ router.post('/contact', contactRateLimiter, async (req, res) => {
         from: data.email,
         subject,
         body: data.mensaje || '',
-        activeComplejos: activeComplejos.map(c => ({ id: c.id, nombre: c.nombre })),
+        activeComplejos: activeComplejos.map((c) => ({ id: c.id, nombre: c.nombre })),
         formFields: {
           nombre: data.nombre,
           email: data.email,
@@ -99,23 +99,25 @@ router.post('/contact', contactRateLimiter, async (req, res) => {
       });
 
       logger.info({ email: data.email, subject, complejoId }, 'Contact form auto-reply sent and saved');
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error({ err, email: data.email }, 'Failed to process contact form auto-reply');
-      await prisma.emailProcesado.create({
-        data: {
-          messageId,
-          fromEmail: data.email,
-          subject,
-          respondido: false,
-          error: err.message?.slice(0, 500),
-          bodyOriginal: JSON.stringify(data),
-          esFormulario: true,
-        },
-      }).catch(dbErr => {
-        logger.error({ dbErr }, 'Failed to save contact form error to DB');
-      });
+      await prisma.emailProcesado
+        .create({
+          data: {
+            messageId,
+            fromEmail: data.email,
+            subject,
+            respondido: false,
+            error: (err instanceof Error ? err.message : String(err))?.slice(0, 500),
+            bodyOriginal: JSON.stringify(data),
+            esFormulario: true,
+          },
+        })
+        .catch((dbErr) => {
+          logger.error({ dbErr }, 'Failed to save contact form error to DB');
+        });
     }
-  })().catch(err => {
+  })().catch((err) => {
     logger.error({ err }, 'Unexpected error in contact form background processing');
   });
 });

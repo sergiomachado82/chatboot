@@ -27,7 +27,12 @@ export async function updateBotConfig(
   const current = await getBotConfig();
 
   // Build audit entries for changed fields
-  const auditEntries: { agenteId: string | null; campo: string; valorAnterior: string | null; valorNuevo: string | null }[] = [];
+  const auditEntries: {
+    agenteId: string | null;
+    campo: string;
+    valorAnterior: string | null;
+    valorNuevo: string | null;
+  }[] = [];
   for (const [key, newVal] of Object.entries(data)) {
     const oldVal = (current as Record<string, unknown>)[key];
     const oldStr = oldVal == null ? null : typeof oldVal === 'object' ? JSON.stringify(oldVal) : String(oldVal);

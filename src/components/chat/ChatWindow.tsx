@@ -1,4 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { notify } from '../../utils/notify';
 import { useChat } from '../../hooks/useChat';
 import { enviarMensajeAgente } from '../../api/conversacionApi';
@@ -16,9 +18,10 @@ interface ChatWindowProps {
 }
 
 export default function ChatWindow({ conversacion, onConversacionUpdate }: ChatWindowProps) {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useState<SearchMensajesParams | undefined>();
   const { data: mensajes, isLoading, isSearchActive } = useChat(conversacion.id, searchParams);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [sending, setSending] = useState(false);
 
   // Reset search when switching conversations
@@ -29,13 +32,6 @@ export default function ChatWindow({ conversacion, onConversacionUpdate }: ChatW
       prevConvId.current = conversacion.id;
     }
   }, [conversacion.id]);
-
-  // Auto-scroll only when not searching
-  useEffect(() => {
-    if (!isSearchActive) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [mensajes, isSearchActive]);
 
   const handleSearch = useCallback((params: SearchMensajesParams | undefined) => {
     setSearchParams(params);
@@ -48,7 +44,7 @@ export default function ChatWindow({ conversacion, onConversacionUpdate }: ChatW
     try {
       await enviarMensajeAgente(conversacion.id, contenido);
     } catch (err) {
-      notify.error(err instanceof Error ? err.message : 'Error al enviar mensaje');
+      notify.error(err instanceof Error ? err.message : t('chat.errorSendMessage'));
     } finally {
       setSending(false);
     }
@@ -63,32 +59,43 @@ export default function ChatWindow({ conversacion, onConversacionUpdate }: ChatW
         isLoading={isSearchActive && isLoading}
       />
 
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
+      <div className="flex-1 bg-gray-50 dark:bg-gray-900" aria-live="polite">
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-400">{isSearchActive ? 'Buscando...' : 'Cargando mensajes...'}</p>
+            <p className="text-sm text-gray-400">{isSearchActive ? t('chat.searching') : t('chat.loadingMessages')}</p>
           </div>
         )}
         {!isLoading && mensajes?.length === 0 && (
-          <EmptyState title={isSearchActive ? 'Sin resultados' : 'Sin mensajes'} />
+          <EmptyState title={isSearchActive ? t('chat.noResultsTitle') : t('chat.noMessagesTitle')} />
         )}
-        {mensajes?.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            mensaje={msg}
-            highlightText={searchParams?.search}
-            senderName={conversacion.huesped?.nombre ?? conversacion.huesped?.waId}
-            senderIdentifier={conversacion.huesped?.waId ?? conversacion.id}
+        {!isLoading && mensajes && mensajes.length > 0 && (
+          <Virtuoso
+            ref={virtuosoRef}
+            style={{ height: '100%' }}
+            className="p-4"
+            data={mensajes}
+            followOutput="smooth"
+            initialTopMostItemIndex={mensajes.length - 1}
+            itemContent={(_index, msg) => (
+              <MessageBubble
+                key={msg.id}
+                mensaje={msg}
+                highlightText={searchParams?.search}
+                senderName={conversacion.huesped?.nombre ?? conversacion.huesped?.waId}
+                senderIdentifier={conversacion.huesped?.waId ?? conversacion.id}
+              />
+            )}
           />
-        ))}
-        <div ref={messagesEndRef} />
+        )}
       </div>
 
       <ChatInput
         onSend={handleSend}
         disabled={!canSend || sending}
-        placeholder={sending ? 'Enviando...' : canSend ? 'Escribe un mensaje...' : 'Toma el control para responder'}
+        placeholder={
+          sending ? t('chat.sending') : canSend ? t('chat.inputPlaceholder') : t('chat.takeControlPlaceholder')
+        }
       />
     </div>
   );

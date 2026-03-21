@@ -69,16 +69,17 @@ function normalizeDate(dateStr: string | null): string | null {
  */
 function extractFromFormFields(
   fields: ContactFormFields,
-  activeComplejos: Array<{ id: string; nombre: string }>
+  activeComplejos: Array<{ id: string; nombre: string }>,
 ): ExtractedData {
   // Match complejo name from form to known complejos
   let complejoNombre: string | null = null;
   if (fields.complejo) {
     const lower = fields.complejo.toLowerCase();
     const match = activeComplejos.find(
-      c => c.nombre.toLowerCase() === lower ||
-           c.nombre.toLowerCase().includes(lower) ||
-           lower.includes(c.nombre.toLowerCase())
+      (c) =>
+        c.nombre.toLowerCase() === lower ||
+        c.nombre.toLowerCase().includes(lower) ||
+        lower.includes(c.nombre.toLowerCase()),
     );
     if (match) complejoNombre = match.nombre;
     else complejoNombre = fields.complejo; // pass as-is for context
@@ -100,13 +101,15 @@ function extractFromFormFields(
  * Process an incoming email: extract data, check availability, generate and send reply.
  * Returns the complejoId if one was identified, or null.
  */
-export async function processIncomingEmail(email: IncomingEmail): Promise<{ complejoId: string | null; replyBody: string }> {
+export async function processIncomingEmail(
+  email: IncomingEmail,
+): Promise<{ complejoId: string | null; replyBody: string }> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
   const todayStr = getArgentinaToday();
-  const complejoNames = email.activeComplejos.map(c => c.nombre).join(', ');
+  const complejoNames = email.activeComplejos.map((c) => c.nombre).join(', ');
 
   // ── Step 1: Extract data ──
   let extracted: ExtractedData;
@@ -117,13 +120,14 @@ export async function processIncomingEmail(email: IncomingEmail): Promise<{ comp
     logger.info({ extracted, from: email.from }, 'Form fields extracted directly');
   } else {
     // Regular email: use Claude to extract data
-    const extractionResponse = await getClient().messages.create({
-      model: env.CLAUDE_CLASSIFIER_MODEL,
-      max_tokens: 300,
-      system: [
-        {
-          type: 'text',
-          text: `Eres un extractor de datos de emails de consulta de alojamiento turistico.
+    const extractionResponse = await getClient().messages.create(
+      {
+        model: env.CLAUDE_CLASSIFIER_MODEL,
+        max_tokens: 300,
+        system: [
+          {
+            type: 'text',
+            text: `Eres un extractor de datos de emails de consulta de alojamiento turistico.
 La fecha de hoy es ${todayStr}.
 Los complejos/departamentos disponibles son: ${complejoNames}.
 
@@ -144,19 +148,23 @@ Reglas:
 - Si menciona un departamento, usa el nombre exacto de la lista
 - Si no menciona ningun departamento, deja null
 - "consulta" es un resumen de 1 linea de lo que pide el email`,
-        },
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: `Asunto: ${email.subject}\n\n${email.body}`.slice(0, 3000),
-        },
-      ],
-    }, { timeout: env.CLAUDE_TIMEOUT_MS });
+          },
+        ],
+        messages: [
+          {
+            role: 'user',
+            content: `Asunto: ${email.subject}\n\n${email.body}`.slice(0, 3000),
+          },
+        ],
+      },
+      { timeout: env.CLAUDE_TIMEOUT_MS },
+    );
 
-    const extractionText = extractionResponse.content[0]?.type === 'text'
-      ? extractionResponse.content[0].text : '{}';
-    const cleanExtraction = extractionText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const extractionText = extractionResponse.content[0]?.type === 'text' ? extractionResponse.content[0].text : '{}';
+    const cleanExtraction = extractionText
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
 
     try {
       extracted = JSON.parse(cleanExtraction);
@@ -179,7 +187,7 @@ Reglas:
   let complejoId: string | null = null;
   if (extracted.complejo_nombre) {
     const match = email.activeComplejos.find(
-      c => c.nombre.toLowerCase() === extracted.complejo_nombre!.toLowerCase()
+      (c) => c.nombre.toLowerCase() === extracted.complejo_nombre!.toLowerCase(),
     );
     if (match) complejoId = match.id;
   }
@@ -192,15 +200,12 @@ Reglas:
       const fechaSalida = new Date(extracted.fecha_salida);
       const noches = Math.ceil((fechaSalida.getTime() - fechaEntrada.getTime()) / (1000 * 60 * 60 * 24));
 
-      const results = await checkAvailability(
-        fechaEntrada,
-        fechaSalida,
-        extracted.complejo_nombre || undefined
-      );
+      const results = await checkAvailability(fechaEntrada, fechaSalida, extracted.complejo_nombre || undefined);
 
       if (results.length > 0) {
-        const lines = results.map(r =>
-          `- ${r.habitacion}: DISPONIBLE, ${r.noches} noches, $${r.precioTotal.toLocaleString('es-AR')} total ($${r.precioPorNoche.map(p => p.toLocaleString('es-AR')).join('/')} por noche)`
+        const lines = results.map(
+          (r) =>
+            `- ${r.habitacion}: DISPONIBLE, ${r.noches} noches, $${r.precioTotal.toLocaleString('es-AR')} total ($${r.precioPorNoche.map((p) => p.toLocaleString('es-AR')).join('/')} por noche)`,
         );
         availabilityInfo = `\nRESULTADOS DE DISPONIBILIDAD para ${extracted.fecha_entrada} a ${extracted.fecha_salida}:\n${lines.join('\n')}`;
       } else {
@@ -210,8 +215,9 @@ Reglas:
         if (extracted.complejo_nombre) {
           const otherResults = await checkAvailability(fechaEntrada, fechaSalida);
           if (otherResults.length > 0) {
-            const otherLines = otherResults.map(r =>
-              `- ${r.habitacion}: ${r.noches} noches, $${r.precioTotal.toLocaleString('es-AR')} total ($${r.precioPorNoche.map(p => p.toLocaleString('es-AR')).join('/')} por noche)`
+            const otherLines = otherResults.map(
+              (r) =>
+                `- ${r.habitacion}: ${r.noches} noches, $${r.precioTotal.toLocaleString('es-AR')} total ($${r.precioPorNoche.map((p) => p.toLocaleString('es-AR')).join('/')} por noche)`,
             );
             availabilityInfo += `\n\nOTROS DEPARTAMENTOS DISPONIBLES en las mismas fechas (${extracted.fecha_entrada} a ${extracted.fecha_salida}):\n${otherLines.join('\n')}`;
             availabilityInfo += `\nIMPORTANTE: Ofrece estas alternativas al huesped mencionando que el departamento consultado no esta disponible pero que tenemos estos otros.`;
@@ -230,11 +236,7 @@ Reglas:
           const today = new Date(todayStr);
           if (altEntrada < today) continue;
 
-          const altResults = await checkAvailability(
-            altEntrada,
-            altSalida,
-            extracted.complejo_nombre || undefined
-          );
+          const altResults = await checkAvailability(altEntrada, altSalida, extracted.complejo_nombre || undefined);
           if (altResults.length > 0) {
             nearbyResults.push({ offset: dayOffset, results: altResults });
           }
@@ -245,14 +247,19 @@ Reglas:
           for (const nr of nearbyResults) {
             for (const r of nr.results) {
               const label = nr.offset < 0 ? `${Math.abs(nr.offset)} dias antes` : `${nr.offset} dias despues`;
-              nearbyLines.push(`- ${r.habitacion} (${label}): ${r.fechaEntrada} a ${r.fechaSalida}, ${r.noches} noches, $${r.precioTotal.toLocaleString('es-AR')} total`);
+              nearbyLines.push(
+                `- ${r.habitacion} (${label}): ${r.fechaEntrada} a ${r.fechaSalida}, ${r.noches} noches, $${r.precioTotal.toLocaleString('es-AR')} total`,
+              );
             }
           }
           availabilityInfo += `\n\nFECHAS CERCANAS DISPONIBLES:\n${nearbyLines.join('\n')}`;
           availabilityInfo += `\nIMPORTANTE: Sugeri estas fechas alternativas al huesped como opcion cercana a lo que consultaron.`;
         }
 
-        if (nearbyResults.length === 0 && (!extracted.complejo_nombre || (await checkAvailability(fechaEntrada, fechaSalida)).length === 0)) {
+        if (
+          nearbyResults.length === 0 &&
+          (!extracted.complejo_nombre || (await checkAvailability(fechaEntrada, fechaSalida)).length === 0)
+        ) {
           availabilityInfo += `\nNo se encontraron alternativas cercanas. Sugeri al huesped que nos contacte por WhatsApp (+54 2920 561033) para buscar opciones juntos.`;
         }
       }
@@ -264,9 +271,10 @@ Reglas:
 
   // ── Step 3: Get context ──
   const needsFullContext = availabilityInfo.includes('OTROS DEPARTAMENTOS DISPONIBLES');
-  const contextData = (extracted.complejo_nombre && !needsFullContext)
-    ? await getFilteredContext(extracted.complejo_nombre)
-    : await getFullContext();
+  const contextData =
+    extracted.complejo_nombre && !needsFullContext
+      ? await getFilteredContext(extracted.complejo_nombre)
+      : await getFullContext();
 
   // ── Step 4: Generate response with Claude ──
   const isFormSubmission = !!email.formFields;
@@ -274,13 +282,14 @@ Reglas:
   const fechasInfo = extracted.fecha_entrada ? `Fechas: ${extracted.fecha_entrada} a ${extracted.fecha_salida}` : '';
   const complejoInfo = extracted.complejo_nombre ? `Departamento consultado: ${extracted.complejo_nombre}` : '';
 
-  const responseResult = await getClient().messages.create({
-    model: env.CLAUDE_RESPONSE_MODEL,
-    max_tokens: 1000,
-    system: [
-      {
-        type: 'text',
-        text: `Eres el equipo de Las Grutas Departamentos respondiendo un email de consulta sobre alojamiento.
+  const responseResult = await getClient().messages.create(
+    {
+      model: env.CLAUDE_RESPONSE_MODEL,
+      max_tokens: 1000,
+      system: [
+        {
+          type: 'text',
+          text: `Eres el equipo de Las Grutas Departamentos respondiendo un email de consulta sobre alojamiento.
 Escribis en espanol argentino, tono amable y profesional.
 
 REGLAS PARA EMAIL:
@@ -305,13 +314,13 @@ REGLAS PARA EMAIL:
 CONTEXTO DEL ALOJAMIENTO:
 ${contextData}
 ${availabilityInfo}`,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: `Responde a este email de ${extracted.nombre_huesped || email.from}:
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: `Responde a este email de ${extracted.nombre_huesped || email.from}:
 
 Asunto: ${email.subject}
 ${isFormSubmission ? 'Origen: Formulario de contacto web' : ''}
@@ -322,18 +331,19 @@ Consulta: ${extracted.consulta}
 
 ${isFormSubmission && email.formFields?.mensaje ? `Mensaje del huesped: ${email.formFields.mensaje}` : ''}
 ${!isFormSubmission ? `Texto original del email:\n${email.body.slice(0, 2000)}` : ''}`.trim(),
-      },
-    ],
-  }, { timeout: env.CLAUDE_TIMEOUT_MS });
+        },
+      ],
+    },
+    { timeout: env.CLAUDE_TIMEOUT_MS },
+  );
 
-  const replyBody = responseResult.content[0]?.type === 'text'
-    ? responseResult.content[0].text
-    : 'Gracias por tu consulta. Te contactaremos a la brevedad. Saludos, Las Grutas Departamentos.';
+  const replyBody =
+    responseResult.content[0]?.type === 'text'
+      ? responseResult.content[0].text
+      : 'Gracias por tu consulta. Te contactaremos a la brevedad. Saludos, Las Grutas Departamentos.';
 
   // ── Step 5: Send reply ──
-  const replySubject = email.subject.startsWith('Re:')
-    ? email.subject
-    : `Re: ${email.subject}`;
+  const replySubject = email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`;
 
   await sendAutoReplyEmail({
     to: email.from,

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { addMedia } from '../../api/complejoApi';
 import { Plus } from 'lucide-react';
@@ -8,6 +9,7 @@ interface MediaUploadFormProps {
 }
 
 export default function MediaUploadForm({ complejoId }: MediaUploadFormProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [url, setUrl] = useState('');
   const [tipo, setTipo] = useState('image');
@@ -30,44 +32,50 @@ export default function MediaUploadForm({ complejoId }: MediaUploadFormProps) {
 
   return (
     <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 space-y-2">
-      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Agregar multimedia</h4>
+      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('complejos.mediaAddTitle')}</h4>
       <div className="flex gap-2">
         <input
           type="url"
           value={url}
-          onChange={(e) => { setUrl(e.target.value); setShowPreview(false); }}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setShowPreview(false);
+          }}
           onBlur={handleUrlBlur}
-          placeholder="URL de imagen o video"
-          className="flex-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+          placeholder={t('complejos.mediaUrlPlaceholder')}
+          aria-label={t('complejos.mediaUrlAria')}
+          className="flex-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
         />
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
-          className="text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+          aria-label={t('complejos.mediaTypeAria')}
+          className="text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
         >
-          <option value="image">Imagen</option>
-          <option value="video">Video</option>
+          <option value="image">{t('complejos.mediaTypeImage')}</option>
+          <option value="video">{t('complejos.mediaTypeVideo')}</option>
         </select>
       </div>
       <input
         type="text"
         value={caption}
         onChange={(e) => setCaption(e.target.value)}
-        placeholder="Caption (opcional)"
-        className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+        placeholder={t('complejos.mediaCaptionPlaceholder')}
+        aria-label={t('complejos.mediaCaptionAria')}
+        className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
       />
       {showPreview && url && tipo === 'image' && (
-        <div className="w-32 h-20 rounded overflow-hidden bg-gray-100">
+        <div className="w-32 h-20 rounded-md overflow-hidden bg-gray-100">
           <img src={url} alt="Preview" className="w-full h-full object-cover" onError={() => setShowPreview(false)} />
         </div>
       )}
       <button
         onClick={() => mutation.mutate()}
         disabled={!url || mutation.isPending}
-        className="flex items-center gap-1 text-sm px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+        className="flex items-center gap-1 text-sm px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
       >
         <Plus size={14} />
-        Agregar
+        {t('common.add')}
       </button>
     </div>
   );

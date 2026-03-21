@@ -10,6 +10,12 @@ interface TokenPayload {
   rol: string;
 }
 
+/**
+ * Verifies user credentials against the database.
+ * @param email - The user's email address
+ * @param password - The plaintext password to verify
+ * @returns The agent data if credentials are valid, or null if invalid
+ */
 export async function verifyCredentials(email: string, password: string) {
   const agente = await prisma.agente.findUnique({ where: { email } });
   if (!agente || !agente.activo) return null;
@@ -28,18 +34,30 @@ export async function verifyCredentials(email: string, password: string) {
   };
 }
 
+/**
+ * Generates a signed JWT token from the given payload.
+ * @param payload - The token payload containing user id, email, and role
+ * @returns The signed JWT token string
+ */
 export function generateToken(payload: TokenPayload): string {
   return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRY });
 }
 
-type VerifyResult = {
-  valid: true;
-  payload: TokenPayload;
-} | {
-  valid: false;
-  reason: 'expired' | 'invalid';
-};
+type VerifyResult =
+  | {
+      valid: true;
+      payload: TokenPayload;
+    }
+  | {
+      valid: false;
+      reason: 'expired' | 'invalid';
+    };
 
+/**
+ * Verifies and decodes a JWT token.
+ * @param token - The JWT token string to verify
+ * @returns An object indicating validity with the decoded payload, or the failure reason
+ */
 export function verifyToken(token: string): VerifyResult {
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as TokenPayload;
@@ -52,6 +70,11 @@ export function verifyToken(token: string): VerifyResult {
   }
 }
 
+/**
+ * Generates a password reset token for the given email and stores it in the database with a 1-hour expiry.
+ * @param email - The email address of the agent requesting the reset
+ * @returns The generated reset token string, or null if the agent is not found or inactive
+ */
 export async function generateResetToken(email: string): Promise<string | null> {
   const agente = await prisma.agente.findUnique({ where: { email } });
   if (!agente || !agente.activo) return null;
@@ -67,6 +90,12 @@ export async function generateResetToken(email: string): Promise<string | null> 
   return token;
 }
 
+/**
+ * Resets an agent's password using a valid, non-expired reset token.
+ * @param token - The reset token previously generated via generateResetToken
+ * @param newPassword - The new plaintext password to set
+ * @returns True if the password was successfully reset, false if the token is invalid or expired
+ */
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
   const agente = await prisma.agente.findFirst({
     where: {
@@ -77,7 +106,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
   if (!agente) return false;
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, 12);
 
   await prisma.agente.update({
     where: { id: agente.id },

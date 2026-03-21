@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useReservas } from '../../hooks/useReservas';
 import { useComplejos } from '../../hooks/useComplejos';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notify } from '../../utils/notify';
+import { formatCurrency } from '../../utils/format';
 import { createReservaManual, deleteReserva, updateReserva, updateReservaEstado } from '../../api/reservaApi';
 import Badge, { estadoColor, estadoLabel } from '../ui/Badge';
 import type { Reserva, CrearReservaManualRequest, UpdateReservaRequest } from '@shared/types/reserva';
@@ -30,7 +32,7 @@ function fmtDate(iso: string): string {
 
 function fmtMoney(n: number | null | undefined): string {
   if (n == null) return '-';
-  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 0 })}`;
+  return formatCurrency(n);
 }
 
 const EMPTY_FORM = {
@@ -91,6 +93,7 @@ function ReservaCard({
   onCancelReserva: (id: string) => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation();
   const nombre = r.nombreHuesped ?? r.huesped?.nombre ?? r.huesped?.waId ?? '-';
   const dias = calcDias(r.fechaEntrada, r.fechaSalida);
 
@@ -99,21 +102,23 @@ function ReservaCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{nombre}</p>
-          <p className="text-xs text-gray-500">{r.habitacion ?? 'Sin asignar'}</p>
+          <p className="text-xs text-gray-500">{r.habitacion ?? t('reservas.cardNoRoom')}</p>
         </div>
         <div className="flex items-center gap-1.5">
           <Badge color={estadoColor(r.estado)}>{estadoLabel(r.estado)}</Badge>
           <button
             onClick={onEdit}
-            className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-            title="Editar"
+            className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+            title={t('reservas.cardEdit')}
+            aria-label={t('reservas.cardEdit')}
           >
             <Pencil size={14} />
           </button>
           <button
             onClick={onDelete}
-            className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-            title="Eliminar"
+            className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md"
+            title={t('reservas.cardDelete')}
+            aria-label={t('reservas.cardDelete')}
           >
             <Trash2 size={14} />
           </button>
@@ -122,30 +127,30 @@ function ReservaCard({
 
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div>
-          <span className="text-gray-500">IN</span>
+          <span className="text-gray-500">{t('reservas.cardIn')}</span>
           <p className="text-gray-700">{fmtDate(r.fechaEntrada)}</p>
         </div>
         <div>
-          <span className="text-gray-500">OUT</span>
+          <span className="text-gray-500">{t('reservas.cardOut')}</span>
           <p className="text-gray-700">{fmtDate(r.fechaSalida)}</p>
         </div>
         <div>
-          <span className="text-gray-500">Dias</span>
+          <span className="text-gray-500">{t('reservas.cardDays')}</span>
           <p className="text-gray-700">{dias}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div>
-          <span className="text-gray-500">Total</span>
+          <span className="text-gray-500">{t('reservas.cardTotal')}</span>
           <p className="text-gray-700 font-medium">{fmtMoney(r.precioTotal)}</p>
         </div>
         <div>
-          <span className="text-gray-500">Sena</span>
+          <span className="text-gray-500">{t('reservas.cardDeposit')}</span>
           <p className="text-gray-700">{fmtMoney(r.montoReserva)}</p>
         </div>
         <div>
-          <span className="text-gray-500">Saldo</span>
+          <span className="text-gray-500">{t('reservas.cardBalance')}</span>
           <p className="text-gray-700">{fmtMoney(r.saldo)}</p>
         </div>
       </div>
@@ -156,16 +161,16 @@ function ReservaCard({
           <button
             onClick={() => onEstadoChange(r.id, 'confirmada')}
             disabled={isPending}
-            className="flex-1 text-xs py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+            className="flex-1 text-xs py-1.5 bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-50"
           >
-            Confirmar
+            {t('reservas.cardConfirm')}
           </button>
           <button
             onClick={() => onCancelReserva(r.id)}
             disabled={isPending}
-            className="flex-1 text-xs py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+            className="flex-1 text-xs py-1.5 bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
           >
-            Cancelar
+            {t('reservas.cardCancel')}
           </button>
         </div>
       )}
@@ -174,9 +179,9 @@ function ReservaCard({
           <button
             onClick={() => onEstadoChange(r.id, 'completada')}
             disabled={isPending}
-            className="w-full text-xs py-1.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
+            className="w-full text-xs py-1.5 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50"
           >
-            Completar
+            {t('reservas.cardComplete')}
           </button>
         </div>
       )}
@@ -185,6 +190,7 @@ function ReservaCard({
 }
 
 export default function ReservaList() {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [filtro, setFiltro] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -206,7 +212,7 @@ export default function ReservaList() {
       queryClient.invalidateQueries({ queryKey: ['reservas'] });
       closeModal();
     },
-    onError: (err: Error) => setModalError(err.message || 'Error al crear reserva'),
+    onError: (err: Error) => setModalError(err.message || t('reservas.errorCreate')),
   });
 
   const updateMut = useMutation({
@@ -215,28 +221,28 @@ export default function ReservaList() {
       queryClient.invalidateQueries({ queryKey: ['reservas'] });
       closeModal();
     },
-    onError: (err: Error) => setModalError(err.message || 'Error al actualizar reserva'),
+    onError: (err: Error) => setModalError(err.message || t('reservas.errorUpdate')),
   });
 
   const updateEstadoMut = useMutation({
     mutationFn: ({ id, estado }: { id: string; estado: string }) => updateReservaEstado(id, estado),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reservas'] }),
-    onError: (err: Error) => notify.error(err.message || 'Error al cambiar estado'),
+    onError: (err: Error) => notify.error(err.message || t('reservas.errorUpdateState')),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteReserva(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reservas'] }),
-    onError: (err: Error) => notify.error(err.message || 'Error al eliminar reserva'),
+    onError: (err: Error) => notify.error(err.message || t('reservas.errorDelete')),
   });
 
   const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
 
   function handleDelete(id: string) {
     confirm({
-      title: 'Eliminar reserva',
-      message: 'Esta accion eliminara la reserva permanentemente. ¿Continuar?',
-      confirmLabel: 'Eliminar',
+      title: t('reservas.deleteTitleSingle'),
+      message: t('reservas.deleteMessageSingle'),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
       onConfirm: () => deleteMut.mutate(id),
     });
@@ -244,9 +250,9 @@ export default function ReservaList() {
 
   function handleCancelReserva(id: string) {
     confirm({
-      title: 'Cancelar reserva',
-      message: '¿Seguro que queres cancelar esta reserva?',
-      confirmLabel: 'Cancelar reserva',
+      title: t('reservas.cancelTitle'),
+      message: t('reservas.cancelMessage'),
+      confirmLabel: t('reservas.cancelLabel'),
       variant: 'warning',
       onConfirm: () => updateEstadoMut.mutate({ id, estado: 'cancelada' }),
     });
@@ -273,9 +279,9 @@ export default function ReservaList() {
     const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
     if (isDirty) {
       confirm({
-        title: 'Cambios sin guardar',
-        message: 'Hay cambios sin guardar. ¿Descartar los cambios?',
-        confirmLabel: 'Descartar',
+        title: t('common.unsavedTitle'),
+        message: t('common.unsavedMessage'),
+        confirmLabel: t('common.discard'),
         variant: 'warning',
         onConfirm: () => {
           setModalOpen(false);
@@ -292,7 +298,9 @@ export default function ReservaList() {
     setModalError('');
   }
 
-  const modalRef = useModalKeyboard(() => { if (modalOpen) closeModal(); });
+  const modalRef = useModalKeyboard(() => {
+    if (modalOpen) closeModal();
+  });
 
   function handleChange(field: keyof FormData, value: string | number) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -301,11 +309,11 @@ export default function ReservaList() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errors: Record<string, string> = {};
-    if (!form.nombreHuesped.trim()) errors.nombreHuesped = 'Nombre es requerido';
-    if (!form.fechaEntrada) errors.fechaEntrada = 'Fecha entrada es requerida';
-    if (!form.fechaSalida) errors.fechaSalida = 'Fecha salida es requerida';
+    if (!form.nombreHuesped.trim()) errors.nombreHuesped = t('reservas.validationNameRequired');
+    if (!form.fechaEntrada) errors.fechaEntrada = t('reservas.validationCheckinRequired');
+    if (!form.fechaSalida) errors.fechaSalida = t('reservas.validationCheckoutRequired');
     if (form.fechaEntrada && form.fechaSalida && form.fechaEntrada >= form.fechaSalida) {
-      errors.fechaSalida = 'Fecha salida debe ser posterior a la entrada';
+      errors.fechaSalida = t('reservas.validationCheckoutAfterCheckin');
     }
     if (Object.keys(errors).length > 0) {
       setModalError(Object.values(errors).join('. '));
@@ -336,6 +344,7 @@ export default function ReservaList() {
         id: editingId,
         data: {
           ...base,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           estado: form.estado as any,
           telefonoHuesped: form.telefonoHuesped.trim() || null,
           dni: form.dni.trim() || null,
@@ -351,6 +360,7 @@ export default function ReservaList() {
     } else {
       createMut.mutate({
         ...base,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         estado: form.estado as any,
       });
     }
@@ -362,19 +372,19 @@ export default function ReservaList() {
     return (
       <div>
         <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-6 pb-0">
-          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Reservas</h2>
+          <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('reservas.title')}</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode('table')}
-              className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              title="Vista tabla"
+              className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              title={t('reservas.tableView')}
             >
               <List size={18} />
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className="p-1.5 rounded bg-blue-100 text-blue-700"
-              title="Vista calendario"
+              className="p-1.5 rounded-md bg-blue-100 text-blue-700"
+              title={t('reservas.calendarView')}
             >
               <CalendarDays size={18} />
             </button>
@@ -389,40 +399,43 @@ export default function ReservaList() {
     <div className="p-4 md:p-6">
       {/* Header toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Reservas</h2>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('reservas.title')}</h1>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setViewMode('table')}
-              className="p-1.5 rounded bg-blue-100 text-blue-700"
-              title="Vista tabla"
+              className="p-1.5 rounded-md bg-blue-100 text-blue-700"
+              title={t('reservas.tableView')}
             >
               <List size={18} />
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              title="Vista calendario"
+              className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              title={t('reservas.calendarView')}
             >
               <CalendarDays size={18} />
             </button>
           </div>
           <select
             value={filtro}
-            onChange={(e) => { setFiltro(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setFiltro(e.target.value);
+              setPage(1);
+            }}
             className="text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-700 dark:text-gray-100"
           >
-            <option value="">Todas</option>
-            <option value="pre_reserva">Validar transferencia</option>
-            <option value="confirmada">Confirmada</option>
-            <option value="cancelada">Cancelada</option>
-            <option value="completada">Completada</option>
+            <option value="">{t('reservas.filterAll')}</option>
+            <option value="pre_reserva">{t('reservas.filterValidating')}</option>
+            <option value="confirmada">{t('reservas.filterConfirmed')}</option>
+            <option value="cancelada">{t('reservas.filterCancelled')}</option>
+            <option value="completada">{t('reservas.filterCompleted')}</option>
           </select>
           <button
             onClick={openCreate}
             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
           >
-            <Plus size={16} /> <span className="hidden sm:inline">Nueva</span> Reserva
+            <Plus size={16} /> {t('reservas.newReserva')}
           </button>
         </div>
       </div>
@@ -443,7 +456,7 @@ export default function ReservaList() {
           />
         ))}
         {reservas?.length === 0 && (
-          <div className="text-center text-gray-500 dark:text-gray-400 py-8">No hay reservas</div>
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8">{t('reservas.noReservas')}</div>
         )}
       </div>
 
@@ -452,23 +465,57 @@ export default function ReservaList() {
         <table className="w-full text-xs">
           <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
             <tr>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Nombre</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">DTO</th>
-              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Pers</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">IN</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">OUT</th>
-              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Dias</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Telefono</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">DNI</th>
-              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Tarifa</th>
-              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Total</th>
-              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Reserva</th>
-              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Saldo</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Origen</th>
-              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">Nro Fact.</th>
-              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">USD</th>
-              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Estado</th>
-              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">Acciones</th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderName')}
+              </th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderDto')}
+              </th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderPersons')}
+              </th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderCheckin')}
+              </th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderCheckout')}
+              </th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderDays')}
+              </th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">
+                {t('reservas.tableHeaderPhone')}
+              </th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">
+                {t('reservas.tableHeaderDni')}
+              </th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">
+                {t('reservas.tableHeaderRate')}
+              </th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderTotal')}
+              </th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderDeposit')}
+              </th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderBalance')}
+              </th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">
+                {t('reservas.tableHeaderOrigin')}
+              </th>
+              <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">
+                {t('reservas.tableHeaderInvoice')}
+              </th>
+              <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap hidden xl:table-cell">
+                {t('reservas.tableHeaderUsd')}
+              </th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderState')}
+              </th>
+              <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">
+                {t('reservas.tableHeaderActions')}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -477,7 +524,16 @@ export default function ReservaList() {
               const telefono = r.telefonoHuesped ?? r.huesped?.telefono ?? '-';
               const dias = calcDias(r.fechaEntrada, r.fechaSalida);
               return (
-                <tr key={r.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr
+                  key={r.id}
+                  className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      openEdit(r);
+                    }
+                  }}
+                >
                   <td className="px-3 py-2 whitespace-nowrap">{nombre}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{r.habitacion ?? '-'}</td>
                   <td className="px-3 py-2 text-center">{r.numHuespedes}</td>
@@ -486,13 +542,17 @@ export default function ReservaList() {
                   <td className="px-3 py-2 text-center">{dias}</td>
                   <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{telefono}</td>
                   <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{r.dni ?? '-'}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap hidden xl:table-cell">{fmtMoney(r.tarifaNoche)}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap hidden xl:table-cell">
+                    {fmtMoney(r.tarifaNoche)}
+                  </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap font-medium">{fmtMoney(r.precioTotal)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{fmtMoney(r.montoReserva)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">{fmtMoney(r.saldo)}</td>
                   <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{r.origenReserva ?? '-'}</td>
                   <td className="px-3 py-2 whitespace-nowrap hidden xl:table-cell">{r.nroFactura ?? '-'}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap hidden xl:table-cell">{r.importeUsd != null ? `US$${r.importeUsd}` : '-'}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap hidden xl:table-cell">
+                    {r.importeUsd != null ? `US$${r.importeUsd}` : '-'}
+                  </td>
                   <td className="px-3 py-2 text-center">
                     <Badge color={estadoColor(r.estado)}>{estadoLabel(r.estado)}</Badge>
                   </td>
@@ -500,17 +560,17 @@ export default function ReservaList() {
                     <div className="flex gap-1 justify-center items-center">
                       <button
                         onClick={() => openEdit(r)}
-                        className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                        title="Editar"
-                        aria-label="Editar reserva"
+                        className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                        title={t('reservas.cardEdit')}
+                        aria-label={t('reservas.cardEdit')}
                       >
                         <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => handleDelete(r.id)}
-                        className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                        title="Eliminar"
-                        aria-label="Eliminar reserva"
+                        className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md"
+                        title={t('reservas.cardDelete')}
+                        aria-label={t('reservas.cardDelete')}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -519,16 +579,16 @@ export default function ReservaList() {
                           <button
                             onClick={() => updateEstadoMut.mutate({ id: r.id, estado: 'confirmada' })}
                             disabled={updateEstadoMut.isPending}
-                            className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+                            className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-50"
                           >
-                            Confirmar
+                            {t('reservas.cardConfirm')}
                           </button>
                           <button
                             onClick={() => handleCancelReserva(r.id)}
                             disabled={updateEstadoMut.isPending}
-                            className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                            className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
                           >
-                            Cancelar
+                            {t('reservas.cardCancel')}
                           </button>
                         </>
                       )}
@@ -536,9 +596,9 @@ export default function ReservaList() {
                         <button
                           onClick={() => updateEstadoMut.mutate({ id: r.id, estado: 'completada' })}
                           disabled={updateEstadoMut.isPending}
-                          className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
+                          className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50"
                         >
-                          Completar
+                          {t('reservas.cardComplete')}
                         </button>
                       )}
                     </div>
@@ -549,7 +609,7 @@ export default function ReservaList() {
             {reservas?.length === 0 && (
               <tr>
                 <td colSpan={17} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                  No hay reservas
+                  {t('reservas.noReservas')}
                 </td>
               </tr>
             )}
@@ -561,22 +621,22 @@ export default function ReservaList() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 rounded-b-lg mt-0 md:mt-0">
           <span className="text-xs text-gray-500">
-            Pag {page}/{totalPages} ({data?.total ?? 0})
+            {t('common.page')} {page}/{totalPages} ({data?.total ?? 0})
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 dark:text-gray-300"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 dark:text-gray-300"
             >
-              Anterior
+              {t('common.previous')}
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 dark:text-gray-300"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 dark:text-gray-300"
             >
-              Siguiente
+              {t('common.next')}
             </button>
           </div>
         </div>
@@ -584,13 +644,24 @@ export default function ReservaList() {
 
       {/* Modal crear/editar — responsive */}
       {modalOpen && (
-        <div ref={modalRef} tabIndex={-1} className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 outline-none">
+        <div
+          ref={modalRef}
+          tabIndex={-1}
+          className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 outline-none"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reserva-modal-title"
+        >
           <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b sticky top-0 bg-white z-10">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-                {editingId ? 'Editar Reserva' : 'Nueva Reserva'}
+              <h3 id="reserva-modal-title" className="text-base sm:text-lg font-semibold text-gray-800">
+                {editingId ? t('reservas.editTitle') : t('reservas.createTitle')}
               </h3>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar modal">
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label={t('reservas.closeModal')}
+              >
                 <X size={20} />
               </button>
             </div>
@@ -599,7 +670,7 @@ export default function ReservaList() {
               {/* Fila 1: Nombre + Telefono + DNI */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Nombre *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formName')}</label>
                   <input
                     type="text"
                     value={form.nombreHuesped}
@@ -609,7 +680,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Telefono</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formPhone')}</label>
                   <input
                     type="text"
                     value={form.telefonoHuesped}
@@ -618,13 +689,13 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">DNI</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formDni')}</label>
                   <input
                     type="text"
                     value={form.dni}
                     onChange={(e) => handleChange('dni', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                    placeholder="Ej: 35123456"
+                    placeholder={t('reservas.formDniPlaceholder')}
                   />
                 </div>
               </div>
@@ -632,13 +703,13 @@ export default function ReservaList() {
               {/* Fila 2: DTO + Personas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Departamento</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formDepartment')}</label>
                   <select
                     value={form.habitacion}
                     onChange={(e) => handleChange('habitacion', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                   >
-                    <option value="">-- Seleccionar --</option>
+                    <option value="">{t('reservas.formDepartmentSelect')}</option>
                     {complejos
                       ?.filter((c) => c.activo)
                       .map((c) => (
@@ -649,7 +720,7 @@ export default function ReservaList() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Personas</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formPersons')}</label>
                   <input
                     type="number"
                     min={1}
@@ -663,7 +734,7 @@ export default function ReservaList() {
               {/* Fila 3: IN + OUT + Dias */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Entrada *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formCheckin')}</label>
                   <input
                     type="date"
                     value={form.fechaEntrada}
@@ -673,7 +744,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Salida *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formCheckout')}</label>
                   <input
                     type="date"
                     value={form.fechaSalida}
@@ -683,7 +754,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div className="hidden sm:block">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Dias</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formDays')}</label>
                   <input
                     type="text"
                     value={form.fechaEntrada && form.fechaSalida ? calcDias(form.fechaEntrada, form.fechaSalida) : ''}
@@ -696,7 +767,7 @@ export default function ReservaList() {
               {/* Fila 4: Tarifa + Total + Reserva + Saldo */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Tarifa/Noche</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formRate')}</label>
                   <input
                     type="number"
                     min={0}
@@ -708,7 +779,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Total</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formTotal')}</label>
                   <input
                     type="number"
                     min={0}
@@ -720,7 +791,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Sena</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formDeposit')}</label>
                   <input
                     type="number"
                     min={0}
@@ -732,7 +803,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Saldo</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formBalance')}</label>
                   <input
                     type="number"
                     min={0}
@@ -748,17 +819,17 @@ export default function ReservaList() {
               {/* Fila 5: Origen + Nro Factura + Importe USD + Estado */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Origen</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formOrigin')}</label>
                   <input
                     type="text"
                     value={form.origenReserva}
                     onChange={(e) => handleChange('origenReserva', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                    placeholder="Booking..."
+                    placeholder={t('reservas.formOriginPlaceholder')}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Nro Fact.</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formInvoice')}</label>
                   <input
                     type="text"
                     value={form.nroFactura}
@@ -767,7 +838,7 @@ export default function ReservaList() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">USD</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formUsd')}</label>
                   <input
                     type="number"
                     min={0}
@@ -775,27 +846,27 @@ export default function ReservaList() {
                     value={form.importeUsd}
                     onChange={(e) => handleChange('importeUsd', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                    placeholder="US$"
+                    placeholder={t('reservas.formUsdPlaceholder')}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formState')}</label>
                   <select
                     value={form.estado}
                     onChange={(e) => handleChange('estado', e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                   >
-                    <option value="pre_reserva">Validar transferencia</option>
-                    <option value="confirmada">Confirmada</option>
-                    <option value="cancelada">Cancelada</option>
-                    <option value="completada">Completada</option>
+                    <option value="pre_reserva">{t('reservas.formStateValidating')}</option>
+                    <option value="confirmada">{t('reservas.formStateConfirmed')}</option>
+                    <option value="cancelada">{t('reservas.formStateCancelled')}</option>
+                    <option value="completada">{t('reservas.formStateCompleted')}</option>
                   </select>
                 </div>
               </div>
 
               {/* Fila 6: Notas */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Notas</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t('reservas.formNotes')}</label>
                 <textarea
                   value={form.notas}
                   onChange={(e) => handleChange('notas', e.target.value)}
@@ -804,9 +875,7 @@ export default function ReservaList() {
                 />
               </div>
 
-              {modalError && (
-                <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{modalError}</p>
-              )}
+              {modalError && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-md">{modalError}</p>}
 
               {/* Botones */}
               <div className="flex justify-end gap-2 pt-2">
@@ -815,14 +884,14 @@ export default function ReservaList() {
                   onClick={closeModal}
                   className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
                 >
-                  Cancelar
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
                   className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {isSaving ? 'Guardando...' : editingId ? 'Guardar' : 'Crear'}
+                  {isSaving ? t('reservas.formSaving') : editingId ? t('reservas.formSave') : t('reservas.formCreate')}
                 </button>
               </div>
             </form>

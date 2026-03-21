@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import { csrfProtection } from './middleware/csrfProtection.js';
 import { requestId } from './middleware/requestId.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { authMiddleware } from './middleware/authMiddleware.js';
@@ -35,27 +37,48 @@ const app = express();
 // Parse allowed origins from env
 const allowedOrigins = env.ALLOWED_ORIGINS;
 if (allowedOrigins === '*' && env.NODE_ENV === 'production') {
-  logger.warn('ALLOWED_ORIGINS is set to "*" in production — this allows any origin. Set explicit origins in .env for security.');
+  logger.warn(
+    'ALLOWED_ORIGINS is set to "*" in production — this allows any origin. Set explicit origins in .env for security.',
+  );
 }
 
 // Global middleware
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: false,
-  crossOriginResourcePolicy: false,
-}));
-app.use(cors({
-  origin: allowedOrigins === '*' ? true : allowedOrigins.split(',').map(o => o.trim()),
-  credentials: true,
-}));
-app.use(express.json({
-  limit: '1mb',
-  verify: (req, _res, buf) => {
-    // Store raw body for webhook signature verification
-    (req as Record<string, unknown>).rawBody = buf;
-  },
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", 'wss:', 'ws:'],
+        fontSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false,
+  }),
+);
+app.use(
+  cors({
+    origin: allowedOrigins === '*' ? true : allowedOrigins.split(',').map((o) => o.trim()),
+    credentials: true,
+  }),
+);
+app.use(
+  express.json({
+    limit: '1mb',
+    verify: (req, _res, buf) => {
+      // Store raw body for webhook signature verification
+      (req as Record<string, unknown>).rawBody = buf;
+    },
+  }),
+);
+app.use(cookieParser());
+app.use(csrfProtection);
 app.use(requestId);
 app.use(requestLogger);
 

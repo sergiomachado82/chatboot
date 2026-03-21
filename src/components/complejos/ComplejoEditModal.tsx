@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notify } from '../../utils/notify';
 import { createComplejo, updateComplejo, deleteComplejo, createIcalFeed, deleteIcalFeed } from '../../api/complejoApi';
@@ -17,6 +18,7 @@ interface ComplejoEditModalProps {
 }
 
 export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditModalProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const isNew = !complejo;
   const [tab, setTab] = useState<Tab>('datos');
@@ -101,8 +103,8 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
     }
   }, [complejo]);
 
-  const isDirty = JSON.stringify(form) !== initialFormRef.current ||
-    JSON.stringify(amenities) !== initialAmenitiesRef.current;
+  const isDirty =
+    JSON.stringify(form) !== initialFormRef.current || JSON.stringify(amenities) !== initialAmenitiesRef.current;
 
   const [showDirtyConfirm, setShowDirtyConfirm] = useState(false);
 
@@ -152,7 +154,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
       queryClient.invalidateQueries({ queryKey: ['complejos'] });
       onClose();
     },
-    onError: (err: Error) => notify.error(err.message || 'Error al guardar'),
+    onError: (err: Error) => notify.error(err.message || t('common.errorGeneric')),
   });
 
   const deleteMutation = useMutation({
@@ -161,11 +163,11 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
       queryClient.invalidateQueries({ queryKey: ['complejos'] });
       onClose();
     },
-    onError: (err: Error) => notify.error(err.message || 'Error al desactivar'),
+    onError: (err: Error) => notify.error(err.message || t('common.errorGeneric')),
   });
 
   function handleDelete() {
-    if (confirm('Desactivar este departamento?')) {
+    if (confirm(t('complejos.deactivateConfirm'))) {
       deleteMutation.mutate();
     }
   }
@@ -189,8 +191,8 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
       setFeeds([...feeds, feed]);
       setNewFeedUrl('');
       queryClient.invalidateQueries({ queryKey: ['complejos'] });
-    } catch (err: any) {
-      notify.error(err.message || 'Error al agregar feed');
+    } catch (err: unknown) {
+      notify.error((err instanceof Error ? err.message : '') || t('complejos.errorAddFeed'));
     } finally {
       setFeedLoading(false);
     }
@@ -202,8 +204,8 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
       await deleteIcalFeed(complejo.id, feedId);
       setFeeds(feeds.filter((f) => f.id !== feedId));
       queryClient.invalidateQueries({ queryKey: ['complejos'] });
-    } catch (err: any) {
-      notify.error(err.message || 'Error al eliminar feed');
+    } catch (err: unknown) {
+      notify.error((err instanceof Error ? err.message : '') || t('complejos.errorDeleteFeed'));
     }
   }
 
@@ -216,39 +218,52 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'datos', label: 'Datos' },
-    { key: 'amenities', label: 'Amenities' },
-    { key: 'politicas', label: 'Politicas' },
-    { key: 'tarifas', label: 'Tarifas' },
-    { key: 'reserva', label: 'Datos Reserva' },
-    { key: 'media', label: 'Multimedia' },
-    { key: 'sync', label: 'Sync' },
+    { key: 'datos', label: t('complejos.tabDatos') },
+    { key: 'amenities', label: t('complejos.tabAmenities') },
+    { key: 'politicas', label: t('complejos.tabPoliticas') },
+    { key: 'tarifas', label: t('complejos.tabTarifas') },
+    { key: 'reserva', label: t('complejos.tabReservation') },
+    { key: 'media', label: t('complejos.tabMedia') },
+    { key: 'sync', label: t('complejos.tabSync') },
   ];
 
   return (
-    <div ref={modalRef} tabIndex={-1} className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 outline-none">
+    <div
+      ref={modalRef}
+      tabIndex={-1}
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 outline-none"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="complejo-modal-title"
+    >
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b dark:border-gray-700">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
-            {isNew ? 'Nuevo Departamento' : `Editar: ${complejo.nombre}`}
-          </h3>
-          <button onClick={handleCloseWithDirtyCheck} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar modal">
+          <h2 id="complejo-modal-title" className="text-lg font-bold text-gray-800 dark:text-gray-100">
+            {isNew ? t('complejos.titleNew') : `${t('complejos.titleEdit')} ${complejo.nombre}`}
+          </h2>
+          <button
+            onClick={handleCloseWithDirtyCheck}
+            className="text-gray-400 hover:text-gray-600"
+            aria-label={t('common.close')}
+          >
             <X size={20} />
           </button>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-1 px-5 pt-3 border-b dark:border-gray-700">
-          {tabs.map((t) => (
+          {tabs.map((tabItem) => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tabItem.key}
+              onClick={() => setTab(tabItem.key)}
               className={`px-3 py-1.5 text-sm font-medium rounded-t-md ${
-                tab === t.key ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
+                tab === tabItem.key
+                  ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t.label}
+              {tabItem.label}
             </button>
           ))}
         </div>
@@ -258,123 +273,202 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
           {tab === 'datos' && (
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Nombre *</label>
+                <label
+                  htmlFor="complejo-nombre"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formName')}
+                </label>
                 <input
+                  id="complejo-nombre"
                   value={form.nombre}
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  required
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Tipo</label>
+                <label
+                  htmlFor="complejo-tipo"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formType')}
+                </label>
                 <input
+                  id="complejo-tipo"
                   value={form.tipo}
                   onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-                  placeholder="Ej: Monoambiente, 2 ambientes"
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('complejos.formTypePlaceholder')}
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Superficie</label>
+                <label
+                  htmlFor="complejo-superficie"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formSurface')}
+                </label>
                 <input
+                  id="complejo-superficie"
                   value={form.superficie}
                   onChange={(e) => setForm({ ...form, superficie: e.target.value })}
-                  placeholder="Ej: 35-40 m2"
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('complejos.formSurfacePlaceholder')}
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Direccion</label>
+                <label
+                  htmlFor="complejo-direccion"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formAddress')}
+                </label>
                 <input
+                  id="complejo-direccion"
                   value={form.direccion}
                   onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Ubicacion</label>
+                <label
+                  htmlFor="complejo-ubicacion"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formLocation')}
+                </label>
                 <input
+                  id="complejo-ubicacion"
                   value={form.ubicacion}
                   onChange={(e) => setForm({ ...form, ubicacion: e.target.value })}
-                  placeholder="Ej: a 2 cuadras de la playa"
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('complejos.formLocationPlaceholder')}
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Capacidad</label>
+                <label
+                  htmlFor="complejo-capacidad"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formCapacity')}
+                </label>
                 <input
+                  id="complejo-capacidad"
                   type="number"
                   min={1}
                   value={form.capacidad}
                   onChange={(e) => setForm({ ...form, capacidad: Number(e.target.value) })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Cant. unidades</label>
+                <label
+                  htmlFor="complejo-cantidadUnidades"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formUnits')}
+                </label>
                 <input
+                  id="complejo-cantidadUnidades"
                   type="number"
                   min={1}
                   value={form.cantidadUnidades}
                   onChange={(e) => setForm({ ...form, cantidadUnidades: Number(e.target.value) })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Dormitorios</label>
+                <label
+                  htmlFor="complejo-dormitorios"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formBedrooms')}
+                </label>
                 <input
+                  id="complejo-dormitorios"
                   type="number"
                   min={0}
                   value={form.dormitorios}
                   onChange={(e) => setForm({ ...form, dormitorios: Number(e.target.value) })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Banos</label>
+                <label
+                  htmlFor="complejo-banos"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formBathrooms')}
+                </label>
                 <input
+                  id="complejo-banos"
                   type="number"
                   min={0}
                   value={form.banos}
                   onChange={(e) => setForm({ ...form, banos: Number(e.target.value) })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Estadia minima (noches)</label>
+                <label
+                  htmlFor="complejo-estadiaMinima"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formMinStay')}
+                </label>
                 <input
+                  id="complejo-estadiaMinima"
                   type="number"
                   min={0}
                   value={form.estadiaMinima}
                   onChange={(e) => setForm({ ...form, estadiaMinima: Number(e.target.value) })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Check-in</label>
+                <label
+                  htmlFor="complejo-checkIn"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formCheckin')}
+                </label>
                 <input
+                  id="complejo-checkIn"
                   value={form.checkIn}
                   onChange={(e) => setForm({ ...form, checkIn: e.target.value })}
-                  placeholder="14:00"
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('complejos.formCheckinPlaceholder')}
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Check-out</label>
+                <label
+                  htmlFor="complejo-checkOut"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formCheckout')}
+                </label>
                 <input
+                  id="complejo-checkOut"
                   value={form.checkOut}
                   onChange={(e) => setForm({ ...form, checkOut: e.target.value })}
-                  placeholder="10:00"
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('complejos.formCheckoutPlaceholder')}
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Video tour (URL)</label>
+                <label
+                  htmlFor="complejo-videoTour"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.formVideoTour')}
+                </label>
                 <input
+                  id="complejo-videoTour"
                   value={form.videoTour}
                   onChange={(e) => setForm({ ...form, videoTour: e.target.value })}
-                  placeholder="https://youtube.com/..."
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('complejos.formVideoTourPlaceholder')}
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
               </div>
             </div>
@@ -387,44 +481,48 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
                   value={newAmenity}
                   onChange={(e) => setNewAmenity(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addAmenity()}
-                  placeholder="Nuevo amenity..."
-                  className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('complejos.amenitiesPlaceholder')}
+                  className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                 />
                 <button
                   onClick={addAmenity}
-                  className="flex items-center gap-1 text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="flex items-center gap-1 text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
                   <Plus size={14} />
-                  Agregar
+                  {t('complejos.amenitiesAdd')}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {amenities.map((a, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-sm px-2 py-1 rounded">
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-sm px-2 py-1 rounded-full"
+                  >
                     {a}
                     <button
                       onClick={() => setAmenities(amenities.filter((_, idx) => idx !== i))}
                       className="text-gray-400 hover:text-red-500"
+                      aria-label={t('common.delete')}
                     >
                       <X size={12} />
                     </button>
                   </span>
                 ))}
-                {amenities.length === 0 && (
-                  <p className="text-sm text-gray-400">Sin amenities agregados</p>
-                )}
+                {amenities.length === 0 && <p className="text-sm text-gray-400">{t('complejos.amenitiesNone')}</p>}
               </div>
             </div>
           )}
 
           {tab === 'politicas' && (
             <div className="space-y-3">
-              {([
-                { key: 'mascotas', label: 'Mascotas permitidas' },
-                { key: 'fumar', label: 'Se permite fumar' },
-                { key: 'fiestas', label: 'Fiestas permitidas' },
-                { key: 'autoResponderEmail', label: 'Responder emails automaticamente' },
-              ] as const).map((p) => (
+              {(
+                [
+                  { key: 'mascotas', label: t('complejos.policiesPets') },
+                  { key: 'fumar', label: t('complejos.policiesSmoking') },
+                  { key: 'fiestas', label: t('complejos.policiesParties') },
+                  { key: 'autoResponderEmail', label: t('complejos.policiesAutoEmail') },
+                ] as const
+              ).map((p) => (
                 <label key={p.key} className="flex items-center gap-3 cursor-pointer">
                   <div
                     className={`relative w-10 h-5 rounded-full transition-colors ${
@@ -445,16 +543,25 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
           )}
 
           {tab === 'tarifas' && !isNew && (
-            <TarifaSection complejoId={complejo.id} tarifas={complejo.tarifas} tarifasEspeciales={complejo.tarifasEspeciales} bloqueos={complejo.bloqueos ?? []} cantidadUnidades={complejo.cantidadUnidades} />
+            <TarifaSection
+              complejoId={complejo.id}
+              tarifas={complejo.tarifas}
+              tarifasEspeciales={complejo.tarifasEspeciales}
+              bloqueos={complejo.bloqueos ?? []}
+              cantidadUnidades={complejo.cantidadUnidades}
+            />
           )}
-          {tab === 'tarifas' && isNew && (
-            <p className="text-sm text-gray-400">Guarda el departamento primero para agregar tarifas.</p>
-          )}
+          {tab === 'tarifas' && isNew && <p className="text-sm text-gray-400">{t('complejos.tarifasSaveFirst')}</p>}
 
           {tab === 'reserva' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Porcentaje para reserva (%)</label>
+                <label
+                  htmlFor="complejo-porcentajeReserva"
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                >
+                  {t('complejos.reservationPercentage')}
+                </label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -466,119 +573,162 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <input
+                    id="complejo-porcentajeReserva"
                     type="number"
                     min={0}
                     max={60}
                     value={form.porcentajeReserva}
-                    onChange={(e) => setForm({ ...form, porcentajeReserva: Math.min(60, Math.max(0, Number(e.target.value))) })}
-                    className="w-16 text-sm text-center border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    onChange={(e) =>
+                      setForm({ ...form, porcentajeReserva: Math.min(60, Math.max(0, Number(e.target.value))) })
+                    }
+                    className="w-16 text-sm text-center border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                   <span className="text-sm text-gray-500">%</span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   {form.porcentajeReserva === 0
-                    ? '0% = reserva de palabra (sin deposito)'
-                    : `El huesped debera abonar el ${form.porcentajeReserva}% del total como sena`}
+                    ? t('complejos.reservationPercentageZero')
+                    : t('complejos.reservationPercentageInfo', { pct: form.porcentajeReserva })}
                 </p>
               </div>
               <div className="border-t dark:border-gray-700 pt-3"></div>
-              <p className="text-xs text-gray-500">Datos bancarios para el pago de la sena. El bot los compartira con el huesped cuando confirme la reserva.</p>
+              <p className="text-xs text-gray-500">{t('complejos.bankDataInfo')}</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Titular de la cuenta</label>
+                  <label
+                    htmlFor="complejo-titularCuenta"
+                    className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                  >
+                    {t('complejos.formAccountHolder')}
+                  </label>
                   <input
+                    id="complejo-titularCuenta"
                     value={form.titularCuenta}
                     onChange={(e) => setForm({ ...form, titularCuenta: e.target.value })}
-                    placeholder="Nombre completo del titular"
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    placeholder={t('complejos.formAccountHolderPlaceholder')}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Banco</label>
+                  <label
+                    htmlFor="complejo-banco"
+                    className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                  >
+                    {t('complejos.formBank')}
+                  </label>
                   <input
+                    id="complejo-banco"
                     value={form.banco}
                     onChange={(e) => setForm({ ...form, banco: e.target.value })}
-                    placeholder="Ej: Banco Nacion"
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    placeholder={t('complejos.formBankPlaceholder')}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">CUIT/CUIL</label>
+                  <label
+                    htmlFor="complejo-cuit"
+                    className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                  >
+                    {t('complejos.formCuit')}
+                  </label>
                   <input
+                    id="complejo-cuit"
                     value={form.cuit}
                     onChange={(e) => setForm({ ...form, cuit: e.target.value })}
-                    placeholder="XX-XXXXXXXX-X"
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    placeholder={t('complejos.formCuitPlaceholder')}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">CBU</label>
+                  <label
+                    htmlFor="complejo-cbu"
+                    className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                  >
+                    {t('complejos.formCbu')}
+                  </label>
                   <input
+                    id="complejo-cbu"
                     value={form.cbu}
                     onChange={(e) => setForm({ ...form, cbu: e.target.value })}
-                    placeholder="22 digitos"
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    placeholder={t('complejos.formCbuPlaceholder')}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Alias CBU</label>
+                  <label
+                    htmlFor="complejo-aliasCbu"
+                    className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                  >
+                    {t('complejos.formCbuAlias')}
+                  </label>
                   <input
+                    id="complejo-aliasCbu"
                     value={form.aliasCbu}
                     onChange={(e) => setForm({ ...form, aliasCbu: e.target.value })}
-                    placeholder="Ej: MI.ALIAS.MP"
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    placeholder={t('complejos.formCbuAliasPlaceholder')}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
               </div>
               <div className="border-t pt-3 mt-3">
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Pago con tarjeta (MercadoPago)</h4>
-                <p className="text-xs text-gray-500 mb-2">Link de pago para sena con tarjeta de credito (recargo 8%).</p>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  {t('complejos.mercadoPagoTitle')}
+                </h4>
+                <p className="text-xs text-gray-500 mb-2">{t('complejos.mercadoPagoInfo')}</p>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Link de MercadoPago</label>
+                  <label
+                    htmlFor="complejo-linkMercadoPago"
+                    className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1"
+                  >
+                    {t('complejos.mercadoPagoLink')}
+                  </label>
                   <input
+                    id="complejo-linkMercadoPago"
                     value={form.linkMercadoPago}
                     onChange={(e) => setForm({ ...form, linkMercadoPago: e.target.value })}
-                    placeholder="https://www.mercadopago.com.ar/..."
-                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    placeholder={t('complejos.mercadoPagoPlaceholder')}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {tab === 'media' && !isNew && (
-            <MediaGallery complejoId={complejo.id} media={complejo.media} />
-          )}
-          {tab === 'media' && isNew && (
-            <p className="text-sm text-gray-400">Guarda el departamento primero para agregar multimedia.</p>
-          )}
+          {tab === 'media' && !isNew && <MediaGallery complejoId={complejo.id} media={complejo.media} />}
+          {tab === 'media' && isNew && <p className="text-sm text-gray-400">{t('complejos.mediaSaveFirst')}</p>}
 
           {tab === 'sync' && !isNew && (
             <div className="space-y-4">
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Feeds iCal (importar reservas)</h4>
-                <p className="text-xs text-gray-500 mb-3">Agrega URLs de iCal de Booking, Airbnb, VRBO u otras plataformas para importar reservas automaticamente.</p>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  {t('complejos.syncIcalTitle')}
+                </h4>
+                <p className="text-xs text-gray-500 mb-3">{t('complejos.syncIcalInfo')}</p>
 
                 {/* Existing feeds */}
                 {feeds.length > 0 && (
                   <div className="space-y-2 mb-3">
                     {feeds.map((feed) => (
-                      <div key={feed.id} className="flex items-center gap-2 bg-gray-50 rounded px-3 py-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                      <div key={feed.id} className="flex items-center gap-2 bg-gray-50 rounded-md px-3 py-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
                           {feed.plataforma}
                         </span>
                         <span className="flex-1 text-xs text-gray-600 truncate" title={feed.url}>
                           {feed.url}
                         </span>
                         {feed.ultimoSync && (
-                          <span className="text-xs text-gray-400" title={`Ultimo sync: ${new Date(feed.ultimoSync).toLocaleString()}`}>
+                          <span
+                            className="text-xs text-gray-400"
+                            title={`Ultimo sync: ${new Date(feed.ultimoSync).toLocaleString()}`}
+                          >
                             {new Date(feed.ultimoSync).toLocaleDateString()}
                           </span>
                         )}
                         <button
                           onClick={() => handleDeleteFeed(feed.id)}
                           className="text-gray-400 hover:text-red-500"
-                          title="Eliminar feed"
+                          title={t('common.delete')}
+                          aria-label={t('common.delete')}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -592,7 +742,7 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
                   <select
                     value={newFeedPlataforma}
                     onChange={(e) => setNewFeedPlataforma(e.target.value)}
-                    className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    className="text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   >
                     <option value="booking">Booking</option>
                     <option value="airbnb">Airbnb</option>
@@ -604,42 +754,42 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
                     onChange={(e) => setNewFeedUrl(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddFeed()}
                     placeholder="https://..."
-                    className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                   <button
                     onClick={handleAddFeed}
                     disabled={!newFeedUrl.trim() || feedLoading}
-                    className="flex items-center gap-1 text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    className="flex items-center gap-1 text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
                     <Plus size={14} />
-                    Agregar
+                    {t('common.add')}
                   </button>
                 </div>
               </div>
 
               <div className="border-t dark:border-gray-700 pt-4">
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Exportar iCal</h4>
-                <p className="text-xs text-gray-500 mb-2">Usa esta URL para exportar las reservas de este complejo a otras plataformas.</p>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  {t('complejos.syncExportTitle')}
+                </h4>
+                <p className="text-xs text-gray-500 mb-2">{t('complejos.syncExportInfo')}</p>
                 <div className="flex gap-2">
                   <input
                     readOnly
                     value={`${window.location.origin}/api/ical/${complejo.id}.ics`}
-                    className="flex-1 text-xs bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-gray-600 dark:text-gray-300"
+                    className="flex-1 text-xs bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 text-gray-600 dark:text-gray-300"
                   />
                   <button
                     onClick={handleCopyIcalUrl}
-                    className="flex items-center gap-1 text-sm px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
+                    className="flex items-center gap-1 text-sm px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
                   >
                     {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
-                    {copied ? 'Copiado' : 'Copiar'}
+                    {copied ? t('common.copied') : t('common.copy')}
                   </button>
                 </div>
               </div>
             </div>
           )}
-          {tab === 'sync' && isNew && (
-            <p className="text-sm text-gray-400">Guarda el departamento primero para configurar sincronizacion.</p>
-          )}
+          {tab === 'sync' && isNew && <p className="text-sm text-gray-400">{t('complejos.syncSaveFirst')}</p>}
         </div>
 
         {/* Footer */}
@@ -651,23 +801,23 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
                 className="flex items-center gap-1 text-sm text-red-600 hover:text-red-800"
               >
                 <Trash2 size={14} />
-                Desactivar
+                {t('common.deactivate')}
               </button>
             )}
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleCloseWithDirtyCheck}
-              className="text-sm px-4 py-1.5 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
+              className="text-sm px-4 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
             >
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button
               onClick={() => saveMutation.mutate()}
               disabled={!form.nombre || saveMutation.isPending}
-              className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
-              {saveMutation.isPending ? 'Guardando...' : 'Guardar'}
+              {saveMutation.isPending ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>
@@ -675,11 +825,14 @@ export default function ComplejoEditModal({ complejo, onClose }: ComplejoEditMod
 
       <ConfirmDialog
         open={showDirtyConfirm}
-        title="Cambios sin guardar"
-        message="Hay cambios sin guardar. ¿Descartar los cambios?"
-        confirmLabel="Descartar"
+        title={t('common.unsavedTitle')}
+        message={t('common.unsavedMessage')}
+        confirmLabel={t('common.discard')}
         variant="warning"
-        onConfirm={() => { setShowDirtyConfirm(false); onClose(); }}
+        onConfirm={() => {
+          setShowDirtyConfirm(false);
+          onClose();
+        }}
         onCancel={() => setShowDirtyConfirm(false)}
       />
     </div>

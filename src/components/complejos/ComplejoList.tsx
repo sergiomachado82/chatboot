@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useComplejos } from '../../hooks/useComplejos';
 import { Plus } from 'lucide-react';
 import type { Complejo } from '@shared/types/complejo';
@@ -8,6 +9,7 @@ import ResumenPanel from './ResumenPanel';
 import { CardSkeleton } from '../ui/Skeleton';
 
 export default function ComplejoList() {
+  const { t } = useTranslation();
   const { data: complejos, isLoading } = useComplejos();
   const [editingComplejo, setEditingComplejo] = useState<Complejo | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -32,13 +34,14 @@ export default function ComplejoList() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Propiedades</h2>
+          <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('complejos.title')}</h1>
           <button
             onClick={handleCreate}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
             <Plus size={16} />
-            <span className="hidden sm:inline">Agregar</span> Depto
+            <span className="hidden sm:inline">{t('complejos.addButton')}</span>
+            <span className="sm:hidden">{t('complejos.addButtonShort')}</span>
           </button>
         </div>
 
@@ -52,12 +55,9 @@ export default function ComplejoList() {
           </div>
           {complejos?.length === 0 && (
             <div className="text-center text-gray-400 dark:text-gray-500 py-12">
-              <p className="text-sm">No hay departamentos registrados</p>
-              <button
-                onClick={handleCreate}
-                className="mt-2 text-sm text-blue-600 hover:underline"
-              >
-                Agregar el primero
+              <p className="text-sm">{t('complejos.noDepartments')}</p>
+              <button onClick={handleCreate} className="mt-2 text-sm text-blue-600 hover:underline">
+                {t('complejos.addFirst')}
               </button>
             </div>
           )}
@@ -70,9 +70,7 @@ export default function ComplejoList() {
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <ComplejoEditModal complejo={editingComplejo} onClose={handleClose} />
-      )}
+      {showModal && <ComplejoEditModal complejo={editingComplejo} onClose={handleClose} />}
     </div>
   );
 }

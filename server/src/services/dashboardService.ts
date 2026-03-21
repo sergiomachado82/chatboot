@@ -22,82 +22,104 @@ export async function getDashboardStats() {
     complejos,
   ] = await Promise.all([
     // Conversations by estado
-    prisma.conversacion.groupBy({
-      by: ['estado'],
-      _count: { id: true },
-    }).catch(() => []),
+    prisma.conversacion
+      .groupBy({
+        by: ['estado'],
+        _count: { id: true },
+      })
+      .catch(() => []),
     // Reservas this month by estado
-    prisma.reserva.groupBy({
-      by: ['estado'],
-      where: {
-        fechaEntrada: { lte: monthEnd },
-        fechaSalida: { gte: monthStart },
-      },
-      _count: { id: true },
-    }).catch(() => []),
+    prisma.reserva
+      .groupBy({
+        by: ['estado'],
+        where: {
+          fechaEntrada: { lte: monthEnd },
+          fechaSalida: { gte: monthStart },
+        },
+        _count: { id: true },
+      })
+      .catch(() => []),
     // Total reservas this month
-    prisma.reserva.count({
-      where: {
-        fechaEntrada: { lte: monthEnd },
-        fechaSalida: { gte: monthStart },
-      },
-    }).catch(() => 0),
+    prisma.reserva
+      .count({
+        where: {
+          fechaEntrada: { lte: monthEnd },
+          fechaSalida: { gte: monthStart },
+        },
+      })
+      .catch(() => 0),
     // Emails today
-    prisma.emailProcesado.count({
-      where: { creadoEn: { gte: todayStart } },
-    }).catch(() => 0),
+    prisma.emailProcesado
+      .count({
+        where: { creadoEn: { gte: todayStart } },
+      })
+      .catch(() => 0),
     // Emails respondidos (all time)
-    prisma.emailProcesado.count({
-      where: { respondido: true },
-    }).catch(() => 0),
+    prisma.emailProcesado
+      .count({
+        where: { respondido: true },
+      })
+      .catch(() => 0),
     // Emails with errors
-    prisma.emailProcesado.count({
-      where: { error: { not: null } },
-    }).catch(() => 0),
+    prisma.emailProcesado
+      .count({
+        where: { error: { not: null } },
+      })
+      .catch(() => 0),
     // Emails formularios
-    prisma.emailProcesado.count({
-      where: { esFormulario: true },
-    }).catch(() => 0),
+    prisma.emailProcesado
+      .count({
+        where: { esFormulario: true },
+      })
+      .catch(() => 0),
     // Recent active conversations
-    prisma.conversacion.findMany({
-      where: { estado: { in: ['espera_humano', 'humano_activo', 'bot'] } },
-      orderBy: { ultimoMensajeEn: 'desc' },
-      take: 5,
-      include: {
-        huesped: { select: { nombre: true, waId: true } },
-        agente: { select: { nombre: true } },
-      },
-    }).catch(() => []),
+    prisma.conversacion
+      .findMany({
+        where: { estado: { in: ['espera_humano', 'humano_activo', 'bot'] } },
+        orderBy: { ultimoMensajeEn: 'desc' },
+        take: 5,
+        include: {
+          huesped: { select: { nombre: true, waId: true } },
+          agente: { select: { nombre: true } },
+        },
+      })
+      .catch(() => []),
     // Upcoming reservas
-    prisma.reserva.findMany({
-      where: {
-        fechaEntrada: { gte: now },
-        estado: { in: ['pre_reserva', 'confirmada'] },
-      },
-      orderBy: { fechaEntrada: 'asc' },
-      take: 5,
-      include: {
-        huesped: { select: { nombre: true } },
-      },
-    }).catch(() => []),
+    prisma.reserva
+      .findMany({
+        where: {
+          fechaEntrada: { gte: now },
+          estado: { in: ['pre_reserva', 'confirmada'] },
+        },
+        orderBy: { fechaEntrada: 'asc' },
+        take: 5,
+        include: {
+          huesped: { select: { nombre: true } },
+        },
+      })
+      .catch(() => []),
     // Reservas in next 7 days (for occupancy)
-    prisma.reserva.findMany({
-      where: {
-        estado: { in: ['confirmada', 'pre_reserva'] },
-        fechaEntrada: { lte: weekFromNow },
-        fechaSalida: { gte: now },
-      },
-      select: {
-        habitacion: true,
-        fechaEntrada: true,
-        fechaSalida: true,
-      },
-    }).catch(() => []),
+    prisma.reserva
+      .findMany({
+        where: {
+          estado: { in: ['confirmada', 'pre_reserva'] },
+          fechaEntrada: { lte: weekFromNow },
+          fechaSalida: { gte: now },
+        },
+        select: {
+          habitacion: true,
+          fechaEntrada: true,
+          fechaSalida: true,
+        },
+      })
+      .catch(() => []),
     // Active complejos with capacity
-    prisma.complejo.findMany({
-      where: { activo: true },
-      select: { nombre: true, cantidadUnidades: true },
-    }).catch(() => []),
+    prisma.complejo
+      .findMany({
+        where: { activo: true },
+        select: { nombre: true, cantidadUnidades: true },
+      })
+      .catch(() => []),
   ]);
 
   // Build conversation stats

@@ -12,7 +12,10 @@ router.get('/huespedes', async (_req, res) => {
 
 router.get('/huespedes/:id', async (req, res) => {
   const huesped = await getHuespedById(req.params.id);
-  if (!huesped) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!huesped) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
   const reservas = await getReservasByHuesped(req.params.id);
   res.json({ ...huesped, reservas });
 });

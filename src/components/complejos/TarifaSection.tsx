@@ -1,14 +1,16 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { upsertTarifa, createTarifaEspecial, deleteTarifaEspecialApi, createBloqueoApi, deleteBloqueoApi } from '../../api/complejoApi';
+import {
+  upsertTarifa,
+  createTarifaEspecial,
+  deleteTarifaEspecialApi,
+  createBloqueoApi,
+  deleteBloqueoApi,
+} from '../../api/complejoApi';
 import { Trash2 } from 'lucide-react';
+import { formatCurrency } from '../../utils/format';
 import type { Tarifa, TarifaEspecial, Bloqueo } from '@shared/types/complejo';
-
-const TEMPORADAS = [
-  { key: 'baja', label: 'Temp. Baja', desc: 'Mar-Jun, Ago-Nov' },
-  { key: 'media', label: 'Temp. Media', desc: 'Jul, 1-14 Dic' },
-  { key: 'alta', label: 'Temp. Alta', desc: '15 Dic - Feb' },
-];
 
 interface TarifaSectionProps {
   complejoId: string;
@@ -18,19 +20,32 @@ interface TarifaSectionProps {
   cantidadUnidades: number;
 }
 
-export default function TarifaSection({ complejoId, tarifas, tarifasEspeciales, bloqueos, cantidadUnidades }: TarifaSectionProps) {
+export default function TarifaSection({
+  complejoId,
+  tarifas,
+  tarifasEspeciales,
+  bloqueos,
+  cantidadUnidades,
+}: TarifaSectionProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  const TEMPORADAS = [
+    { key: 'baja', label: t('tarifas.tempBaja'), desc: t('tarifas.tempBajaDesc') },
+    { key: 'media', label: t('tarifas.tempMedia'), desc: t('tarifas.tempMediaDesc') },
+    { key: 'alta', label: t('tarifas.tempAlta'), desc: t('tarifas.tempAltaDesc') },
+  ];
   const [prices, setPrices] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
-    for (const t of tarifas) {
-      map[t.temporada] = String(t.precioNoche);
+    for (const tar of tarifas) {
+      map[tar.temporada] = String(tar.precioNoche);
     }
     return map;
   });
   const [minNights, setMinNights] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
-    for (const t of tarifas) {
-      map[t.temporada] = t.estadiaMinima ? String(t.estadiaMinima) : '';
+    for (const tar of tarifas) {
+      map[tar.temporada] = tar.estadiaMinima ? String(tar.estadiaMinima) : '';
     }
     return map;
   });
@@ -51,8 +66,13 @@ export default function TarifaSection({ complejoId, tarifas, tarifasEspeciales, 
   });
 
   const createTeMutation = useMutation({
-    mutationFn: (data: { fechaInicio: string; fechaFin: string; precioNoche: number; estadiaMinima?: number | null; motivo?: string | null }) =>
-      createTarifaEspecial(complejoId, data),
+    mutationFn: (data: {
+      fechaInicio: string;
+      fechaFin: string;
+      precioNoche: number;
+      estadiaMinima?: number | null;
+      motivo?: string | null;
+    }) => createTarifaEspecial(complejoId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['complejos'] });
       setTeForm({ fechaInicio: '', fechaFin: '', precioNoche: '', estadiaMinima: '', motivo: '' });
@@ -129,42 +149,42 @@ export default function TarifaSection({ complejoId, tarifas, tarifasEspeciales, 
     <div className="space-y-6">
       {/* Seasonal rates */}
       <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Tarifas por noche (ARS)</h4>
+        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('tarifas.title')}</h4>
         <div className="space-y-2">
-          {TEMPORADAS.map((t) => (
-            <div key={t.key} className="flex items-center gap-3">
+          {TEMPORADAS.map((temp) => (
+            <div key={temp.key} className="flex items-center gap-3">
               <div className="w-36">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.label}</span>
-                <span className="block text-xs text-gray-400 dark:text-gray-500">{t.desc}</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{temp.label}</span>
+                <span className="block text-xs text-gray-400 dark:text-gray-500">{temp.desc}</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-gray-500 dark:text-gray-400">$</span>
                 <input
                   type="number"
                   min={0}
-                  value={prices[t.key] ?? ''}
-                  onChange={(e) => setPrices({ ...prices, [t.key]: e.target.value })}
-                  className="w-28 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                  value={prices[temp.key] ?? ''}
+                  onChange={(e) => setPrices({ ...prices, [temp.key]: e.target.value })}
+                  className="w-28 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
                   placeholder="0"
                 />
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Min noches</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{t('tarifas.minNights')}</span>
                 <input
                   type="number"
                   min={1}
-                  value={minNights[t.key] ?? ''}
-                  onChange={(e) => setMinNights({ ...minNights, [t.key]: e.target.value })}
-                  className="w-16 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                  value={minNights[temp.key] ?? ''}
+                  onChange={(e) => setMinNights({ ...minNights, [temp.key]: e.target.value })}
+                  className="w-16 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
                   placeholder="-"
                 />
               </div>
               <button
-                onClick={() => handleSave(t.key)}
+                onClick={() => handleSave(temp.key)}
                 disabled={tarifaMutation.isPending}
-                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
+                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50"
               >
-                Guardar
+                {t('common.save')}
               </button>
             </div>
           ))}
@@ -173,28 +193,34 @@ export default function TarifaSection({ complejoId, tarifas, tarifasEspeciales, 
 
       {/* Special rates */}
       <div className="space-y-3 border-t dark:border-gray-700 pt-4">
-        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Tarifas Especiales (overrides por fechas)</h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Precios custom que sobreescriben la tarifa estacional para un rango de fechas. Se sincronizan al inventario automaticamente.</p>
+        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('tarifas.specialRatesTitle')}</h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{t('tarifas.specialRatesInfo')}</p>
 
         {/* Existing special rates list */}
         {tarifasEspeciales.length > 0 && (
           <div className="space-y-1">
             {tarifasEspeciales.map((te) => (
-              <div key={te.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded px-3 py-2 text-sm">
+              <div
+                key={te.id}
+                className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-md px-3 py-2 text-sm"
+              >
                 <span className="text-gray-700 dark:text-gray-300">
-                  {new Date(te.fechaInicio).toLocaleDateString('es-AR')} - {new Date(te.fechaFin).toLocaleDateString('es-AR')}
+                  {new Date(te.fechaInicio).toLocaleDateString('es-AR')} -{' '}
+                  {new Date(te.fechaFin).toLocaleDateString('es-AR')}
                 </span>
-                <span className="font-medium text-gray-900 dark:text-gray-100">${te.precioNoche.toLocaleString('es-AR')}/noche</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {formatCurrency(te.precioNoche)}
+                  {t('complejos.pricePerNight')}
+                </span>
                 {te.estadiaMinima && (
                   <span className="text-xs text-gray-500 dark:text-gray-400">min {te.estadiaMinima}n</span>
                 )}
-                {te.motivo && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500 italic">{te.motivo}</span>
-                )}
+                {te.motivo && <span className="text-xs text-gray-400 dark:text-gray-500 italic">{te.motivo}</span>}
                 <button
                   onClick={() => handleDeleteTe(te.id)}
                   disabled={deleteTeMutation.isPending}
                   className="ml-auto text-red-400 hover:text-red-600 disabled:opacity-50"
+                  aria-label={t('common.delete')}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -203,100 +229,123 @@ export default function TarifaSection({ complejoId, tarifas, tarifasEspeciales, 
           </div>
         )}
         {tarifasEspeciales.length === 0 && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">Sin tarifas especiales</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{t('tarifas.noSpecialRates')}</p>
         )}
 
         {/* Add new special rate form */}
-        <div className="bg-blue-50 dark:bg-blue-900/30 rounded p-3 space-y-2">
-          <span className="text-xs font-medium text-blue-700">Agregar tarifa especial</span>
+        <div className="bg-blue-50 dark:bg-blue-900/30 rounded-md p-3 space-y-2">
+          <span className="text-xs font-medium text-blue-700">{t('tarifas.addSpecialRate')}</span>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Fecha inicio</label>
+              <label htmlFor="tarifa-te-fechaInicio" className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                {t('tarifas.specialRateStart')}
+              </label>
               <input
+                id="tarifa-te-fechaInicio"
                 type="date"
                 value={teForm.fechaInicio}
                 onChange={(e) => setTeForm({ ...teForm, fechaInicio: e.target.value })}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Fecha fin</label>
+              <label htmlFor="tarifa-te-fechaFin" className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                {t('tarifas.specialRateEnd')}
+              </label>
               <input
+                id="tarifa-te-fechaFin"
                 type="date"
                 value={teForm.fechaFin}
                 onChange={(e) => setTeForm({ ...teForm, fechaFin: e.target.value })}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Precio/noche</label>
+              <label htmlFor="tarifa-te-precioNoche" className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                {t('tarifas.specialRatePrice')}
+              </label>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-gray-500">$</span>
                 <input
+                  id="tarifa-te-precioNoche"
                   type="number"
                   min={0}
                   value={teForm.precioNoche}
                   onChange={(e) => setTeForm({ ...teForm, precioNoche: e.target.value })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
                   placeholder="0"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Min noches (opc.)</label>
+              <label
+                htmlFor="tarifa-te-estadiaMinima"
+                className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5"
+              >
+                {t('tarifas.specialRateMinNights')}
+              </label>
               <input
+                id="tarifa-te-estadiaMinima"
                 type="number"
                 min={1}
                 value={teForm.estadiaMinima}
                 onChange={(e) => setTeForm({ ...teForm, estadiaMinima: e.target.value })}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
                 placeholder="-"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Motivo (opc.)</label>
+              <label htmlFor="tarifa-te-motivo" className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                {t('tarifas.specialRateReason')}
+              </label>
               <input
+                id="tarifa-te-motivo"
                 value={teForm.motivo}
                 onChange={(e) => setTeForm({ ...teForm, motivo: e.target.value })}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
-                placeholder="Ej: Semana Santa, Fin de semana largo..."
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
+                placeholder={t('tarifas.specialRateReasonPlaceholder')}
               />
             </div>
           </div>
           <button
             onClick={handleCreateTe}
             disabled={createTeMutation.isPending || !teForm.fechaInicio || !teForm.fechaFin || !teForm.precioNoche}
-            className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
-            {createTeMutation.isPending ? 'Creando...' : 'Agregar'}
+            {createTeMutation.isPending ? t('tarifas.specialRateCreating') : t('common.add')}
           </button>
         </div>
       </div>
 
       {/* Bloqueos de Disponibilidad */}
       <div className="space-y-3 border-t dark:border-gray-700 pt-4">
-        <h4 className="text-sm font-semibold text-red-700">Bloqueos de Disponibilidad</h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Cerrar la disponibilidad para un rango de fechas (reparaciones, uso personal, etc). El bot no ofrecera el depto en esas fechas.</p>
+        <h4 className="text-sm font-semibold text-red-700">{t('tarifas.blockagesTitle')}</h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{t('tarifas.blockagesInfo')}</p>
 
         {bloqueos.length > 0 && (
           <div className="space-y-1">
             {bloqueos.map((b) => (
-              <div key={b.id} className="flex items-center gap-3 bg-red-50 dark:bg-red-900/30 rounded px-3 py-2 text-sm">
+              <div
+                key={b.id}
+                className="flex items-center gap-3 bg-red-50 dark:bg-red-900/30 rounded-md px-3 py-2 text-sm"
+              >
                 <span className="text-gray-700 dark:text-gray-300">
-                  {new Date(b.fechaInicio).toLocaleDateString('es-AR')} - {new Date(b.fechaFin).toLocaleDateString('es-AR')}
+                  {new Date(b.fechaInicio).toLocaleDateString('es-AR')} -{' '}
+                  {new Date(b.fechaFin).toLocaleDateString('es-AR')}
                 </span>
                 {cantidadUnidades > 1 && (
                   <span className="text-xs font-medium text-red-600">
-                    {b.unidades === 0 ? `Todas (${cantidadUnidades})` : `${b.unidades} unidad${b.unidades > 1 ? 'es' : ''}`}
+                    {b.unidades === 0
+                      ? `${t('tarifas.blockageAll')} (${cantidadUnidades})`
+                      : `${b.unidades} ${b.unidades > 1 ? t('tarifas.blockagePlural') : t('tarifas.blockageSingular')}`}
                   </span>
                 )}
-                {b.motivo && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400 italic">{b.motivo}</span>
-                )}
+                {b.motivo && <span className="text-xs text-gray-500 dark:text-gray-400 italic">{b.motivo}</span>}
                 <button
                   onClick={() => handleDeleteBloqueo(b.id)}
                   disabled={deleteBloqueoMutation.isPending}
                   className="ml-auto text-red-400 hover:text-red-600 disabled:opacity-50"
+                  aria-label={t('common.delete')}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -305,50 +354,65 @@ export default function TarifaSection({ complejoId, tarifas, tarifasEspeciales, 
           </div>
         )}
         {bloqueos.length === 0 && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">Sin bloqueos activos</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{t('tarifas.noBlockages')}</p>
         )}
 
-        <div className="bg-red-50 dark:bg-red-900/30 rounded p-3 space-y-2">
-          <span className="text-xs font-medium text-red-700">Bloquear fechas</span>
+        <div className="bg-red-50 dark:bg-red-900/30 rounded-md p-3 space-y-2">
+          <span className="text-xs font-medium text-red-700">{t('tarifas.blockDates')}</span>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Fecha inicio</label>
+              <label htmlFor="bloqueo-fechaInicio" className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                {t('tarifas.blockageStart')}
+              </label>
               <input
+                id="bloqueo-fechaInicio"
                 type="date"
                 value={bloqueoForm.fechaInicio}
                 onChange={(e) => setBloqueoForm({ ...bloqueoForm, fechaInicio: e.target.value })}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Fecha fin</label>
+              <label htmlFor="bloqueo-fechaFin" className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                {t('tarifas.blockageEnd')}
+              </label>
               <input
+                id="bloqueo-fechaFin"
                 type="date"
                 value={bloqueoForm.fechaFin}
                 onChange={(e) => setBloqueoForm({ ...bloqueoForm, fechaFin: e.target.value })}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Motivo (opc.)</label>
+              <label htmlFor="bloqueo-motivo" className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                {t('tarifas.blockageReason')}
+              </label>
               <input
+                id="bloqueo-motivo"
                 value={bloqueoForm.motivo}
                 onChange={(e) => setBloqueoForm({ ...bloqueoForm, motivo: e.target.value })}
-                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
-                placeholder="Ej: Reparacion, uso personal..."
+                className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
+                placeholder={t('tarifas.blockageReasonPlaceholder')}
               />
             </div>
             {cantidadUnidades > 1 && (
               <div className="col-span-2">
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">Unidades a bloquear</label>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                  {t('tarifas.blockageUnits')}
+                </label>
                 <select
                   value={bloqueoForm.unidades}
                   onChange={(e) => setBloqueoForm({ ...bloqueoForm, unidades: e.target.value })}
-                  className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1"
+                  className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md px-2 py-1"
                 >
-                  <option value="0">Todas ({cantidadUnidades})</option>
+                  <option value="0">
+                    {t('tarifas.blockageAll')} ({cantidadUnidades})
+                  </option>
                   {Array.from({ length: cantidadUnidades }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={String(n)}>{n} unidad{n > 1 ? 'es' : ''}</option>
+                    <option key={n} value={String(n)}>
+                      {n} {n > 1 ? t('tarifas.blockagePlural') : t('tarifas.blockageSingular')}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -357,9 +421,9 @@ export default function TarifaSection({ complejoId, tarifas, tarifasEspeciales, 
           <button
             onClick={handleCreateBloqueo}
             disabled={createBloqueoMutation.isPending || !bloqueoForm.fechaInicio || !bloqueoForm.fechaFin}
-            className="text-xs px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
           >
-            {createBloqueoMutation.isPending ? 'Bloqueando...' : 'Bloquear fechas'}
+            {createBloqueoMutation.isPending ? t('tarifas.blockageBlocking') : t('tarifas.blockDates')}
           </button>
         </div>
       </div>

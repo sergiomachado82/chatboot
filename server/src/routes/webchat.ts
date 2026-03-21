@@ -33,7 +33,7 @@ router.post('/webchat/send', webchatRateLimiter, async (req, res) => {
         type: 'text',
         text: { body: message },
       },
-      name ?? 'Visitante Web'
+      name ?? 'Visitante Web',
     );
 
     // Get the latest bot response from the conversation

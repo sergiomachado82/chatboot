@@ -14,8 +14,14 @@ import { z } from 'zod';
 const router = Router();
 
 const reservaQuerySchema = z.object({
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   estado: z.enum(['pre_reserva', 'confirmada', 'cancelada', 'completada']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -137,9 +143,12 @@ router.patch('/reservas/:id', async (req, res) => {
     return;
   }
 
-  const data: any = { ...parsed.data };
-  if (data.fechaEntrada) data.fechaEntrada = new Date(data.fechaEntrada);
-  if (data.fechaSalida) data.fechaSalida = new Date(data.fechaSalida);
+  const { fechaEntrada, fechaSalida, ...rest } = parsed.data;
+  const data = {
+    ...rest,
+    ...(fechaEntrada ? { fechaEntrada: new Date(fechaEntrada) } : {}),
+    ...(fechaSalida ? { fechaSalida: new Date(fechaSalida) } : {}),
+  };
 
   const reserva = await updateReserva(req.params.id, data);
   if (!reserva) {

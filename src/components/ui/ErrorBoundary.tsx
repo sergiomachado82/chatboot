@@ -36,13 +36,13 @@ export class ErrorBoundary extends Component<Props, State> {
             Ocurrio un error inesperado. Por favor, recarga la pagina para continuar.
           </p>
           {this.state.error && (
-            <pre className="text-sm text-gray-500 max-w-lg overflow-auto p-2 bg-gray-100 rounded dark:bg-gray-800 dark:text-gray-400">
+            <pre className="text-sm text-gray-500 max-w-lg overflow-auto p-2 bg-gray-100 rounded-md dark:bg-gray-800 dark:text-gray-400">
               {this.state.error.message}
             </pre>
           )}
           <button
             onClick={this.handleReload}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             Recargar pagina
           </button>

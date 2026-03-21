@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useEmails, useEmailStats } from '../../hooks/useEmails';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notify } from '../../utils/notify';
@@ -23,7 +24,12 @@ function fmtDateTime(iso: string): string {
   });
 }
 
-function StatCard({ label, value, icon: Icon, color }: {
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
   label: string;
   value: number | undefined;
   icon: typeof Mail;
@@ -43,31 +49,47 @@ function StatCard({ label, value, icon: Icon, color }: {
 }
 
 function EmailCard({ email, onClick, onDelete }: { email: EmailProcesado; onClick: () => void; onDelete: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-2 cursor-pointer hover:shadow-md transition-shadow"
     >
       <div className="flex items-start justify-between">
         <div className="min-w-0">
           <p className="font-medium text-sm text-gray-900 truncate">{email.fromEmail}</p>
-          <p className="text-xs text-gray-500 truncate">{email.subject || 'Sin asunto'}</p>
+          <p className="text-xs text-gray-500 truncate">{email.subject || t('emails.noSubject')}</p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <Badge color={email.error ? 'red' : email.respondido ? 'green' : 'gray'}>
-            {email.error ? 'Error' : email.respondido ? 'Respondido' : 'Pendiente'}
+            {email.error
+              ? t('emails.statusError')
+              : email.respondido
+                ? t('emails.statusResponded')
+                : t('emails.statusPending')}
           </Badge>
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-            title="Eliminar"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+            aria-label={t('emails.deleteEmail')}
           >
             <Trash2 size={14} />
           </button>
         </div>
       </div>
       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>{email.esFormulario ? 'Formulario' : 'Email directo'}</span>
+        <span>{email.esFormulario ? t('emails.typeForm') : t('emails.typeDirect')}</span>
         <span>{fmtDateTime(email.creadoEn)}</span>
       </div>
     </div>
@@ -75,6 +97,7 @@ function EmailCard({ email, onClick, onDelete }: { email: EmailProcesado; onClic
 }
 
 export default function EmailList() {
+  const { t } = useTranslation();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -98,16 +121,16 @@ export default function EmailList() {
       queryClient.invalidateQueries({ queryKey: ['emails'] });
       queryClient.invalidateQueries({ queryKey: ['emailStats'] });
     },
-    onError: (err: Error) => notify.error(err.message || 'Error al eliminar email'),
+    onError: (err: Error) => notify.error(err.message || t('emails.errorDelete')),
   });
 
   const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
 
   function handleDelete(id: string) {
     confirm({
-      title: 'Eliminar email',
-      message: 'Se eliminara este email permanentemente. ¿Continuar?',
-      confirmLabel: 'Eliminar',
+      title: t('emails.deleteTitle'),
+      message: t('emails.deleteMessage'),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
       onConfirm: () => deleteMut.mutate(id),
     });
@@ -128,25 +151,40 @@ export default function EmailList() {
   }
 
   const FILTROS: { key: Filtro; label: string }[] = [
-    { key: 'todos', label: 'Todos' },
-    { key: 'respondidos', label: 'Respondidos' },
-    { key: 'errores', label: 'Con error' },
-    { key: 'formularios', label: 'Formularios' },
+    { key: 'todos', label: t('emails.filterAll') },
+    { key: 'respondidos', label: t('emails.filterResponded') },
+    { key: 'errores', label: t('emails.filterErrors') },
+    { key: 'formularios', label: t('emails.filterForms') },
   ];
 
   return (
     <div className="p-4 md:p-6">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <StatCard label="Hoy" value={stats?.hoy} icon={Mail} color="bg-blue-100 text-blue-600" />
-        <StatCard label="Respondidos" value={stats?.respondidos} icon={CheckCircle} color="bg-green-100 text-green-600" />
-        <StatCard label="Errores" value={stats?.errores} icon={AlertTriangle} color="bg-red-100 text-red-600" />
-        <StatCard label="Formularios" value={stats?.formularios} icon={FileText} color="bg-purple-100 text-purple-600" />
+        <StatCard label={t('emails.statsToday')} value={stats?.hoy} icon={Mail} color="bg-blue-100 text-blue-600" />
+        <StatCard
+          label={t('emails.statsResponded')}
+          value={stats?.respondidos}
+          icon={CheckCircle}
+          color="bg-green-100 text-green-600"
+        />
+        <StatCard
+          label={t('emails.statsErrors')}
+          value={stats?.errores}
+          icon={AlertTriangle}
+          color="bg-red-100 text-red-600"
+        />
+        <StatCard
+          label={t('emails.statsForms')}
+          value={stats?.formularios}
+          icon={FileText}
+          color="bg-purple-100 text-purple-600"
+        />
       </div>
 
       {/* Header toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Emails</h2>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('emails.title')}</h1>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Filtros */}
           <div className="flex gap-1">
@@ -172,7 +210,7 @@ export default function EmailList() {
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Email o asunto..."
+                placeholder={t('emails.searchPlaceholder')}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="text-sm border border-gray-300 dark:border-gray-600 rounded-md pl-8 pr-3 py-1.5 w-48 dark:bg-gray-700 dark:text-gray-100"
@@ -181,10 +219,14 @@ export default function EmailList() {
             {search && (
               <button
                 type="button"
-                onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }}
+                onClick={() => {
+                  setSearch('');
+                  setSearchInput('');
+                  setPage(1);
+                }}
                 className="text-xs text-gray-500 hover:text-gray-700 px-2"
               >
-                Limpiar
+                {t('emails.searchClear')}
               </button>
             )}
           </form>
@@ -199,7 +241,7 @@ export default function EmailList() {
           <EmailCard key={e.id} email={e} onClick={() => setSelectedId(e.id)} onDelete={() => handleDelete(e.id)} />
         ))}
         {emails?.length === 0 && (
-          <div className="text-center text-gray-500 dark:text-gray-400 py-8">No hay emails</div>
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8">{t('emails.noEmails')}</div>
         )}
       </div>
 
@@ -209,12 +251,12 @@ export default function EmailList() {
           <table className="w-full text-xs">
             <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
               <tr>
-                <th className="text-left px-3 py-2 text-gray-600 font-medium">De</th>
-                <th className="text-left px-3 py-2 text-gray-600 font-medium">Asunto</th>
-                <th className="text-center px-3 py-2 text-gray-600 font-medium">Tipo</th>
-                <th className="text-center px-3 py-2 text-gray-600 font-medium">Estado</th>
-                <th className="text-left px-3 py-2 text-gray-600 font-medium">Fecha</th>
-                <th className="text-center px-3 py-2 text-gray-600 font-medium">Acciones</th>
+                <th className="text-left px-3 py-2 text-gray-600 font-medium">{t('emails.tableFrom')}</th>
+                <th className="text-left px-3 py-2 text-gray-600 font-medium">{t('emails.tableSubject')}</th>
+                <th className="text-center px-3 py-2 text-gray-600 font-medium">{t('emails.tableType')}</th>
+                <th className="text-center px-3 py-2 text-gray-600 font-medium">{t('emails.tableState')}</th>
+                <th className="text-left px-3 py-2 text-gray-600 font-medium">{t('emails.tableDate')}</th>
+                <th className="text-center px-3 py-2 text-gray-600 font-medium">{t('emails.tableActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -225,24 +267,32 @@ export default function EmailList() {
                   className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                 >
                   <td className="px-3 py-2 whitespace-nowrap max-w-[200px] truncate">{e.fromEmail}</td>
-                  <td className="px-3 py-2 whitespace-nowrap max-w-[250px] truncate">{e.subject || 'Sin asunto'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap max-w-[250px] truncate">
+                    {e.subject || t('emails.noSubject')}
+                  </td>
                   <td className="px-3 py-2 text-center">
                     <Badge color={e.esFormulario ? 'blue' : 'gray'}>
-                      {e.esFormulario ? 'Formulario' : 'Email'}
+                      {e.esFormulario ? t('emails.typeForm') : t('emails.typeDirect')}
                     </Badge>
                   </td>
                   <td className="px-3 py-2 text-center">
                     <Badge color={e.error ? 'red' : e.respondido ? 'green' : 'gray'}>
-                      {e.error ? 'Error' : e.respondido ? 'Respondido' : 'Pendiente'}
+                      {e.error
+                        ? t('emails.statusError')
+                        : e.respondido
+                          ? t('emails.statusResponded')
+                          : t('emails.statusPending')}
                     </Badge>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">{fmtDateTime(e.creadoEn)}</td>
                   <td className="px-3 py-2 text-center">
                     <button
-                      onClick={(ev) => { ev.stopPropagation(); handleDelete(e.id); }}
-                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                      title="Eliminar"
-                      aria-label="Eliminar email"
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        handleDelete(e.id);
+                      }}
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                      aria-label={t('emails.deleteEmail')}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -252,7 +302,7 @@ export default function EmailList() {
               {emails?.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                    No hay emails
+                    {t('emails.noEmails')}
                   </td>
                 </tr>
               )}
@@ -265,34 +315,29 @@ export default function EmailList() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-t dark:border-gray-700 rounded-b-lg">
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Pag {page}/{totalPages} ({data?.total ?? 0})
+            {t('common.page')} {page}/{totalPages} ({data?.total ?? 0})
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
-              Anterior
+              {t('common.previous')}
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+              className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
-              Siguiente
+              {t('common.next')}
             </button>
           </div>
         </div>
       )}
 
       {/* Detail Modal */}
-      {selectedId && (
-        <EmailDetailModal
-          emailId={selectedId}
-          onClose={() => setSelectedId(null)}
-        />
-      )}
+      {selectedId && <EmailDetailModal emailId={selectedId} onClose={() => setSelectedId(null)} />}
 
       <ConfirmDialog
         open={confirmState.open}

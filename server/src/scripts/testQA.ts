@@ -22,17 +22,24 @@ const failures: string[] = [];
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-async function api(method: string, path: string, body?: any, authToken?: string | null) {
+async function api(method: string, path: string, body?: unknown, authToken?: string | null) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (authToken !== null) headers['Authorization'] = `Bearer ${authToken ?? token}`;
   const opts: RequestInit = { method, headers };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(`${BASE_URL}${path}`, opts);
-  let data: any;
-  try { data = await res.json(); } catch { data = null; }
-  return { status: res.status, data };
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { status: res.status, data: data as any };
 }
 
 function assert(testName: string, condition: boolean, details?: string) {
@@ -63,6 +70,7 @@ async function sendSim(body: string): Promise<void> {
   await sleep(12000);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getLastBotMsg(): Promise<{ contenido: string; metadata: any } | null> {
   const huesped = await prisma.huesped.findFirst({ where: { waId: FROM } });
   if (!huesped) return null;
@@ -75,6 +83,7 @@ async function getLastBotMsg(): Promise<{ contenido: string; metadata: any } | n
     where: { conversacionId: conv.id, origen: 'bot' },
     orderBy: { creadoEn: 'desc' },
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return msg ? { contenido: msg.contenido, metadata: msg.metadata as any } : null;
 }
 
@@ -110,7 +119,7 @@ async function qa01_DataIntegrity() {
     assert(`${c.nombre}: capacidad > 0`, c.capacidad > 0, `capacidad: ${c.capacidad}`);
 
     // Cada complejo debe tener tarifas para las 3 temporadas
-    const temporadas = c.tarifas.map(t => t.temporada);
+    const temporadas = c.tarifas.map((t) => t.temporada);
     assert(`${c.nombre}: tiene tarifa baja`, temporadas.includes('baja'), `temporadas: ${temporadas.join(', ')}`);
     assert(`${c.nombre}: tiene tarifa media`, temporadas.includes('media'), `temporadas: ${temporadas.join(', ')}`);
     assert(`${c.nombre}: tiene tarifa alta`, temporadas.includes('alta'), `temporadas: ${temporadas.join(', ')}`);
@@ -122,20 +131,26 @@ async function qa01_DataIntegrity() {
 
     // Si tiene estadiaMinima en complejo, debe ser razonable (1-30)
     if (c.estadiaMinima !== null) {
-      assert(`${c.nombre}: estadiaMinima razonable`, c.estadiaMinima >= 1 && c.estadiaMinima <= 30, `got: ${c.estadiaMinima}`);
+      assert(
+        `${c.nombre}: estadiaMinima razonable`,
+        c.estadiaMinima >= 1 && c.estadiaMinima <= 30,
+        `got: ${c.estadiaMinima}`,
+      );
     }
   }
 
   // Verificar que solo Pewmafe tiene estadiaMinima configurada
-  const conEstadiaMinima = complejos.filter(c => c.estadiaMinima !== null);
-  const conTarifaEstadiaMin = complejos.filter(c => c.tarifas.some(t => t.estadiaMinima !== null));
 
   // Pewmafe puede tener estadiaMinima en tarifas, los demás NO deben tener en complejo
   for (const c of complejos) {
     if (c.nombre !== 'Pewmafe') {
       assert(`${c.nombre}: NO tiene estadiaMinima en complejo`, c.estadiaMinima === null, `got: ${c.estadiaMinima}`);
-      const tarifasConMin = c.tarifas.filter(t => t.estadiaMinima !== null);
-      assert(`${c.nombre}: NO tiene estadiaMinima en tarifas`, tarifasConMin.length === 0, `found ${tarifasConMin.length} tarifas con estadiaMinima`);
+      const tarifasConMin = c.tarifas.filter((t) => t.estadiaMinima !== null);
+      assert(
+        `${c.nombre}: NO tiene estadiaMinima en tarifas`,
+        tarifasConMin.length === 0,
+        `found ${tarifasConMin.length} tarifas con estadiaMinima`,
+      );
     }
   }
 }
@@ -151,12 +166,16 @@ async function qa02_InventoryIntegrity() {
   const anio = today.getFullYear();
 
   for (const hab of habitaciones) {
-    const { status, data } = await api('GET', `/api/inventario?habitacion=${encodeURIComponent(hab)}&mes=${mes}&anio=${anio}`);
+    const { status, data } = await api(
+      'GET',
+      `/api/inventario?habitacion=${encodeURIComponent(hab)}&mes=${mes}&anio=${anio}`,
+    );
     assert(`${hab}: inventario mes actual → 200`, status === 200, `status: ${status}`);
     assert(`${hab}: tiene entries`, Array.isArray(data) && data.length > 0, `count: ${data?.length}`);
 
     if (Array.isArray(data) && data.length > 0) {
       // Precios deben ser > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sinPrecio = data.filter((e: any) => Number(e.precio) <= 0);
       assert(`${hab}: todos los precios > 0`, sinPrecio.length === 0, `${sinPrecio.length} entries con precio <= 0`);
     }
@@ -179,7 +198,10 @@ async function qa03_ContextGeneration() {
   assert('fullContext menciona LG', fullCtx.includes('LG'));
 
   // Only Pewmafe should show estadiaMinima
-  assert('fullContext: Pewmafe tiene estadia minima', fullCtx.includes('Estadia minima') && fullCtx.includes('Pewmafe'));
+  assert(
+    'fullContext: Pewmafe tiene estadia minima',
+    fullCtx.includes('Estadia minima') && fullCtx.includes('Pewmafe'),
+  );
 
   // Check that Luminar Mono/2Amb/LG do NOT have estadia minima lines
   const lines = fullCtx.split('\n');
@@ -191,17 +213,20 @@ async function qa03_ContextGeneration() {
     }
   }
   // If we got here without failing, explicitly pass
-  const nonPewmafaEstadia = lines.filter(l => {
+  const nonPewmafaEstadia = lines.filter((l) => {
     return l.includes('Estadia minima');
   });
   // Should only be 1 line (Pewmafe's)
-  assert('solo 1 linea de estadia minima en contexto (Pewmafe)', nonPewmafaEstadia.length === 1, `found ${nonPewmafaEstadia.length} lines`);
+  assert(
+    'solo 1 linea de estadia minima en contexto (Pewmafe)',
+    nonPewmafaEstadia.length === 1,
+    `found ${nonPewmafaEstadia.length} lines`,
+  );
 
   // Filtered context should ONLY show the requested depto
   const filteredCtx = await getFilteredContext('Pewmafe');
   assert('filteredContext: incluye Pewmafe', filteredCtx.includes('Pewmafe'));
-  assert('filteredContext: NO menciona Luminar Mono como depto disponible',
-    !filteredCtx.includes('### Luminar Mono'));
+  assert('filteredContext: NO menciona Luminar Mono como depto disponible', !filteredCtx.includes('### Luminar Mono'));
 
   // Tarifas should have actual prices, not zeros
   assert('fullContext: incluye tabla de tarifas', fullCtx.includes('Temp. Baja'));
@@ -226,22 +251,30 @@ async function qa04_BotMinimumStay() {
     const text = msg.contenido.toLowerCase();
 
     // Bot should NOT say ALL departments have minimum stay
-    assert('NO dice "todos nuestros departamentos tienen estadía mínima"',
+    assert(
+      'NO dice "todos nuestros departamentos tienen estadía mínima"',
       !text.includes('todos nuestros departamentos tienen') || !text.includes('mínima'),
-      `response: ${text.substring(0, 200)}`);
+      `response: ${text.substring(0, 200)}`,
+    );
 
     // Bot should NOT invent minimum for Luminar
-    assert('NO inventa minimo para Luminar Mono',
+    assert(
+      'NO inventa minimo para Luminar Mono',
       !text.includes('luminar mono') || !text.includes('mínimo 4'),
-      `response: ${text.substring(0, 300)}`);
+      `response: ${text.substring(0, 300)}`,
+    );
 
-    assert('NO inventa minimo para Luminar 2Amb',
+    assert(
+      'NO inventa minimo para Luminar 2Amb',
       !text.includes('luminar 2amb') || !text.includes('mínimo 4'),
-      `response: ${text.substring(0, 300)}`);
+      `response: ${text.substring(0, 300)}`,
+    );
 
-    assert('NO inventa minimo para LG',
+    assert(
+      'NO inventa minimo para LG',
       !text.includes('lg') || !text.includes('mínimo 5'),
-      `response: ${text.substring(0, 300)}`);
+      `response: ${text.substring(0, 300)}`,
+    );
 
     // Pewmafe CAN have minimum stay mentioned (it's real: 2 noches in baja)
     // But the bot should offer the other departments as available
@@ -269,13 +302,15 @@ async function qa05_BotCapacity() {
 
     // Should NOT offer Luminar Mono as SOLE option for 5 personas (max 3)
     // Bot may correctly mention it as part of a combination — that's valid behavior
-    const offersMonoAlone = text.includes('luminar mono') &&
-      !text.includes('combin') && !text.includes('2 departamento') &&
-      !text.includes('no apto') && !text.includes('no tiene capacidad') &&
-      !text.includes('no alcanza') && !text.includes('pewmafe');
-    assert('NO ofrece Luminar Mono SOLO para 5 personas',
-      !offersMonoAlone,
-      `response: ${text.substring(0, 300)}`);
+    const offersMonoAlone =
+      text.includes('luminar mono') &&
+      !text.includes('combin') &&
+      !text.includes('2 departamento') &&
+      !text.includes('no apto') &&
+      !text.includes('no tiene capacidad') &&
+      !text.includes('no alcanza') &&
+      !text.includes('pewmafe');
+    assert('NO ofrece Luminar Mono SOLO para 5 personas', !offersMonoAlone, `response: ${text.substring(0, 300)}`);
 
     console.log(`  [INFO] Bot response:\n    ${msg.contenido.replace(/\n/g, '\n    ')}`);
   }
@@ -308,8 +343,11 @@ async function qa06_EntityRetention() {
   // Bot should NOT re-ask for personas
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assert('NO re-pregunta cuántas personas', !text.includes('cuántas personas') && !text.includes('cuantas personas'),
-      `response: ${text.substring(0, 200)}`);
+    assert(
+      'NO re-pregunta cuántas personas',
+      !text.includes('cuántas personas') && !text.includes('cuantas personas'),
+      `response: ${text.substring(0, 200)}`,
+    );
   }
 
   // Step 3: "hola" resets
@@ -382,19 +420,29 @@ async function qa08_AuthRules() {
 
   if (agentData?.id) {
     // Login as non-admin
-    const { data: nonAdminLogin } = await api('POST', '/api/auth/login', {
-      email: 'qa_nonadmin@test.com',
-      password: 'test123456',
-    }, null);
+    const { data: nonAdminLogin } = await api(
+      'POST',
+      '/api/auth/login',
+      {
+        email: 'qa_nonadmin@test.com',
+        password: 'test123456',
+      },
+      null,
+    );
 
     if (nonAdminLogin?.token) {
       // Try to create agent as non-admin
-      const { status } = await api('POST', '/api/agentes', {
-        nombre: 'Should Fail',
-        email: 'shouldfail@test.com',
-        password: 'test123456',
-        rol: 'agente',
-      }, nonAdminLogin.token);
+      const { status } = await api(
+        'POST',
+        '/api/agentes',
+        {
+          nombre: 'Should Fail',
+          email: 'shouldfail@test.com',
+          password: 'test123456',
+          rol: 'agente',
+        },
+        nonAdminLogin.token,
+      );
       assert('non-admin cannot create agents → 403', status === 403, `status: ${status}`);
     }
 
@@ -418,13 +466,19 @@ async function qa09_ConversationStateMachine() {
   await sendSim('hola');
 
   const huesped = await prisma.huesped.findFirst({ where: { waId: FROM } });
-  if (!huesped) { skip('state machine tests', 'no huesped created'); return; }
+  if (!huesped) {
+    skip('state machine tests', 'no huesped created');
+    return;
+  }
 
   const conv = await prisma.conversacion.findFirst({
     where: { huespedId: huesped.id },
     orderBy: { ultimoMensajeEn: 'desc' },
   });
-  if (!conv) { skip('state machine tests', 'no conversation found'); return; }
+  if (!conv) {
+    skip('state machine tests', 'no conversation found');
+    return;
+  }
 
   assert('initial estado = bot', conv.estado === 'bot');
 
@@ -461,7 +515,10 @@ async function qa10_BloqueoAvailability() {
 
   // Get a real complejo
   const complejo = await prisma.complejo.findFirst({ where: { nombre: 'Pewmafe', activo: true } });
-  if (!complejo) { skip('bloqueo tests', 'no Pewmafe found'); return; }
+  if (!complejo) {
+    skip('bloqueo tests', 'no Pewmafe found');
+    return;
+  }
 
   // Create bloqueo for a future date range
   const { status: s1, data: bloqueo } = await api('POST', `/api/complejos/${complejo.id}/bloqueos`, {
@@ -472,8 +529,11 @@ async function qa10_BloqueoAvailability() {
   assert('crear bloqueo → 201', s1 === 201, `status: ${s1}`);
 
   // Check availability — Pewmafe should NOT be available for those dates
-  const { data: avail } = await api('GET',
-    '/api/inventario/disponibilidad?fechaEntrada=2026-10-01&fechaSalida=2026-10-05&habitacion=Pewmafe');
+  const { data: avail } = await api(
+    'GET',
+    '/api/inventario/disponibilidad?fechaEntrada=2026-10-01&fechaSalida=2026-10-05&habitacion=Pewmafe',
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pewmafeAvail = Array.isArray(avail) ? avail.find((a: any) => a.habitacion === 'Pewmafe') : null;
   assert('Pewmafe NOT available during block', !pewmafeAvail, `found: ${JSON.stringify(pewmafeAvail)}`);
 
@@ -482,8 +542,11 @@ async function qa10_BloqueoAvailability() {
     await api('DELETE', `/api/complejos/${complejo.id}/bloqueos/${bloqueo.id}`);
 
     // After deleting, should be available again
-    const { data: avail2 } = await api('GET',
-      '/api/inventario/disponibilidad?fechaEntrada=2026-10-01&fechaSalida=2026-10-05&habitacion=Pewmafe');
+    const { data: avail2 } = await api(
+      'GET',
+      '/api/inventario/disponibilidad?fechaEntrada=2026-10-01&fechaSalida=2026-10-05&habitacion=Pewmafe',
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pewmafeAvail2 = Array.isArray(avail2) ? avail2.find((a: any) => a.habitacion === 'Pewmafe') : null;
     assert('Pewmafe available after unblock', !!pewmafeAvail2, `result: ${JSON.stringify(avail2)}`);
   }
@@ -495,7 +558,10 @@ async function qa11_TarifaEspecialSync() {
   section('QA-11: TARIFA ESPECIAL SYNC TO INVENTORY');
 
   const complejo = await prisma.complejo.findFirst({ where: { nombre: 'Pewmafe', activo: true } });
-  if (!complejo) { skip('tarifa especial tests', 'no Pewmafe'); return; }
+  if (!complejo) {
+    skip('tarifa especial tests', 'no Pewmafe');
+    return;
+  }
 
   // Create tarifa especial
   const { data: te } = await api('POST', `/api/complejos/${complejo.id}/tarifas-especiales`, {
@@ -513,9 +579,11 @@ async function qa11_TarifaEspecialSync() {
   const inv = await prisma.inventario.findFirst({
     where: { habitacion: 'Pewmafe', fecha: checkDate1 },
   });
-  assert('inventario synced with tarifa especial price',
+  assert(
+    'inventario synced with tarifa especial price',
     inv !== null && Number(inv.precio) === 99999,
-    `got: ${inv?.precio}`);
+    `got: ${inv?.precio}`,
+  );
 
   // Delete tarifa especial — should restore seasonal price
   if (te?.id) {
@@ -526,9 +594,11 @@ async function qa11_TarifaEspecialSync() {
     const inv2 = await prisma.inventario.findFirst({
       where: { habitacion: 'Pewmafe', fecha: checkDate2 },
     });
-    assert('inventario restored after delete tarifa especial',
+    assert(
+      'inventario restored after delete tarifa especial',
       inv2 !== null && Number(inv2.precio) !== 99999,
-      `got: ${inv2?.precio}`);
+      `got: ${inv2?.precio}`,
+    );
   }
 }
 
@@ -547,9 +617,8 @@ async function qa12_BotNoInventar() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Should mention real activities from context (buceo, kayak, pinguinera)
-    const realActivities = ['buceo', 'kayak', 'playa', 'pesca', 'pinguinera'].filter(a => text.includes(a));
-    assert('menciona actividades reales de la zona', realActivities.length >= 2,
-      `found: ${realActivities.join(', ')}`);
+    const realActivities = ['buceo', 'kayak', 'playa', 'pesca', 'pinguinera'].filter((a) => text.includes(a));
+    assert('menciona actividades reales de la zona', realActivities.length >= 2, `found: ${realActivities.join(', ')}`);
   }
 
   // Test: Ask for non-existent department
@@ -559,9 +628,11 @@ async function qa12_BotNoInventar() {
   msg = await getLastBotMsg();
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assert('NO inventa depto XYZ',
+    assert(
+      'NO inventa depto XYZ',
       !text.includes('xyz está disponible') && !text.includes('xyz tiene'),
-      `response: ${text.substring(0, 200)}`);
+      `response: ${text.substring(0, 200)}`,
+    );
   }
 }
 
@@ -650,7 +721,10 @@ async function main() {
   // Auth
   const { data } = await api('POST', '/api/auth/login', { email: ADMIN_EMAIL, password: ADMIN_PASS }, null);
   token = data?.token ?? '';
-  if (!token) { console.error('FATAL: Cannot login'); process.exit(1); }
+  if (!token) {
+    console.error('FATAL: Cannot login');
+    process.exit(1);
+  }
 
   console.log('\nCleaning up previous QA data...');
   await cleanupSimData();
@@ -677,7 +751,6 @@ async function main() {
     await qa09_ConversationStateMachine();
     await qa12_BotNoInventar();
     await qa14_BotEscalation();
-
   } catch (err) {
     console.error('\n  FATAL ERROR:', err);
     failed++;
@@ -704,7 +777,7 @@ async function main() {
   process.exit(failed > 0 ? 1 : 0);
 }
 
-main().catch(e => {
+main().catch((e) => {
   console.error('QA suite error:', e);
   process.exit(1);
 });

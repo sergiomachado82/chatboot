@@ -37,9 +37,15 @@ interface ClassifyResult {
   entities: Record<string, string>;
 }
 
+/**
+ * Classifies the intent of a user message using the Claude API, with a regex-based fallback.
+ * @param message - The user's message text to classify
+ * @param conversationHistory - Optional recent conversation history for contextual classification
+ * @returns The classification result containing intent, confidence score, and extracted entities
+ */
 export async function classifyIntent(
   message: string,
-  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Promise<ClassifyResult> {
   if (!env.ANTHROPIC_API_KEY) {
     return classifyIntentFallback(message);
@@ -105,16 +111,22 @@ Solo incluye en entities las claves que esten EXPLICITAMENTE presentes en el ult
       },
     ];
 
-    const response = await getClient().messages.create({
-      model: env.CLAUDE_CLASSIFIER_MODEL,
-      max_tokens: 100,
-      system: classifierSystem,
-      messages,
-    }, { timeout: env.CLAUDE_TIMEOUT_MS });
+    const response = await getClient().messages.create(
+      {
+        model: env.CLAUDE_CLASSIFIER_MODEL,
+        max_tokens: 100,
+        system: classifierSystem,
+        messages,
+      },
+      { timeout: env.CLAUDE_TIMEOUT_MS },
+    );
 
     const text = response.content[0]?.type === 'text' ? response.content[0].text : '';
     // Clean markdown wrappers if present
-    const cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const cleanText = text
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
     const parsed = JSON.parse(cleanText);
     return {
       intent: parsed.intent || 'otro',
@@ -132,15 +144,24 @@ function classifyIntentFallback(message: string): ClassifyResult {
   const lower = message.toLowerCase();
 
   // Check specific intents BEFORE saludo (a message starting with "hola" may still be a price/availability query)
-  if (/disponib|libre|hay lugar/.test(lower)) return { intent: 'consulta_disponibilidad', confidence: 0.7, entities: {} };
-  if (/precio|cuesta|cuánto|cuanto.*sale|tarifa|coste|cost/.test(lower)) return { intent: 'consulta_precio', confidence: 0.7, entities: {} };
+  if (/disponib|libre|hay lugar/.test(lower))
+    return { intent: 'consulta_disponibilidad', confidence: 0.7, entities: {} };
+  if (/precio|cuesta|cuánto|cuanto.*sale|tarifa|coste|cost/.test(lower))
+    return { intent: 'consulta_precio', confidence: 0.7, entities: {} };
   if (/cancel.*reserv|anular.*reserv/.test(lower)) return { intent: 'cancelar_reserva', confidence: 0.8, entities: {} };
-  if (/cambiar.*reserv|modificar.*reserv|mover.*reserv|cambiar.*fecha/.test(lower)) return { intent: 'cambiar_reserva', confidence: 0.8, entities: {} };
+  if (/cambiar.*reserv|modificar.*reserv|mover.*reserv|cambiar.*fecha/.test(lower))
+    return { intent: 'cambiar_reserva', confidence: 0.8, entities: {} };
   if (/reserv|quiero reservar|book/.test(lower)) return { intent: 'reservar', confidence: 0.7, entities: {} };
-  if (/habitaci|servicio|wifi|piscina|check|mascotas?|perros?|parking|amenities|parrilla|estacionamiento|foto/.test(lower)) return { intent: 'consulta_alojamiento', confidence: 0.7, entities: {} };
-  if (/zona|restaurante|actividad|senderismo|visitar|pueblo|como llego|ubicaci|direcci/.test(lower)) return { intent: 'consulta_zona', confidence: 0.7, entities: {} };
-  if (/hablar.*(persona|humano|agente|recepci)|persona real|agente real|humano/.test(lower)) return { intent: 'hablar_humano', confidence: 0.8, entities: {} };
-  if (/queja|mal servicio|horrible|problema|inacep|vergüenza|verguenza|nadie.*responde/.test(lower)) return { intent: 'queja', confidence: 0.7, entities: {} };
+  if (
+    /habitaci|servicio|wifi|piscina|check|mascotas?|perros?|parking|amenities|parrilla|estacionamiento|foto/.test(lower)
+  )
+    return { intent: 'consulta_alojamiento', confidence: 0.7, entities: {} };
+  if (/zona|restaurante|actividad|senderismo|visitar|pueblo|como llego|ubicaci|direcci/.test(lower))
+    return { intent: 'consulta_zona', confidence: 0.7, entities: {} };
+  if (/hablar.*(persona|humano|agente|recepci)|persona real|agente real|humano/.test(lower))
+    return { intent: 'hablar_humano', confidence: 0.8, entities: {} };
+  if (/queja|mal servicio|horrible|problema|inacep|vergüenza|verguenza|nadie.*responde/.test(lower))
+    return { intent: 'queja', confidence: 0.7, entities: {} };
   if (/adi[oó]s|chao|hasta luego|bye/.test(lower)) return { intent: 'despedida', confidence: 0.8, entities: {} };
   // Saludo ONLY if no specific intent was matched (pure greeting)
   if (/hola|buenos|buenas|hey|buen dia/.test(lower)) return { intent: 'saludo', confidence: 0.8, entities: {} };
@@ -149,11 +170,19 @@ function classifyIntentFallback(message: string): ClassifyResult {
   return { intent: 'otro', confidence: 0.5, entities: {} };
 }
 
+/**
+ * Generates a natural language response using the Claude API based on the classified intent and context.
+ * @param intent - The classified intent of the user's message
+ * @param entities - The extracted entities from the conversation
+ * @param conversationHistory - The conversation history for context-aware response generation
+ * @param additionalContext - Optional extra context such as availability results or known data
+ * @returns The generated response text to send to the guest
+ */
 export async function generateResponse(
   intent: Intent,
   entities: Record<string, string>,
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
-  additionalContext?: string
+  additionalContext?: string,
 ): Promise<string> {
   const botConfig = await getBotConfig();
 
@@ -167,12 +196,18 @@ export async function generateResponse(
 
     // KEY: When a department is active, send ONLY that department's data to Claude.
     // This prevents Claude from referencing or listing other departments.
-    const contextData = hasDepartamento
-      ? await getFilteredContext(activeDepartamento)
-      : await getFullContext();
+    const contextData = hasDepartamento ? await getFilteredContext(activeDepartamento) : await getFullContext();
 
-    const IDIOMA_MAP: Record<string, string> = { 'es_AR': 'espanol de Argentina (voseo)', 'es': 'espanol neutro', 'en': 'English' };
-    const LONGITUD_MAP: Record<string, string> = { 'corta': 'max 3-4 frases', 'media': 'max 5-7 frases', 'detallada': 'max 8-10 frases' };
+    const IDIOMA_MAP: Record<string, string> = {
+      es_AR: 'espanol de Argentina (voseo)',
+      es: 'espanol neutro',
+      en: 'English',
+    };
+    const LONGITUD_MAP: Record<string, string> = {
+      corta: 'max 3-4 frases',
+      media: 'max 5-7 frases',
+      detallada: 'max 8-10 frases',
+    };
     const idioma = IDIOMA_MAP[botConfig.idioma] ?? IDIOMA_MAP['es_AR'];
     const longitud = LONGITUD_MAP[botConfig.longitudRespuesta] ?? LONGITUD_MAP['corta'];
     const emojiRule = botConfig.usarEmojis
@@ -262,11 +297,14 @@ Instrucciones segun intencion:
 
     // Extract "DATOS YA CONOCIDOS" and "Datos que FALTAN" from additionalContext and put them FIRST
     if (additionalContext) {
-      const knownMatch = additionalContext.match(/DATOS YA CONOCIDOS[^\n]*\n([\s\S]*?)(?=\n(?:ANALISIS|Datos que FALTAN|DEPARTAMENTOS|Resultados|ADVERTENCIA|IMPORTANTE|No hay|No se pudo|No tenemos)|$)/);
+      const knownMatch = additionalContext.match(
+        /DATOS YA CONOCIDOS[^\n]*\n([\s\S]*?)(?=\n(?:ANALISIS|Datos que FALTAN|DEPARTAMENTOS|Resultados|ADVERTENCIA|IMPORTANTE|No hay|No se pudo|No tenemos)|$)/,
+      );
       const missingMatch = additionalContext.match(/Datos que FALTAN[^\n]*/);
       if (knownMatch || missingMatch) {
         dynamicParts.push('=== ESTADO DE LA CONVERSACION (LEER PRIMERO) ===');
-        if (knownMatch) dynamicParts.push(`DATOS YA CONOCIDOS (PROHIBIDO volver a preguntar):\n${knownMatch[1].trim()}`);
+        if (knownMatch)
+          dynamicParts.push(`DATOS YA CONOCIDOS (PROHIBIDO volver a preguntar):\n${knownMatch[1].trim()}`);
         if (missingMatch) dynamicParts.push(`${missingMatch[0]} — SOLO pregunta por estos.`);
         dynamicParts.push('=== FIN ESTADO ===\n');
       }
@@ -281,14 +319,19 @@ Instrucciones segun intencion:
       text: dynamicParts.join('\n'),
     };
 
-    const response = await getClient().messages.create({
-      model: env.CLAUDE_RESPONSE_MODEL,
-      max_tokens: 500,
-      system: [rulesBlock, contextBlock, dynamicBlock],
-      messages: conversationHistory.slice(-10),
-    }, { timeout: env.CLAUDE_TIMEOUT_MS });
+    const response = await getClient().messages.create(
+      {
+        model: env.CLAUDE_RESPONSE_MODEL,
+        max_tokens: 500,
+        system: [rulesBlock, contextBlock, dynamicBlock],
+        messages: conversationHistory.slice(-10),
+      },
+      { timeout: env.CLAUDE_TIMEOUT_MS },
+    );
 
-    return response.content[0]?.type === 'text' ? response.content[0].text : generateResponseFallback(intent, botConfig);
+    return response.content[0]?.type === 'text'
+      ? response.content[0].text
+      : generateResponseFallback(intent, botConfig);
   } catch (err) {
     logger.error({ err }, 'Claude response generation failed, using fallback');
     logIntegrationError('claude', 'Generacion de respuesta fallida', (err as Error).message).catch(() => {});
@@ -296,27 +339,35 @@ Instrucciones segun intencion:
   }
 }
 
+/**
+ * Transcribes an audio buffer to text using the Claude API.
+ * @param audioBuffer - The raw audio data as a Buffer
+ * @param mimeType - The MIME type of the audio (e.g., 'audio/ogg', 'audio/mp4')
+ * @returns The transcribed text, or an empty string if transcription fails
+ */
 export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string> {
   const response = await getClient().messages.create({
     model: env.CLAUDE_CLASSIFIER_MODEL,
     max_tokens: 1000,
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'input_audio',
-          source: {
-            type: 'base64',
-            media_type: mimeType,
-            data: audioBuffer.toString('base64'),
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_audio',
+            source: {
+              type: 'base64',
+              media_type: mimeType,
+              data: audioBuffer.toString('base64'),
+            },
           },
-        },
-        {
-          type: 'text',
-          text: 'Transcribi este audio a texto exactamente como lo dice la persona. Solo devolvé el texto, sin explicaciones.',
-        },
-      ],
-    }],
+          {
+            type: 'text',
+            text: 'Transcribi este audio a texto exactamente como lo dice la persona. Solo devolvé el texto, sin explicaciones.',
+          },
+        ],
+      },
+    ],
   });
 
   return response.content[0]?.type === 'text' ? response.content[0].text : '';
@@ -324,17 +375,31 @@ export async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Pr
 
 function generateResponseFallback(intent: Intent, botConfig?: BotConfig): string {
   const responses: Record<Intent, string> = {
-    saludo: botConfig?.mensajeBienvenida ?? 'Hola! Bienvenido a Las Grutas Departamentos. Tenemos departamentos a pocas cuadras de la playa en Las Grutas, Rio Negro. ¿En que puedo ayudarte? Puedo informarte sobre disponibilidad, precios, departamentos o actividades en la zona.',
-    consulta_disponibilidad: 'Para consultar disponibilidad, necesito que me indiques las fechas de entrada y salida, y la cantidad de personas. ¿Me las podes facilitar?',
-    consulta_precio: 'Para darte el precio exacto necesito saber las fechas de entrada y salida, y la cantidad de personas. ¿Me las podes indicar?',
-    consulta_alojamiento: 'Tenemos 4 departamentos: Pewmafe (4 pers, con patio y parrilla), Luminar Monoambiente (3 pers), Luminar 2 Ambientes (4 pers, con parrilla) y LG (4 pers, 50m2). Todos con cocina equipada, Wi-Fi, aire acondicionado y a 2-3 cuadras de la playa. ¿Cual te interesa?',
-    consulta_zona: 'Estamos en Las Grutas, la playa mas linda de la Patagonia! Podes disfrutar de buceo, kayak, mountain bike, y visitar las famosas grutas. A 100 km esta la pinguinera de El Condor. ¿Te interesa alguna actividad?',
-    reservar: 'Perfecto, vamos a gestionar tu reserva. Necesito: 1) Fechas de entrada y salida, 2) Cantidad de personas, 3) Preferencia de departamento (Pewmafe, Luminar Mono, Luminar 2Amb o LG), 4) Tu nombre completo, 5) Un numero de celular y 6) Tu numero de DNI. ¿Me pasas esos datos?',
-    cancelar_reserva: 'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la cancelacion de tu reserva. Te va a atender en breve.',
-    cambiar_reserva: 'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la modificacion de tu reserva. Te va a atender en breve.',
-    hablar_humano: botConfig?.mensajeEsperaHumano ?? 'Entendido, te voy a comunicar con uno de nuestros agentes. Te va a atender en breve. Gracias por tu paciencia.',
-    queja: 'Lamento mucho la situacion. Te voy a comunicar con uno de nuestros agentes para que pueda ayudarte personalmente. Disculpa las molestias.',
-    despedida: botConfig?.mensajeDespedida ?? 'Gracias por contactarnos! Si necesitas algo mas, no dudes en escribirnos. Que tengas un excelente dia!',
+    saludo:
+      botConfig?.mensajeBienvenida ??
+      'Hola! Bienvenido a Las Grutas Departamentos. Tenemos departamentos a pocas cuadras de la playa en Las Grutas, Rio Negro. ¿En que puedo ayudarte? Puedo informarte sobre disponibilidad, precios, departamentos o actividades en la zona.',
+    consulta_disponibilidad:
+      'Para consultar disponibilidad, necesito que me indiques las fechas de entrada y salida, y la cantidad de personas. ¿Me las podes facilitar?',
+    consulta_precio:
+      'Para darte el precio exacto necesito saber las fechas de entrada y salida, y la cantidad de personas. ¿Me las podes indicar?',
+    consulta_alojamiento:
+      'Tenemos 4 departamentos: Pewmafe (4 pers, con patio y parrilla), Luminar Monoambiente (3 pers), Luminar 2 Ambientes (4 pers, con parrilla) y LG (4 pers, 50m2). Todos con cocina equipada, Wi-Fi, aire acondicionado y a 2-3 cuadras de la playa. ¿Cual te interesa?',
+    consulta_zona:
+      'Estamos en Las Grutas, la playa mas linda de la Patagonia! Podes disfrutar de buceo, kayak, mountain bike, y visitar las famosas grutas. A 100 km esta la pinguinera de El Condor. ¿Te interesa alguna actividad?',
+    reservar:
+      'Perfecto, vamos a gestionar tu reserva. Necesito: 1) Fechas de entrada y salida, 2) Cantidad de personas, 3) Preferencia de departamento (Pewmafe, Luminar Mono, Luminar 2Amb o LG), 4) Tu nombre completo, 5) Un numero de celular y 6) Tu numero de DNI. ¿Me pasas esos datos?',
+    cancelar_reserva:
+      'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la cancelacion de tu reserva. Te va a atender en breve.',
+    cambiar_reserva:
+      'Entendido, te voy a comunicar con uno de nuestros agentes para gestionar la modificacion de tu reserva. Te va a atender en breve.',
+    hablar_humano:
+      botConfig?.mensajeEsperaHumano ??
+      'Entendido, te voy a comunicar con uno de nuestros agentes. Te va a atender en breve. Gracias por tu paciencia.',
+    queja:
+      'Lamento mucho la situacion. Te voy a comunicar con uno de nuestros agentes para que pueda ayudarte personalmente. Disculpa las molestias.',
+    despedida:
+      botConfig?.mensajeDespedida ??
+      'Gracias por contactarnos! Si necesitas algo mas, no dudes en escribirnos. Que tengas un excelente dia!',
     otro: 'Gracias por tu mensaje. Puedo ayudarte con informacion sobre disponibilidad, precios, departamentos o actividades en la zona. ¿Que te gustaria saber?',
   };
   return responses[intent];

@@ -29,7 +29,9 @@ const PHONES = {
   ST_14: '5491100030014',
 };
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function send(from: string, body: string, name: string): Promise<void> {
   await fetch(`${BASE_URL}/api/simulator/send`, {
@@ -40,6 +42,7 @@ async function send(from: string, body: string, name: string): Promise<void> {
   await sleep(WAIT_MS);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getLastBotMsg(waId: string): Promise<{ contenido: string; metadata: any } | null> {
   const huesped = await prisma.huesped.findFirst({ where: { waId } });
   if (!huesped) return null;
@@ -52,10 +55,12 @@ async function getLastBotMsg(waId: string): Promise<{ contenido: string; metadat
     where: { conversacionId: conv.id, origen: 'bot' },
     orderBy: { creadoEn: 'desc' },
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return msg ? { contenido: msg.contenido, metadata: msg.metadata as any } : null;
 }
 
-async function getAllBotMsgs(waId: string): Promise<{ contenido: string; metadata: any }[]> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+async function _getAllBotMsgs(waId: string): Promise<{ contenido: string; metadata: any }[]> {
   const huesped = await prisma.huesped.findFirst({ where: { waId } });
   if (!huesped) return [];
   const conv = await prisma.conversacion.findFirst({
@@ -67,7 +72,8 @@ async function getAllBotMsgs(waId: string): Promise<{ contenido: string; metadat
     where: { conversacionId: conv.id, origen: 'bot' },
     orderBy: { creadoEn: 'asc' },
   });
-  return msgs.map(m => ({ contenido: m.contenido, metadata: m.metadata as any }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return msgs.map((m) => ({ contenido: m.contenido, metadata: m.metadata as any }));
 }
 
 async function getConvEstado(waId: string): Promise<string | null> {
@@ -140,7 +146,8 @@ function section(title: string) {
 }
 
 // Helper: compute date strings
-function futureDate(daysFromNow: number): string {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _futureDate(daysFromNow: number): string {
   const d = new Date();
   d.setDate(d.getDate() + daysFromNow);
   return d.toISOString().slice(0, 10);
@@ -158,18 +165,23 @@ function futureDateHuman(daysFromNow: number): string {
 async function st01_CapacidadExcedida() {
   section('ST-01: NO ofrecer Luminar Mono a 4 personas (cap max 3)');
   const phone = PHONES.ST_01;
-  await send(phone, `Hola, somos 4 personas, que tienen disponible del ${futureDateHuman(30)} por 3 noches?`, 'Test Capacidad');
+  await send(
+    phone,
+    `Hola, somos 4 personas, que tienen disponible del ${futureDateHuman(30)} por 3 noches?`,
+    'Test Capacidad',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Luminar Mono max 3 pers — should NOT be offered for 4
-    assert('NO ofrece Luminar Mono para 4 personas',
-      !text.includes('luminar mono') && !text.includes('monoambiente'));
+    assert('NO ofrece Luminar Mono para 4 personas', !text.includes('luminar mono') && !text.includes('monoambiente'));
     // Should offer Pewmafe/Luminar 2Amb/LG (cap 4) — requires Claude for contextual response
-    assertRequiresAPI('ofrece al menos un depto valido (cap >= 4)',
-      text.includes('pewmafe') || text.includes('luminar 2') || text.includes('lg'));
+    assertRequiresAPI(
+      'ofrece al menos un depto valido (cap >= 4)',
+      text.includes('pewmafe') || text.includes('luminar 2') || text.includes('lg'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -187,12 +199,19 @@ async function st02_DeptoInexistente() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Bot should NOT pretend "Premium Suite" exists
-    assert('NO confirma que existe "Premium Suite"',
-      !text.includes('premium suite disponible') && !text.includes('el premium suite'));
+    assert(
+      'NO confirma que existe "Premium Suite"',
+      !text.includes('premium suite disponible') && !text.includes('el premium suite'),
+    );
     // Should list real departments or say it doesn't exist — requires Claude for contextual response
-    assertRequiresAPI('menciona departamentos reales o indica que no existe',
-      text.includes('pewmafe') || text.includes('luminar') || text.includes('lg') ||
-      text.includes('no contamos') || text.includes('no tenemos'));
+    assertRequiresAPI(
+      'menciona departamentos reales o indica que no existe',
+      text.includes('pewmafe') ||
+        text.includes('luminar') ||
+        text.includes('lg') ||
+        text.includes('no contamos') ||
+        text.includes('no tenemos'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -210,13 +229,17 @@ async function st03_NochesNoSonPersonas() {
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
     // num_personas should NOT be 3 (that's noches, not personas)
-    assert('NO confunde noches con personas (num_personas != 3)',
+    assert(
+      'NO confunde noches con personas (num_personas != 3)',
       entities.num_personas !== '3',
-      `entities: ${JSON.stringify(entities)}`);
+      `entities: ${JSON.stringify(entities)}`,
+    );
     // Should ask for personas since it's unknown — requires Claude for contextual response
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('pregunta cuantas personas son',
-      text.includes('persona') || text.includes('cuántos') || text.includes('cuantos'));
+    assertRequiresAPI(
+      'pregunta cuantas personas son',
+      text.includes('persona') || text.includes('cuántos') || text.includes('cuantos'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -234,11 +257,12 @@ async function st04_Mascotas() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Should clearly say NO to pets — requires Claude for contextual response
-    assertRequiresAPI('indica que NO se admiten mascotas',
-      text.includes('no') && (text.includes('mascota') || text.includes('perro')));
+    assertRequiresAPI(
+      'indica que NO se admiten mascotas',
+      text.includes('no') && (text.includes('mascota') || text.includes('perro')),
+    );
     // Should NOT say "some departments allow pets"
-    assert('NO dice que algunos deptos aceptan mascotas',
-      !text.includes('algunos') || !text.includes('mascota'));
+    assert('NO dice que algunos deptos aceptan mascotas', !text.includes('algunos') || !text.includes('mascota'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -257,12 +281,16 @@ async function st05_FechasInvertidas() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Bot should NOT crash or give error — should handle gracefully
-    assert('respuesta es coherente (no error)',
-      !text.includes('error') && !text.includes('fallo') && text.length > 20);
+    assert('respuesta es coherente (no error)', !text.includes('error') && !text.includes('fallo') && text.length > 20);
     // Should either swap dates and show availability, or ask to clarify
-    assert('maneja las fechas (muestra disponibilidad o pide corregir)',
-      text.includes('disponib') || text.includes('precio') || text.includes('$') ||
-      text.includes('fecha') || text.includes('noche'));
+    assert(
+      'maneja las fechas (muestra disponibilidad o pide corregir)',
+      text.includes('disponib') ||
+        text.includes('precio') ||
+        text.includes('$') ||
+        text.includes('fecha') ||
+        text.includes('noche'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -282,10 +310,11 @@ async function st06_PrecioConFechas() {
     const text = msg.contenido.toLowerCase();
     assertRequiresAPI('menciona precio con $', text.includes('$'));
     // Should NOT list multiple seasons (only "baja" applies for April)
-    assert('NO lista multiples temporadas',
-      !(text.includes('temporada baja') && text.includes('temporada alta')));
-    assert('NO lista "temporada media" y "temporada alta" juntas',
-      !(text.includes('media') && text.includes('alta') && text.includes('baja')));
+    assert('NO lista multiples temporadas', !(text.includes('temporada baja') && text.includes('temporada alta')));
+    assert(
+      'NO lista "temporada media" y "temporada alta" juntas',
+      !(text.includes('media') && text.includes('alta') && text.includes('baja')),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -303,14 +332,17 @@ async function st07_NoURLs() {
   if (msg) {
     const text = msg.contenido;
     // Should NOT contain http:// or https:// URLs
-    assert('NO incluye URLs http/https',
-      !text.includes('http://') && !text.includes('https://'));
+    assert('NO incluye URLs http/https', !text.includes('http://') && !text.includes('https://'));
     // Should NOT contain YouTube links
-    assert('NO incluye links de YouTube',
-      !text.toLowerCase().includes('youtube') && !text.toLowerCase().includes('youtu.be'));
+    assert(
+      'NO incluye links de YouTube',
+      !text.toLowerCase().includes('youtube') && !text.toLowerCase().includes('youtu.be'),
+    );
     // Should NOT say "fotos se envian automaticamente"
-    assert('NO dice "se envian automaticamente"',
-      !text.toLowerCase().includes('automáticamente') && !text.toLowerCase().includes('automaticamente'));
+    assert(
+      'NO dice "se envian automaticamente"',
+      !text.toLowerCase().includes('automáticamente') && !text.toLowerCase().includes('automaticamente'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -322,7 +354,11 @@ async function st08_NoConfirmarReserva() {
   section('ST-08: Bot NO debe confirmar reserva (solo agente puede)');
   const phone = PHONES.ST_08;
   // Give all data for a reservation
-  await send(phone, `Quiero reservar Luminar 2Amb del ${futureDateHuman(20)} al ${futureDateHuman(23)} para 3 personas`, 'Test Confirma');
+  await send(
+    phone,
+    `Quiero reservar Luminar 2Amb del ${futureDateHuman(20)} al ${futureDateHuman(23)} para 3 personas`,
+    'Test Confirma',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
@@ -333,11 +369,15 @@ async function st08_NoConfirmarReserva() {
     assert('NO dice "te confirmo la reserva"', !text.includes('te confirmo la reserva'));
     assert('NO dice "queda confirmada"', !text.includes('queda confirmada'));
     // Should NOT use "pre-reserva" (internal term) — must say "reserva"
-    assert('NO dice "pre-reserva" (termino interno)',
-      !text.includes('pre-reserva') && !text.includes('pre reserva') && !text.includes('prereserva'));
+    assert(
+      'NO dice "pre-reserva" (termino interno)',
+      !text.includes('pre-reserva') && !text.includes('pre reserva') && !text.includes('prereserva'),
+    );
     // Should mention "reserva" or ask to proceed
-    assert('usa "reserva" o pregunta si desea proceder',
-      text.includes('reserva') || text.includes('proceder') || text.includes('confirmar') || text.includes('desea'));
+    assert(
+      'usa "reserva" o pregunta si desea proceder',
+      text.includes('reserva') || text.includes('proceder') || text.includes('confirmar') || text.includes('desea'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 500)}`);
   }
 }
@@ -350,18 +390,25 @@ async function st09_UnidadesLimite() {
   section('ST-09: NO ofrecer mas unidades de las que existen');
   const phone = PHONES.ST_09;
   // 6 personas: should NOT offer "2 Luminar Mono" (only 1 exists)
-  await send(phone, `Hola, somos 6 personas, que opciones hay del ${futureDateHuman(15)} al ${futureDateHuman(18)}?`, 'Test Unidades');
+  await send(
+    phone,
+    `Hola, somos 6 personas, que opciones hay del ${futureDateHuman(15)} al ${futureDateHuman(18)}?`,
+    'Test Unidades',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Should NOT offer "2 Luminar Mono" or "2 Luminar 2Amb" (only 1 unit each)
-    assert('NO ofrece 2 Luminar Mono (solo existe 1)',
-      !text.includes('2 luminar mono') && !text.includes('dos luminar mono') &&
-      !text.includes('2 monoambiente'));
-    assert('NO ofrece 2 Luminar 2Amb (solo existe 1)',
-      !text.includes('2 luminar 2') && !text.includes('dos luminar 2'));
+    assert(
+      'NO ofrece 2 Luminar Mono (solo existe 1)',
+      !text.includes('2 luminar mono') && !text.includes('dos luminar mono') && !text.includes('2 monoambiente'),
+    );
+    assert(
+      'NO ofrece 2 Luminar 2Amb (solo existe 1)',
+      !text.includes('2 luminar 2') && !text.includes('dos luminar 2'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 500)}`);
   }
 }
@@ -372,19 +419,28 @@ async function st09_UnidadesLimite() {
 async function st10_MercadoPagoProactivo() {
   section('ST-10: NO mencionar MercadoPago/tarjeta proactivamente');
   const phone = PHONES.ST_10;
-  await send(phone, `Quiero reservar LG del ${futureDateHuman(25)} al ${futureDateHuman(28)} para 2 personas`, 'Test MercadoPago');
+  await send(
+    phone,
+    `Quiero reservar LG del ${futureDateHuman(25)} al ${futureDateHuman(28)} para 2 personas`,
+    'Test MercadoPago',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     assert('NO menciona MercadoPago', !text.includes('mercadopago') && !text.includes('mercado pago'));
-    assert('NO menciona tarjeta de credito', !text.includes('tarjeta de crédito') && !text.includes('tarjeta de credito'));
+    assert(
+      'NO menciona tarjeta de credito',
+      !text.includes('tarjeta de crédito') && !text.includes('tarjeta de credito'),
+    );
     assert('NO menciona 8% recargo', !text.includes('8%'));
     // PASO 1: Bot should summarize (depto, fechas, precio) and ask to proceed.
     // Transferencia goes in PASO 2 (after user accepts), so it's OK if not mentioned here.
-    assertRequiresAPI('resume datos o pregunta si quiere proceder',
-      text.includes('reserva') || text.includes('proceder') || text.includes('confirmar'));
+    assertRequiresAPI(
+      'resume datos o pregunta si quiere proceder',
+      text.includes('reserva') || text.includes('proceder') || text.includes('confirmar'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 500)}`);
   }
 }
@@ -403,13 +459,14 @@ async function st11_CambioPersonas() {
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
     // Should have updated to 4, not retained 2 — requires Claude for entity extraction
-    assertRequiresAPI('actualizo num_personas a 4 (no retuvo 2)',
+    assertRequiresAPI(
+      'actualizo num_personas a 4 (no retuvo 2)',
       entities.num_personas === '4',
-      `entities: ${JSON.stringify(entities)}`);
+      `entities: ${JSON.stringify(entities)}`,
+    );
     const text = msg.contenido.toLowerCase();
     // Should NOT offer Luminar Mono (cap 3) now that we're 4
-    assert('NO ofrece Luminar Mono para 4 personas',
-      !text.includes('luminar mono') && !text.includes('monoambiente'));
+    assert('NO ofrece Luminar Mono para 4 personas', !text.includes('luminar mono') && !text.includes('monoambiente'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -429,12 +486,21 @@ async function st12_EstadiaMinimaPewmafe() {
     const text = msg.contenido.toLowerCase();
     assertRequiresAPI('menciona Pewmafe', text.includes('pewmafe'));
     // Should mention minimum stay for Pewmafe since 1 < 3 — requires Claude for contextual validation
-    assertRequiresAPI('advierte sobre estadia minima o noches insuficientes',
-      text.includes('mínima') || text.includes('minima') || text.includes('mínimo') || text.includes('minimo') ||
-      text.includes('3 noches') || text.includes('mas noches') || text.includes('extender'));
+    assertRequiresAPI(
+      'advierte sobre estadia minima o noches insuficientes',
+      text.includes('mínima') ||
+        text.includes('minima') ||
+        text.includes('mínimo') ||
+        text.includes('minimo') ||
+        text.includes('3 noches') ||
+        text.includes('mas noches') ||
+        text.includes('extender'),
+    );
     // Should NOT generalize to other departments
-    assert('NO generaliza estadia minima a todos los deptos',
-      !text.includes('todos nuestros') || !text.includes('mínima'));
+    assert(
+      'NO generaliza estadia minima a todos los deptos',
+      !text.includes('todos nuestros') || !text.includes('mínima'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -446,7 +512,11 @@ async function st13_NoBankDataInvented() {
   section('ST-13: NO inventar datos bancarios para depto sin cuenta cargada');
   const phone = PHONES.ST_13;
   // Luminar Mono has NO bank data loaded in DB
-  await send(phone, `Quiero reservar Luminar Mono del ${futureDateHuman(3)} al ${futureDateHuman(8)} para 2 personas`, 'Test BankData');
+  await send(
+    phone,
+    `Quiero reservar Luminar Mono del ${futureDateHuman(3)} al ${futureDateHuman(8)} para 2 personas`,
+    'Test BankData',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
@@ -455,11 +525,16 @@ async function st13_NoBankDataInvented() {
     // CRITICAL: Must NOT contain invented bank data
     assert('NO inventa CBU', !text.includes('cbu'));
     assert('NO inventa alias bancario', !text.includes('alias:') && !text.includes('alias bancario'));
-    assert('NO inventa nombre de banco', !text.includes('banco nación') && !text.includes('banco nacion') && !text.includes('banco galicia'));
+    assert(
+      'NO inventa nombre de banco',
+      !text.includes('banco nación') && !text.includes('banco nacion') && !text.includes('banco galicia'),
+    );
     assert('NO inventa titular de cuenta', !text.includes('titular:'));
     // Should mention that an agent will contact them for payment info
-    assertRequiresAPI('menciona que un agente contactara para pago',
-      text.includes('agente') || text.includes('contactar') || text.includes('breve') || text.includes('proceder'));
+    assertRequiresAPI(
+      'menciona que un agente contactara para pago',
+      text.includes('agente') || text.includes('contactar') || text.includes('breve') || text.includes('proceder'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 500)}`);
   }
   // Conversation should be escalated to espera_humano
@@ -475,7 +550,11 @@ async function st14_BankDataTrustedHolder() {
   const phone = PHONES.ST_14;
   // Pewmafe HAS bank data with titular "Sergio Machado" (trusted)
   // Need 2 messages: first reserve, then accept to get PASO 2 with bank data
-  await send(phone, `Quiero reservar Pewmafe del ${futureDateHuman(10)} al ${futureDateHuman(14)} para 2 personas`, 'Test BankTrusted');
+  await send(
+    phone,
+    `Quiero reservar Pewmafe del ${futureDateHuman(10)} al ${futureDateHuman(14)} para 2 personas`,
+    'Test BankTrusted',
+  );
   await send(phone, 'Si, quiero proceder con la reserva', 'Test BankTrusted');
 
   const msg = await getLastBotMsg(phone);
@@ -484,8 +563,7 @@ async function st14_BankDataTrustedHolder() {
     const text = msg.contenido.toLowerCase();
     // PASO 2: Should show bank data since Pewmafe has verified holder
     assertRequiresAPI('menciona transferencia', text.includes('transferencia'));
-    assertRequiresAPI('muestra alias o CBU',
-      text.includes('alias') || text.includes('cbu'));
+    assertRequiresAPI('muestra alias o CBU', text.includes('alias') || text.includes('cbu'));
     // Should NOT be escalated (trusted holder = bot handles it)
     const estado14 = await getConvEstado(phone);
     assert('conversacion NO escalada (titular verificado)', estado14 !== 'espera_humano', `estado: ${estado14}`);
@@ -514,7 +592,11 @@ async function main() {
     const { env } = await import('../config/env.js');
     if (env.ANTHROPIC_API_KEY) {
       const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-      await client.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'OK' }] });
+      await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'OK' }],
+      });
       apiAvailable = true;
       console.log('\n  Claude API: \x1b[32mDISPONIBLE\x1b[0m — todos los tests se ejecutan');
     } else {
@@ -592,7 +674,7 @@ if (process.argv.includes('--cleanup')) {
       process.exit(1);
     });
 } else {
-  main().catch(e => {
+  main().catch((e) => {
     console.error('Error:', e);
     process.exit(1);
   });

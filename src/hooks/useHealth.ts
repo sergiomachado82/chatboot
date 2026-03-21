@@ -57,8 +57,11 @@ export function useHealth() {
 export function getCriticalFailures(health: HealthData | null): string[] {
   if (!health) return [];
   const critical = ['database', 'redis', 'claude', 'whatsapp'];
-  const labels: Record<string, string> = { database: 'Base de datos', redis: 'Redis', claude: 'Claude IA', whatsapp: 'WhatsApp' };
-  return critical
-    .filter((key) => health.services[key]?.status === 'error')
-    .map((key) => labels[key] ?? key);
+  const labels: Record<string, string> = {
+    database: 'Base de datos',
+    redis: 'Redis',
+    claude: 'Claude IA',
+    whatsapp: 'WhatsApp',
+  };
+  return critical.filter((key) => health.services[key]?.status === 'error').map((key) => labels[key] ?? key);
 }

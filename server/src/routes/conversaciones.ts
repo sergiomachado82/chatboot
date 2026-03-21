@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { listConversaciones, getConversacionById, updateConversacionEstado, deleteConversaciones } from '../services/conversacionService.js';
+import {
+  listConversaciones,
+  getConversacionById,
+  updateConversacionEstado,
+  deleteConversaciones,
+} from '../services/conversacionService.js';
 import { getByConversacion, createMensaje } from '../services/mensajeService.js';
 import { sendWhatsAppMessage } from '../services/whatsappService.js';
 
@@ -9,8 +14,14 @@ const router = Router();
 const conversacionesQuerySchema = z.object({
   estado: z.string().optional(),
   search: z.string().min(1).max(200).optional(),
-  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD').optional(),
-  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD').optional(),
+  dateFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD')
+    .optional(),
+  dateTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD')
+    .optional(),
 });
 
 // Bulk delete conversations
@@ -51,8 +62,14 @@ const mensajesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   before: z.string().datetime().optional(),
   search: z.string().min(1).max(200).optional(),
-  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD').optional(),
-  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD').optional(),
+  dateFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD')
+    .optional(),
+  dateTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD')
+    .optional(),
 });
 
 router.get('/conversaciones/:id/mensajes', async (req, res) => {
@@ -69,7 +86,10 @@ router.get('/conversaciones/:id/mensajes', async (req, res) => {
 // Agent takes control
 router.post('/conversaciones/:id/tomar-control', async (req, res) => {
   const conv = await getConversacionById(req.params.id);
-  if (!conv) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!conv) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
 
   const updated = await updateConversacionEstado(req.params.id, 'humano_activo', req.user!.id);
 
@@ -128,7 +148,10 @@ router.post('/conversaciones/:id/mensajes', async (req, res) => {
   const { contenido } = parsed.data;
 
   const conv = await getConversacionById(req.params.id);
-  if (!conv) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!conv) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
 
   const mensaje = await createMensaje({
     conversacionId: req.params.id,

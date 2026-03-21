@@ -9,6 +9,7 @@ const includeHuesped = {
   huesped: { select: { id: true, nombre: true, waId: true, telefono: true } },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeReserva(r: any) {
   return {
     ...r,
@@ -38,6 +39,11 @@ interface CreateReservaParams {
   notas?: string;
 }
 
+/**
+ * Creates a new reservation within a transaction, blocking inventory dates and syncing to Google Sheets and Calendar.
+ * @param params - The reservation parameters including guest, dates, room, and pricing details
+ * @returns The created reservation record with serialized numeric fields
+ */
 export async function createReserva(params: CreateReservaParams) {
   const dates = dateRange(params.fechaEntrada, params.fechaSalida);
 
@@ -77,7 +83,7 @@ export async function createReserva(params: CreateReservaParams) {
 
   // Recalc disponible for multi-unit correctness (outside transaction)
   await recalcDisponible(params.habitacion, dates).catch((err) =>
-    logger.error({ err }, 'recalcDisponible failed on create')
+    logger.error({ err }, 'recalcDisponible failed on create'),
   );
 
   // Sync to Google Sheets (fire-and-forget, outside transaction)
@@ -97,9 +103,7 @@ export async function createReserva(params: CreateReservaParams) {
   }).catch((err) => logger.error({ err }, 'Sheets sync failed on create'));
 
   // Sync to Google Calendar (fire-and-forget)
-  pushReservaToGCal(reserva.id).catch((err) =>
-    logger.error({ err }, 'GCal push failed on create')
-  );
+  pushReservaToGCal(reserva.id).catch((err) => logger.error({ err }, 'GCal push failed on create'));
 
   return serializeReserva(reserva);
 }
@@ -123,6 +127,11 @@ interface CreateReservaManualParams {
   notas?: string;
 }
 
+/**
+ * Creates a manual reservation without a linked guest or conversation, recalculating inventory availability.
+ * @param params - The reservation parameters including guest name, dates, room, and optional pricing details
+ * @returns The created reservation record with serialized numeric fields
+ */
 export async function createReservaManual(params: CreateReservaManualParams) {
   const reserva = await prisma.reserva.create({
     data: {
@@ -150,7 +159,7 @@ export async function createReservaManual(params: CreateReservaManualParams) {
   if (params.habitacion) {
     const dates = dateRange(params.fechaEntrada, params.fechaSalida);
     await recalcDisponible(params.habitacion, dates).catch((err) =>
-      logger.error({ err }, 'recalcDisponible failed on manual create')
+      logger.error({ err }, 'recalcDisponible failed on manual create'),
     );
   }
 
@@ -176,6 +185,12 @@ interface UpdateReservaParams {
   notas?: string | null;
 }
 
+/**
+ * Updates an existing reservation's fields and recalculates inventory if cancelled.
+ * @param id - The reservation ID to update
+ * @param params - The fields to update on the reservation
+ * @returns The updated reservation record, or null if not found
+ */
 export async function updateReserva(id: string, params: UpdateReservaParams) {
   const existing = await prisma.reserva.findUnique({ where: { id } });
   if (!existing) return null;
@@ -193,13 +208,17 @@ export async function updateReserva(id: string, params: UpdateReservaParams) {
   });
 
   // Sync to Google Calendar (fire-and-forget)
-  pushReservaToGCal(id).catch((err) =>
-    logger.error({ err }, 'GCal push failed on update')
-  );
+  pushReservaToGCal(id).catch((err) => logger.error({ err }, 'GCal push failed on update'));
 
   return serializeReserva(reserva);
 }
 
+/**
+ * Updates a reservation's status and syncs changes to Google Sheets and Calendar.
+ * @param id - The reservation ID
+ * @param estado - The new reservation status (e.g., 'confirmada', 'cancelada')
+ * @returns The updated reservation record, or null if not found
+ */
 export async function updateReservaEstado(id: string, estado: ReservaEstado) {
   const reserva = await prisma.reserva.findUnique({ where: { id } });
   if (!reserva) return null;
@@ -215,7 +234,7 @@ export async function updateReservaEstado(id: string, estado: ReservaEstado) {
     const dates = dateRange(reserva.fechaEntrada, reserva.fechaSalida);
     if (dates.length > 0) {
       await recalcDisponible(reserva.habitacion, dates).catch((err) =>
-        logger.error({ err }, 'recalcDisponible failed on cancel')
+        logger.error({ err }, 'recalcDisponible failed on cancel'),
       );
     }
   }
@@ -237,13 +256,16 @@ export async function updateReservaEstado(id: string, estado: ReservaEstado) {
   }).catch((err) => logger.error({ err }, 'Sheets sync failed on update'));
 
   // Sync to Google Calendar (fire-and-forget)
-  pushReservaToGCal(updated.id).catch((err) =>
-    logger.error({ err }, 'GCal push failed on estado update')
-  );
+  pushReservaToGCal(updated.id).catch((err) => logger.error({ err }, 'GCal push failed on estado update'));
 
   return serializeReserva(updated);
 }
 
+/**
+ * Retrieves a single reservation by its ID with guest data included.
+ * @param id - The reservation ID
+ * @returns The reservation record with serialized numeric fields, or null if not found
+ */
 export async function getReservaById(id: string) {
   const reserva = await prisma.reserva.findUnique({
     where: { id },
@@ -252,6 +274,11 @@ export async function getReservaById(id: string) {
   return reserva ? serializeReserva(reserva) : null;
 }
 
+/**
+ * Retrieves all reservations for a specific guest, ordered by most recent first.
+ * @param huespedId - The guest's unique identifier
+ * @returns An array of reservation records with serialized numeric fields
+ */
 export async function getReservasByHuesped(huespedId: string) {
   const reservas = await prisma.reserva.findMany({
     where: { huespedId },
@@ -261,6 +288,12 @@ export async function getReservasByHuesped(huespedId: string) {
   return reservas.map(serializeReserva);
 }
 
+/**
+ * Retrieves all non-cancelled reservations that overlap with the given date range.
+ * @param from - The start date of the range
+ * @param to - The end date of the range
+ * @returns An array of reservation records ordered by check-in date
+ */
 export async function getReservasByDateRange(from: Date, to: Date) {
   const reservas = await prisma.reserva.findMany({
     where: {
@@ -274,6 +307,11 @@ export async function getReservasByDateRange(from: Date, to: Date) {
   return reservas.map(serializeReserva);
 }
 
+/**
+ * Permanently deletes a reservation and recalculates inventory availability for the affected dates.
+ * @param id - The reservation ID to delete
+ * @returns True if the reservation was deleted, false if not found
+ */
 export async function deleteReserva(id: string) {
   const reserva = await prisma.reserva.findUnique({ where: { id } });
   if (!reserva) return false;
@@ -283,7 +321,7 @@ export async function deleteReserva(id: string) {
     const dates = dateRange(reserva.fechaEntrada, reserva.fechaSalida);
     await prisma.reserva.delete({ where: { id } });
     await recalcDisponible(reserva.habitacion, dates).catch((err) =>
-      logger.error({ err }, 'recalcDisponible failed on delete')
+      logger.error({ err }, 'recalcDisponible failed on delete'),
     );
   } else {
     await prisma.reserva.delete({ where: { id } });
@@ -292,6 +330,13 @@ export async function deleteReserva(id: string) {
   return true;
 }
 
+/**
+ * Lists reservations with optional status filtering and pagination.
+ * @param estado - Optional reservation status to filter by
+ * @param page - The page number (1-indexed, defaults to 1)
+ * @param pageSize - The number of results per page (defaults to 20)
+ * @returns An object containing the reservations array, total count, page number, and total pages
+ */
 export async function listReservas(estado?: string, page = 1, pageSize = 20) {
   const where = estado ? { estado } : undefined;
   const [reservas, total] = await Promise.all([

@@ -4,6 +4,7 @@ import { recalcDisponible, dateRange } from './inventarioService.js';
 import { pushReservaToGCal } from './googleCalendarService.js';
 
 // node-ical has no @types — lazy-load via dynamic import
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let icalModule: any = null;
 async function getIcal() {
   if (!icalModule) {
@@ -111,7 +112,11 @@ interface IcalEvent {
  * Sync reservations from an iCal feed for a complejo.
  * Creates new reservas for unknown UIDs, updates changed dates, cancels removed ones.
  */
-export async function syncFromIcalFeed(complejoId: string, icalUrl: string, plataforma: string): Promise<{
+export async function syncFromIcalFeed(
+  complejoId: string,
+  icalUrl: string,
+  plataforma: string,
+): Promise<{
   created: number;
   updated: number;
   cancelled: number;
@@ -162,7 +167,7 @@ export async function syncFromIcalFeed(complejoId: string, icalUrl: string, plat
   });
 
   // Build map: uid -> existing reserva
-  const uidToReserva = new Map<string, typeof existingReservas[0]>();
+  const uidToReserva = new Map<string, (typeof existingReservas)[0]>();
   for (const r of existingReservas) {
     if (r.notas) {
       // notas stores the UID like "ical-uid:abc123"
@@ -201,7 +206,7 @@ export async function syncFromIcalFeed(complejoId: string, icalUrl: string, plat
 
       // Push to Google Calendar (fire-and-forget)
       pushReservaToGCal(newReserva.id).catch((err) =>
-        logger.error({ err, reservaId: newReserva.id }, 'GCal push failed for iCal-imported reserva')
+        logger.error({ err, reservaId: newReserva.id }, 'GCal push failed for iCal-imported reserva'),
       );
     } else {
       // Check if dates changed

@@ -2,12 +2,7 @@ import toast from 'react-hot-toast';
 import { createElement } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 
-function iconToast(
-  message: string,
-  icon: typeof CheckCircle,
-  color: string,
-  opts?: { duration?: number },
-) {
+function iconToast(message: string, icon: typeof CheckCircle, color: string, opts?: { duration?: number }) {
   return toast(message, {
     icon: createElement(icon, { size: 18, color }),
     duration: opts?.duration,

@@ -2,7 +2,8 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
-const useLocalMta = env.SMTP_HOST === 'localhost' || env.SMTP_HOST === '127.0.0.1' || env.SMTP_HOST === 'host.docker.internal';
+const useLocalMta =
+  env.SMTP_HOST === 'localhost' || env.SMTP_HOST === '127.0.0.1' || env.SMTP_HOST === 'host.docker.internal';
 const smtpFrom = env.SMTP_USER || 'info@lasgrutasdepartamentos.com';
 const logoUrl = 'https://lasgrutasdepartamentos.com/logo.png';
 
@@ -11,15 +12,23 @@ const transporter = nodemailer.createTransport({
   port: env.SMTP_PORT,
   secure: env.SMTP_PORT === 465,
   ...(!env.SMTP_HOST && { service: 'gmail' }),
-  ...(useLocalMta ? {} : {
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
-    },
-  }),
+  ...(useLocalMta
+    ? {}
+    : {
+        auth: {
+          user: env.SMTP_USER,
+          pass: env.SMTP_PASS,
+        },
+      }),
   tls: { rejectUnauthorized: false },
 });
 
+/**
+ * Sends a password reset email with a branded HTML template containing a reset link.
+ * @param to - The recipient's email address
+ * @param resetUrl - The full URL for the password reset page
+ * @returns A promise that resolves when the email has been sent
+ */
 export async function sendResetEmail(to: string, resetUrl: string): Promise<void> {
   if (!useLocalMta && (!env.SMTP_USER || !env.SMTP_PASS)) {
     logger.error('SMTP_USER and SMTP_PASS must be configured to send emails');
@@ -63,6 +72,11 @@ interface ContactFormData {
   mensaje?: string;
 }
 
+/**
+ * Sends a contact form submission email to the business inbox with a formatted HTML table.
+ * @param data - The contact form data including name, email, phone, and optional reservation details
+ * @returns A promise that resolves when the email has been sent
+ */
 export async function sendContactEmail(data: ContactFormData): Promise<void> {
   if (!useLocalMta && (!env.SMTP_USER || !env.SMTP_PASS)) {
     logger.error('SMTP credentials not configured');
@@ -100,20 +114,32 @@ export async function sendContactEmail(data: ContactFormData): Promise<void> {
           <td style="padding: 8px 12px; font-weight: bold; color: #374151; border-bottom: 1px solid #e5e7eb;">Huespedes</td>
           <td style="padding: 8px 12px; color: #1f2937; border-bottom: 1px solid #e5e7eb;">${huespedes || '-'}</td>
         </tr>
-        ${fechaIngreso ? `<tr>
+        ${
+          fechaIngreso
+            ? `<tr>
           <td style="padding: 8px 12px; font-weight: bold; color: #374151; border-bottom: 1px solid #e5e7eb;">Fecha ingreso</td>
           <td style="padding: 8px 12px; color: #1f2937; border-bottom: 1px solid #e5e7eb;">${fechaIngreso}</td>
-        </tr>` : ''}
-        ${fechaSalida ? `<tr>
+        </tr>`
+            : ''
+        }
+        ${
+          fechaSalida
+            ? `<tr>
           <td style="padding: 8px 12px; font-weight: bold; color: #374151; border-bottom: 1px solid #e5e7eb;">Fecha salida</td>
           <td style="padding: 8px 12px; color: #1f2937; border-bottom: 1px solid #e5e7eb;">${fechaSalida}</td>
-        </tr>` : ''}
+        </tr>`
+            : ''
+        }
       </table>
-      ${mensaje ? `
+      ${
+        mensaje
+          ? `
       <div style="margin-top: 20px; padding: 16px; background-color: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
         <p style="font-weight: bold; color: #374151; margin: 0 0 8px 0;">Mensaje:</p>
         <p style="color: #1f2937; margin: 0; white-space: pre-wrap;">${mensaje}</p>
-      </div>` : ''}
+      </div>`
+          : ''
+      }
       <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
         Enviado desde el formulario de contacto de lasgrutasdepartamentos.com
       </p>
@@ -140,6 +166,11 @@ interface AutoReplyData {
   inReplyTo?: string;
 }
 
+/**
+ * Sends an automatic reply email with branded HTML formatting and proper email threading headers.
+ * @param data - The auto-reply data including recipient, subject, body text, and optional In-Reply-To header
+ * @returns A promise that resolves when the email has been sent
+ */
 export async function sendAutoReplyEmail(data: AutoReplyData): Promise<void> {
   if (!useLocalMta && (!env.SMTP_USER || !env.SMTP_PASS)) {
     logger.error('SMTP credentials not configured for auto-reply');
@@ -151,8 +182,8 @@ export async function sendAutoReplyEmail(data: AutoReplyData): Promise<void> {
   // Convert plain text to HTML paragraphs
   const bodyHtml = bodyText
     .split('\n')
-    .map(line => line.trim())
-    .map(line => line ? `<p style="margin: 0 0 8px 0; color: #1f2937;">${line}</p>` : '<br/>')
+    .map((line) => line.trim())
+    .map((line) => (line ? `<p style="margin: 0 0 8px 0; color: #1f2937;">${line}</p>` : '<br/>'))
     .join('\n');
 
   const html = `
@@ -184,7 +215,7 @@ export async function sendAutoReplyEmail(data: AutoReplyData): Promise<void> {
   const headers: Record<string, string> = {
     'Auto-Submitted': 'auto-replied',
     'X-Auto-Responded-Message': 'true',
-    'Precedence': 'bulk',
+    Precedence: 'bulk',
   };
   if (inReplyTo) {
     headers['In-Reply-To'] = inReplyTo;

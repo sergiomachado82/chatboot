@@ -50,7 +50,10 @@ router.get('/health', async (_req, res) => {
         claudeCache = { status: 'error', checkedAt: now };
       }
     }
-    services.claude = { status: claudeCache.status as 'ok' | 'error', ...(claudeCache.latencyMs ? { latencyMs: claudeCache.latencyMs } : {}) };
+    services.claude = {
+      status: claudeCache.status as 'ok' | 'error',
+      ...(claudeCache.latencyMs ? { latencyMs: claudeCache.latencyMs } : {}),
+    };
   } else {
     services.claude = { status: 'not_configured' };
   }
@@ -71,9 +74,7 @@ router.get('/health', async (_req, res) => {
     services.sheets = { status: 'not_configured' };
   }
 
-  const allOk = Object.values(services).every(
-    (s) => s.status === 'ok' || s.status === 'not_configured'
-  );
+  const allOk = Object.values(services).every((s) => s.status === 'ok' || s.status === 'not_configured');
 
   res.json({
     status: allOk ? 'ok' : 'degraded',

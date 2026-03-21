@@ -19,12 +19,9 @@ const INITIAL: ConfirmState = {
 export function useConfirm() {
   const [state, setState] = useState<ConfirmState>(INITIAL);
 
-  const confirm = useCallback(
-    (opts: Omit<ConfirmState, 'open'>) => {
-      setState({ ...opts, open: true });
-    },
-    [],
-  );
+  const confirm = useCallback((opts: Omit<ConfirmState, 'open'>) => {
+    setState({ ...opts, open: true });
+  }, []);
 
   const handleConfirm = useCallback(() => {
     state.onConfirm();

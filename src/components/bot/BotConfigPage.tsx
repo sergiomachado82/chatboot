@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notify } from '../../utils/notify';
 import { Save, AlertTriangle, Upload, Trash2, Building2, Plus, X, ChevronDown, History } from 'lucide-react';
@@ -7,16 +8,21 @@ import type { BotConfigUpdate, BotConfigAuditEntry } from '../../api/botConfigAp
 
 type BotTab = 'identidad' | 'comportamiento' | 'reglas' | 'mensajes';
 
-const BOT_TABS: { key: BotTab; label: string }[] = [
-  { key: 'identidad', label: 'Identidad' },
-  { key: 'comportamiento', label: 'Comportamiento' },
-  { key: 'reglas', label: 'Reglas' },
-  { key: 'mensajes', label: 'Mensajes' },
+const BOT_TAB_KEYS: { key: BotTab; labelKey: string }[] = [
+  { key: 'identidad', labelKey: 'bot.tabIdentity' },
+  { key: 'comportamiento', labelKey: 'bot.tabBehavior' },
+  { key: 'reglas', labelKey: 'bot.tabRules' },
+  { key: 'mensajes', labelKey: 'bot.tabMessages' },
 ];
 
 export default function BotConfigPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data: config, isLoading, error } = useQuery({
+  const {
+    data: config,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['bot-config'],
     queryFn: getBotConfig,
   });
@@ -76,31 +82,31 @@ export default function BotConfigPage() {
   const mutation = useMutation({
     mutationFn: (data: BotConfigUpdate) => updateBotConfig(data),
     onSuccess: () => {
-      notify.success('Configuracion del bot actualizada');
+      notify.success(t('bot.successUpdate'));
       queryClient.invalidateQueries({ queryKey: ['bot-config'] });
     },
     onError: (err: Error) => {
-      notify.error(err.message || 'Error al actualizar la configuracion');
+      notify.error(err.message || t('bot.errorUpdate'));
     },
   });
 
   const logoUploadMutation = useMutation({
     mutationFn: (base64: string) => uploadLogo(base64),
     onSuccess: () => {
-      notify.success('Logo actualizado');
+      notify.success(t('bot.logoUpdated'));
       queryClient.invalidateQueries({ queryKey: ['bot-config'] });
     },
-    onError: (err: Error) => notify.error(err.message || 'Error al subir el logo'),
+    onError: (err: Error) => notify.error(err.message || t('bot.errorLogoUpload')),
   });
 
   const logoDeleteMutation = useMutation({
     mutationFn: () => deleteLogo(),
     onSuccess: () => {
-      notify.success('Logo eliminado');
+      notify.success(t('bot.logoDeletedSuccess'));
       setLogoPreview(null);
       queryClient.invalidateQueries({ queryKey: ['bot-config'] });
     },
-    onError: (err: Error) => notify.error(err.message || 'Error al eliminar el logo'),
+    onError: (err: Error) => notify.error(err.message || t('bot.errorLogoDelete')),
   });
 
   function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -108,11 +114,11 @@ export default function BotConfigPage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      notify.error('Solo se permiten archivos de imagen');
+      notify.error(t('bot.errorFileType'));
       return;
     }
     if (file.size > 500 * 1024) {
-      notify.error('El archivo es demasiado grande (max 500KB)');
+      notify.error(t('bot.errorFileSize'));
       return;
     }
 
@@ -164,7 +170,7 @@ export default function BotConfigPage() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <AlertTriangle className="mx-auto mb-2 text-red-500" size={32} />
-          <p className="text-red-600">Error al cargar la configuracion del bot</p>
+          <p className="text-red-600">{t('bot.errorLoading')}</p>
           <p className="text-sm text-gray-500 mt-1">{(error as Error).message}</p>
         </div>
       </div>
@@ -174,22 +180,22 @@ export default function BotConfigPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-2xl mx-auto space-y-6">
-        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Configuracion del Agente IA</h2>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100">{t('bot.title')}</h1>
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
-          {BOT_TABS.map((t) => (
+          {BOT_TAB_KEYS.map((tab) => (
             <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              aria-pressed={activeTab === t.key}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === t.key
+                activeTab === tab.key
                   ? 'border-blue-600 text-blue-700 dark:text-blue-300'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
-              {t.label}
+              {t(tab.labelKey)}
             </button>
           ))}
         </div>
@@ -198,11 +204,13 @@ export default function BotConfigPage() {
           <>
             {/* Logo */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Logo del panel</h3>
-              <p className="text-xs text-gray-500">Se muestra en la pantalla de login y recuperacion de contraseña. Max 500KB, formato PNG/JPG/SVG.</p>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                {t('bot.panelLogo')}
+              </h3>
+              <p className="text-xs text-gray-500">{t('bot.logoInfo')}</p>
 
               <div className="flex items-center gap-5">
-                <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden flex-shrink-0">
+                <div className="h-20 w-20 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden flex-shrink-0">
                   {logoPreview ? (
                     <img src={logoPreview} alt="Logo" className="h-full w-full object-contain p-1" />
                   ) : (
@@ -210,14 +218,20 @@ export default function BotConfigPage() {
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoSelect} className="hidden" />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    onChange={handleLogoSelect}
+                    className="hidden"
+                  />
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={logoUploadMutation.isPending}
                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
                   >
                     <Upload size={14} />
-                    {logoUploadMutation.isPending ? 'Subiendo...' : 'Subir logo'}
+                    {logoUploadMutation.isPending ? t('bot.logoUploading') : t('bot.logoUpload')}
                   </button>
                   {logoPreview && (
                     <button
@@ -226,7 +240,7 @@ export default function BotConfigPage() {
                       className="flex items-center gap-2 px-3 py-1.5 bg-white border border-red-300 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 disabled:opacity-50"
                     >
                       <Trash2 size={14} />
-                      {logoDeleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+                      {logoDeleteMutation.isPending ? t('bot.logoDeleting') : t('bot.logoDelete')}
                     </button>
                   )}
                 </div>
@@ -235,49 +249,101 @@ export default function BotConfigPage() {
 
             {/* Identity */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Identidad del agente</h3>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                {t('bot.identityPanel')}
+              </h3>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nombre del agente <span className="text-gray-500 font-normal">({nombreAgente.length}/200)</span>
+                <label
+                  htmlFor="bot-nombreAgente"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  {t('bot.agentName')} <span className="text-gray-500 font-normal">({nombreAgente.length}/200)</span>
                 </label>
-                <input type="text" value={nombreAgente} onChange={(e) => setNombreAgente(e.target.value.slice(0, 200))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100" />
+                <input
+                  id="bot-nombreAgente"
+                  type="text"
+                  value={nombreAgente}
+                  onChange={(e) => setNombreAgente(e.target.value.slice(0, 200))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Ubicacion <span className="text-gray-500 font-normal">({ubicacion.length}/300)</span>
+                <label
+                  htmlFor="bot-ubicacion"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  {t('bot.location')} <span className="text-gray-500 font-normal">({ubicacion.length}/300)</span>
                 </label>
-                <input type="text" value={ubicacion} onChange={(e) => setUbicacion(e.target.value.slice(0, 300))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100" />
+                <input
+                  id="bot-ubicacion"
+                  type="text"
+                  value={ubicacion}
+                  onChange={(e) => setUbicacion(e.target.value.slice(0, 300))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tono <span className="text-gray-500 font-normal">({tono.length}/200)</span>
+                <label htmlFor="bot-tono" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('bot.tone')} <span className="text-gray-500 font-normal">({tono.length}/200)</span>
                 </label>
-                <input type="text" value={tono} onChange={(e) => setTono(e.target.value.slice(0, 200))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100" placeholder="amable, profesional y cercano" />
+                <input
+                  id="bot-tono"
+                  type="text"
+                  value={tono}
+                  onChange={(e) => setTono(e.target.value.slice(0, 200))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  placeholder={t('bot.tonePlaceholder')}
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Idioma</label>
-                <select value={idioma} onChange={(e) => setIdioma(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100">
-                  <option value="es_AR">Espanol Argentina (voseo)</option>
-                  <option value="es">Espanol neutro</option>
-                  <option value="en">English</option>
+                <label htmlFor="bot-idioma" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('bot.language')}
+                </label>
+                <select
+                  id="bot-idioma"
+                  value={idioma}
+                  onChange={(e) => setIdioma(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                >
+                  <option value="es_AR">{t('bot.langSpanishAr')}</option>
+                  <option value="es">{t('bot.langSpanishNeutral')}</option>
+                  <option value="en">{t('bot.langEnglish')}</option>
                 </select>
               </div>
 
               <div className="flex items-center gap-3">
-                <input type="checkbox" id="usarEmojis" checked={usarEmojis} onChange={(e) => setUsarEmojis(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                <label htmlFor="usarEmojis" className="text-sm text-gray-700 dark:text-gray-300">Usar emojis en las respuestas</label>
+                <input
+                  type="checkbox"
+                  id="usarEmojis"
+                  checked={usarEmojis}
+                  onChange={(e) => setUsarEmojis(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="usarEmojis" className="text-sm text-gray-700 dark:text-gray-300">
+                  {t('bot.useEmojis')}
+                </label>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Longitud de respuesta</label>
-                <select value={longitudRespuesta} onChange={(e) => setLongitudRespuesta(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100">
-                  <option value="corta">Corta (3-4 frases)</option>
-                  <option value="media">Media (5-7 frases)</option>
-                  <option value="detallada">Detallada (8-10 frases)</option>
+                <label
+                  htmlFor="bot-longitudRespuesta"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  {t('bot.responseLength')}
+                </label>
+                <select
+                  id="bot-longitudRespuesta"
+                  value={longitudRespuesta}
+                  onChange={(e) => setLongitudRespuesta(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                >
+                  <option value="corta">{t('bot.responseLengthShort')}</option>
+                  <option value="media">{t('bot.responseLengthMedium')}</option>
+                  <option value="detallada">{t('bot.responseLengthDetailed')}</option>
                 </select>
               </div>
             </div>
@@ -286,261 +352,309 @@ export default function BotConfigPage() {
 
         {activeTab === 'comportamiento' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto pre-reserva</p>
-              <p className="text-xs text-gray-500">Crear pre-reserva automaticamente cuando el huesped confirma</p>
-            </div>
-            <Toggle checked={autoPreReserva} onChange={setAutoPreReserva} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Envio de fotos</label>
-            <select
-              value={modoEnvioFotos}
-              onChange={(e) => setModoEnvioFotos(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-            >
-              <option value="auto">Automatico (cuando el huesped pide fotos)</option>
-              <option value="on_request">Solo cuando se solicita explicitamente</option>
-              <option value="off">Desactivado</option>
-            </select>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Escalar quejas a agente</p>
-              <p className="text-xs text-gray-500">Derivar automaticamente cuando se detecta una queja</p>
-            </div>
-            <Toggle checked={escalarSiQueja} onChange={setEscalarSiQueja} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Escalar pagos a agente</p>
-              <p className="text-xs text-gray-500">Derivar cuando hay problemas con datos bancarios</p>
-            </div>
-            <Toggle checked={escalarSiPago} onChange={setEscalarSiPago} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titulares de cuenta verificados</label>
-            <p className="text-xs text-gray-500 mb-2">
-              Nombres de titulares bancarios autorizados. Si un departamento tiene datos bancarios con un titular que no esta en esta lista, el bot NO mostrara los datos y escalara a un agente.
-            </p>
-            <div className="space-y-2">
-              {titularesVerificados.map((t, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">{t}</span>
-                  <button
-                    type="button"
-                    onClick={() => setTitularesVerificados(prev => prev.filter((_, idx) => idx !== i))}
-                    className="p-1 text-red-400 hover:text-red-600"
-                    title="Eliminar"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={nuevoTitular}
-                  onChange={(e) => setNuevoTitular(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && nuevoTitular.trim()) {
-                      e.preventDefault();
-                      setTitularesVerificados(prev => [...prev, nuevoTitular.trim()]);
-                      setNuevoTitular('');
-                    }
-                  }}
-                  placeholder="Nombre del titular..."
-                  className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (nuevoTitular.trim()) {
-                      setTitularesVerificados(prev => [...prev, nuevoTitular.trim()]);
-                      setNuevoTitular('');
-                    }
-                  }}
-                  className="p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  title="Agregar"
-                >
-                  <Plus size={16} />
-                </button>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('bot.autoPreReservation')}</p>
+                <p className="text-xs text-gray-500">{t('bot.autoPreReservationInfo')}</p>
               </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Telefono de contacto</label>
-            <input
-              type="text"
-              value={telefonoContacto}
-              onChange={(e) => setTelefonoContacto(e.target.value.slice(0, 50))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-            />
-          </div>
-        </div>
-        )}
-
-        {activeTab === 'reglas' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Reglas del bot</h3>
-
-          {/* Reglas base R1-R10 (solo lectura, colapsable) */}
-          <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setMostrarReglasBase(!mostrarReglasBase)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-650 transition-colors text-left"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Reglas base del sistema (R1-R10)</span>
-                <span className="text-xs text-gray-400 bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full">Solo lectura</span>
-              </div>
-              <ChevronDown size={16} className={`text-gray-400 transition-transform ${mostrarReglasBase ? 'rotate-180' : ''}`} />
-            </button>
-            {mostrarReglasBase && (
-              <div className="px-4 py-3 space-y-2 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-600">
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">1.</span><span><strong>Fotos:</strong> Nunca incluir URLs de imagenes en texto. Las fotos se envian como adjuntos automaticamente.</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">2.</span><span><strong>Precios:</strong> Usar exclusivamente las tarifas del contexto. Nunca inventar precios.</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">3.</span><span><strong>Capacidad:</strong> Respetar capacidad por unidad. No ofrecer mas unidades de las disponibles.</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">4.</span><span><strong>Datos:</strong> No inventar datos. Estadia minima solo si hay advertencia en el contexto.</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">5.</span><span><strong>Informacion:</strong> Solo mencionar departamentos cuya informacion aparece en el contexto.</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">6.</span><span><strong>Conversacion:</strong> No re-pedir datos ya conocidos. Preguntas progresivas, una a la vez.</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">7.</span><span><strong>Flujo:</strong> Pedir personas, fechas, noches, nombre, celular y DNI (uno a la vez).</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">8.</span><span><strong>Reservas:</strong> Flujo completo en 4 pasos (resumen → datos bancarios → comprobante → confirmacion por agente).</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">9.</span><span><strong>Terminologia:</strong> Siempre decir "reserva", nunca "pre-reserva" al huesped.</span></div>
-                <div className="flex gap-2"><span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">10.</span><span><strong>Datos bancarios:</strong> Jamas inventar CBU/alias/banco. Si hay advertencia, no mostrar datos de pago.</span></div>
-              </div>
-            )}
-          </div>
-
-          {/* Reglas personalizadas (editables) */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Reglas adicionales</p>
-              <span className="text-xs text-gray-400">{reglasPersonalizadas.length}/20 reglas</span>
+              <Toggle checked={autoPreReserva} onChange={setAutoPreReserva} />
             </div>
 
-            {reglasPersonalizadas.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {reglasPersonalizadas.map((regla, i) => (
-                  <div key={i} className="flex items-start gap-2 group">
-                    <span className="flex-shrink-0 w-6 text-right text-xs font-mono text-gray-400 mt-2">{11 + i}.</span>
-                    <span className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200">{regla}</span>
+            <div>
+              <label
+                htmlFor="bot-modoEnvioFotos"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                {t('bot.photoSend')}
+              </label>
+              <select
+                id="bot-modoEnvioFotos"
+                value={modoEnvioFotos}
+                onChange={(e) => setModoEnvioFotos(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+              >
+                <option value="auto">{t('bot.photoSendAuto')}</option>
+                <option value="on_request">{t('bot.photoSendOnRequest')}</option>
+                <option value="off">{t('bot.photoSendOff')}</option>
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('bot.escalateComplaints')}</p>
+                <p className="text-xs text-gray-500">{t('bot.escalateComplaintsInfo')}</p>
+              </div>
+              <Toggle checked={escalarSiQueja} onChange={setEscalarSiQueja} />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('bot.escalatePayments')}</p>
+                <p className="text-xs text-gray-500">{t('bot.escalatePaymentsInfo')}</p>
+              </div>
+              <Toggle checked={escalarSiPago} onChange={setEscalarSiPago} />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('bot.verifiedAccountHolders')}
+              </label>
+              <p className="text-xs text-gray-500 mb-2">{t('bot.verifiedAccountHoldersInfo')}</p>
+              <div className="space-y-2">
+                {titularesVerificados.map((titular, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
+                      {titular}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setReglasPersonalizadas(prev => prev.filter((_, idx) => idx !== i))}
-                      className="p-1 text-red-400 hover:text-red-600 opacity-50 group-hover:opacity-100 transition-opacity"
-                      title="Eliminar regla"
+                      onClick={() => setTitularesVerificados((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="p-1 text-red-400 hover:text-red-600"
+                      title={t('bot.accountHolderDelete')}
                     >
                       <X size={16} />
                     </button>
                   </div>
                 ))}
+                <div className="flex items-center gap-2">
+                  <input
+                    id="bot-nuevoTitular"
+                    type="text"
+                    value={nuevoTitular}
+                    onChange={(e) => setNuevoTitular(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && nuevoTitular.trim()) {
+                        e.preventDefault();
+                        setTitularesVerificados((prev) => [...prev, nuevoTitular.trim()]);
+                        setNuevoTitular('');
+                      }
+                    }}
+                    placeholder={t('bot.accountHolderPlaceholder')}
+                    className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (nuevoTitular.trim()) {
+                        setTitularesVerificados((prev) => [...prev, nuevoTitular.trim()]);
+                        setNuevoTitular('');
+                      }
+                    }}
+                    className="p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    title={t('common.add')}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
 
-            {reglasPersonalizadas.length === 0 && (
-              <p className="text-sm text-gray-400 dark:text-gray-500 italic mb-3">No hay reglas adicionales. Podes agregar hasta 20.</p>
-            )}
-
-            {reglasPersonalizadas.length < 20 && (
-              <div className="flex items-start gap-2">
-                <input
-                  type="text"
-                  value={nuevaRegla}
-                  onChange={(e) => setNuevaRegla(e.target.value.slice(0, 500))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && nuevaRegla.trim()) {
-                      e.preventDefault();
-                      setReglasPersonalizadas(prev => [...prev, nuevaRegla.trim()]);
-                      setNuevaRegla('');
-                    }
-                  }}
-                  placeholder="Ej: No ofrecer descuentos sin autorizacion de un agente humano"
-                  className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (nuevaRegla.trim()) {
-                      setReglasPersonalizadas(prev => [...prev, nuevaRegla.trim()]);
-                      setNuevaRegla('');
-                    }
-                  }}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex-shrink-0"
-                >
-                  <Plus size={14} />
-                  Agregar
-                </button>
-              </div>
-            )}
-
-            {nuevaRegla.length > 0 && (
-              <p className="text-xs text-gray-400 text-right mt-1">{nuevaRegla.length}/500 caracteres</p>
-            )}
+            <div>
+              <label
+                htmlFor="bot-telefonoContacto"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                {t('bot.contactPhone')}
+              </label>
+              <input
+                id="bot-telefonoContacto"
+                type="text"
+                value={telefonoContacto}
+                onChange={(e) => setTelefonoContacto(e.target.value.slice(0, 50))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'reglas' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+              {t('bot.rulesPanel')}
+            </h3>
+
+            {/* Reglas base R1-R10 (solo lectura, colapsable) */}
+            <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setMostrarReglasBase(!mostrarReglasBase)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-650 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    {t('bot.baseRulesLabel')}
+                  </span>
+                  <span className="text-xs text-gray-400 bg-gray-200 dark:bg-gray-600 px-2 py-0.5 rounded-full">
+                    {t('bot.baseRulesReadOnly')}
+                  </span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`text-gray-400 transition-transform ${mostrarReglasBase ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {mostrarReglasBase && (
+                <div className="px-4 py-3 space-y-2 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-600">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                    <div key={n} className="flex gap-2">
+                      <span className="flex-shrink-0 w-6 text-right font-mono text-gray-400">{n}.</span>
+                      <span>{t(`bot.baseRule${n}`)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Reglas personalizadas (editables) */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('bot.customRulesLabel')}</p>
+                <span className="text-xs text-gray-400">
+                  {reglasPersonalizadas.length}/20 {t('bot.customRulesCount')}
+                </span>
+              </div>
+
+              {reglasPersonalizadas.length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {reglasPersonalizadas.map((regla, i) => (
+                    <div key={i} className="flex items-start gap-2 group">
+                      <span className="flex-shrink-0 w-6 text-right text-xs font-mono text-gray-400 mt-2">
+                        {11 + i}.
+                      </span>
+                      <span className="flex-1 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200">
+                        {regla}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReglasPersonalizadas((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="p-1 text-red-400 hover:text-red-600 opacity-50 group-hover:opacity-100 transition-opacity"
+                        title={t('bot.customRuleDelete')}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {reglasPersonalizadas.length === 0 && (
+                <p className="text-sm text-gray-400 dark:text-gray-500 italic mb-3">{t('bot.customRulesNone')}</p>
+              )}
+
+              {reglasPersonalizadas.length < 20 && (
+                <div className="flex items-start gap-2">
+                  <input
+                    id="bot-nuevaRegla"
+                    type="text"
+                    value={nuevaRegla}
+                    onChange={(e) => setNuevaRegla(e.target.value.slice(0, 500))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && nuevaRegla.trim()) {
+                        e.preventDefault();
+                        setReglasPersonalizadas((prev) => [...prev, nuevaRegla.trim()]);
+                        setNuevaRegla('');
+                      }
+                    }}
+                    placeholder={t('bot.customRulePlaceholder')}
+                    className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (nuevaRegla.trim()) {
+                        setReglasPersonalizadas((prev) => [...prev, nuevaRegla.trim()]);
+                        setNuevaRegla('');
+                      }
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex-shrink-0"
+                  >
+                    <Plus size={14} />
+                    {t('bot.customRuleAdd')}
+                  </button>
+                </div>
+              )}
+
+              {nuevaRegla.length > 0 && (
+                <p className="text-xs text-gray-400 text-right mt-1">{nuevaRegla.length}/500 caracteres</p>
+              )}
+            </div>
+          </div>
         )}
 
         {activeTab === 'mensajes' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Mensajes personalizados</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-5">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+              {t('bot.messagesPanel')}
+            </h3>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje de bienvenida <span className="text-gray-500 font-normal">({mensajeBienvenida.length}/1000)</span>
-            </label>
-            <textarea
-              value={mensajeBienvenida}
-              onChange={(e) => setMensajeBienvenida(e.target.value.slice(0, 1000))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
-            />
-          </div>
+            <div>
+              <label
+                htmlFor="bot-mensajeBienvenida"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                {t('bot.welcomeMessage')}{' '}
+                <span className="text-gray-500 font-normal">({mensajeBienvenida.length}/1000)</span>
+              </label>
+              <textarea
+                id="bot-mensajeBienvenida"
+                value={mensajeBienvenida}
+                onChange={(e) => setMensajeBienvenida(e.target.value.slice(0, 1000))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje de despedida <span className="text-gray-500 font-normal">({mensajeDespedida.length}/1000)</span>
-            </label>
-            <textarea
-              value={mensajeDespedida}
-              onChange={(e) => setMensajeDespedida(e.target.value.slice(0, 1000))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
-            />
-          </div>
+            <div>
+              <label
+                htmlFor="bot-mensajeDespedida"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                {t('bot.goodbyeMessage')}{' '}
+                <span className="text-gray-500 font-normal">({mensajeDespedida.length}/1000)</span>
+              </label>
+              <textarea
+                id="bot-mensajeDespedida"
+                value={mensajeDespedida}
+                onChange={(e) => setMensajeDespedida(e.target.value.slice(0, 1000))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje fuera de horario <span className="text-gray-500 font-normal">({mensajeFueraHorario.length}/1000)</span>
-            </label>
-            <textarea
-              value={mensajeFueraHorario}
-              onChange={(e) => setMensajeFueraHorario(e.target.value.slice(0, 1000))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
-            />
-          </div>
+            <div>
+              <label
+                htmlFor="bot-mensajeFueraHorario"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                {t('bot.offHoursMessage')}{' '}
+                <span className="text-gray-500 font-normal">({mensajeFueraHorario.length}/1000)</span>
+              </label>
+              <textarea
+                id="bot-mensajeFueraHorario"
+                value={mensajeFueraHorario}
+                onChange={(e) => setMensajeFueraHorario(e.target.value.slice(0, 1000))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Mensaje espera humano <span className="text-gray-500 font-normal">({mensajeEsperaHumano.length}/1000)</span>
-            </label>
-            <textarea
-              value={mensajeEsperaHumano}
-              onChange={(e) => setMensajeEsperaHumano(e.target.value.slice(0, 1000))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
-            />
+            <div>
+              <label
+                htmlFor="bot-mensajeEsperaHumano"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                {t('bot.waitingMessage')}{' '}
+                <span className="text-gray-500 font-normal">({mensajeEsperaHumano.length}/1000)</span>
+              </label>
+              <textarea
+                id="bot-mensajeEsperaHumano"
+                value={mensajeEsperaHumano}
+                onChange={(e) => setMensajeEsperaHumano(e.target.value.slice(0, 1000))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
           </div>
-        </div>
         )}
 
         {/* Save button */}
@@ -551,14 +665,14 @@ export default function BotConfigPage() {
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
             <Save size={16} />
-            {mutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+            {mutation.isPending ? t('common.saving') : t('bot.saveChanges')}
           </button>
           <button
             onClick={() => setShowHistory(!showHistory)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
           >
             <History size={16} />
-            Historial
+            {t('bot.historyButton')}
           </button>
         </div>
 
@@ -588,47 +702,61 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  nombreAgente: 'Nombre agente',
-  ubicacion: 'Ubicacion',
-  tono: 'Tono',
-  idioma: 'Idioma',
-  usarEmojis: 'Usar emojis',
-  longitudRespuesta: 'Longitud respuesta',
-  autoPreReserva: 'Auto pre-reserva',
-  modoEnvioFotos: 'Envio fotos',
-  escalarSiQueja: 'Escalar quejas',
-  escalarSiPago: 'Escalar pagos',
-  mensajeBienvenida: 'Mensaje bienvenida',
-  mensajeDespedida: 'Mensaje despedida',
-  mensajeFueraHorario: 'Mensaje fuera horario',
-  mensajeEsperaHumano: 'Mensaje espera',
-  telefonoContacto: 'Telefono contacto',
-  titularesVerificados: 'Titulares verificados',
-  reglasPersonalizadas: 'Reglas personalizadas',
-  logo: 'Logo',
+const FIELD_LABEL_KEYS: Record<string, string> = {
+  nombreAgente: 'bot.historyFieldAgentName',
+  ubicacion: 'bot.historyFieldLocation',
+  tono: 'bot.historyFieldTone',
+  idioma: 'bot.historyFieldLanguage',
+  usarEmojis: 'bot.historyFieldEmojis',
+  longitudRespuesta: 'bot.historyFieldResponseLength',
+  autoPreReserva: 'bot.historyFieldAutoPreReservation',
+  modoEnvioFotos: 'bot.historyFieldPhotoSend',
+  escalarSiQueja: 'bot.historyFieldEscalateComplaints',
+  escalarSiPago: 'bot.historyFieldEscalatePayments',
+  mensajeBienvenida: 'bot.historyFieldWelcome',
+  mensajeDespedida: 'bot.historyFieldGoodbye',
+  mensajeFueraHorario: 'bot.historyFieldOffHours',
+  mensajeEsperaHumano: 'bot.historyFieldWaiting',
+  telefonoContacto: 'bot.historyFieldContactPhone',
+  titularesVerificados: 'bot.historyFieldVerifiedHolders',
+  reglasPersonalizadas: 'bot.historyFieldCustomRules',
+  logo: 'bot.historyFieldLogo',
 };
 
 function ConfigHistory() {
+  const { t } = useTranslation();
   const { data: history, isLoading } = useQuery({
     queryKey: ['bot-config-history'],
     queryFn: () => getBotConfigHistory(30),
   });
 
-  if (isLoading) return <p className="text-sm text-gray-500 py-4">Cargando historial...</p>;
-  if (!history || history.length === 0) return <p className="text-sm text-gray-500 py-4">Sin cambios registrados.</p>;
+  if (isLoading) return <p className="text-sm text-gray-500 py-4">{t('bot.historyLoading')}</p>;
+  if (!history || history.length === 0)
+    return <p className="text-sm text-gray-500 py-4">{t('bot.historyNoChanges')}</p>;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6 space-y-2">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">Ultimos cambios</h3>
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">
+        {t('bot.historyTitle')}
+      </h3>
       <div className="space-y-2 max-h-64 overflow-y-auto">
         {history.map((entry: BotConfigAuditEntry) => (
-          <div key={entry.id} className="flex items-start gap-3 text-xs border-b border-gray-100 dark:border-gray-700 pb-2">
+          <div
+            key={entry.id}
+            className="flex items-start gap-3 text-xs border-b border-gray-100 dark:border-gray-700 pb-2"
+          >
             <span className="text-gray-400 whitespace-nowrap flex-shrink-0">
-              {new Date(entry.creadoEn).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              {new Date(entry.creadoEn).toLocaleString('es', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </span>
             <div className="min-w-0">
-              <span className="font-medium text-gray-700 dark:text-gray-300">{FIELD_LABELS[entry.campo] ?? entry.campo}</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                {FIELD_LABEL_KEYS[entry.campo] ? t(FIELD_LABEL_KEYS[entry.campo]) : entry.campo}
+              </span>
               {entry.valorAnterior != null && entry.valorAnterior.length < 80 && (
                 <span className="text-gray-400 ml-1">
                   <span className="line-through">{entry.valorAnterior}</span>

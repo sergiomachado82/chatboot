@@ -1,14 +1,10 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useReservasCalendar } from '../../hooks/useReservas';
 import { useComplejos } from '../../hooks/useComplejos';
 import type { Reserva } from '@shared/types/reserva';
 import type { Complejo } from '@shared/types/complejo';
-
-const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
 
 const ESTADO_COLORS: Record<string, { bg: string; text: string }> = {
   pre_reserva: { bg: 'bg-orange-300', text: 'text-orange-900' },
@@ -75,10 +71,7 @@ function buildRows(complejos: Complejo[]): CalendarRow[] {
 }
 
 // Distribute reservas across units using greedy assignment
-function distributeReservas(
-  spans: ReservaSpan[],
-  numUnits: number
-): Map<number, ReservaSpan[]> {
+function distributeReservas(spans: ReservaSpan[], numUnits: number): Map<number, ReservaSpan[]> {
   const units = new Map<number, ReservaSpan[]>();
   for (let i = 1; i <= numUnits; i++) units.set(i, []);
 
@@ -88,9 +81,7 @@ function distributeReservas(
     let assigned = false;
     for (let i = 1; i <= numUnits; i++) {
       const existing = units.get(i)!;
-      const overlaps = existing.some(
-        (e) => span.startDay <= e.endDay && span.endDay >= e.startDay
-      );
+      const overlaps = existing.some((e) => span.startDay <= e.endDay && span.endDay >= e.startDay);
       if (!overlaps) {
         existing.push(span);
         assigned = true;
@@ -106,6 +97,8 @@ function distributeReservas(
 }
 
 export default function ReservaCalendar() {
+  const { t } = useTranslation();
+  const monthNames = t('calendar.months', { returnObjects: true }) as string[];
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -117,10 +110,7 @@ export default function ReservaCalendar() {
   const { data: reservas, isLoading } = useReservasCalendar(from, to);
   const { data: complejos } = useComplejos();
 
-  const activeComplejos = useMemo(
-    () => complejos?.filter((c) => c.activo) ?? [],
-    [complejos]
-  );
+  const activeComplejos = useMemo(() => complejos?.filter((c) => c.activo) ?? [], [complejos]);
 
   const rows = useMemo(() => buildRows(activeComplejos), [activeComplejos]);
 
@@ -161,12 +151,16 @@ export default function ReservaCalendar() {
   }, [activeComplejos, spansByHabitacion]);
 
   function prevMonth() {
-    if (month === 0) { setYear(year - 1); setMonth(11); }
-    else setMonth(month - 1);
+    if (month === 0) {
+      setYear(year - 1);
+      setMonth(11);
+    } else setMonth(month - 1);
   }
   function nextMonth() {
-    if (month === 11) { setYear(year + 1); setMonth(0); }
-    else setMonth(month + 1);
+    if (month === 11) {
+      setYear(year + 1);
+      setMonth(0);
+    } else setMonth(month + 1);
   }
 
   function getReservaForCell(habitacion: string, unitIndex: number, day: number): Reserva | null {
@@ -187,22 +181,28 @@ export default function ReservaCalendar() {
     <div className="p-6">
       {/* Navigation */}
       <div className="flex items-center gap-4 mb-4">
-        <button onClick={prevMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+        <button onClick={prevMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
           <ChevronLeft size={20} />
         </button>
         <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 min-w-[200px] text-center">
-          {MONTH_NAMES[month]} {year}
+          {monthNames[month]} {year}
         </h2>
-        <button onClick={nextMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+        <button onClick={nextMonth} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
           <ChevronRight size={20} />
         </button>
       </div>
 
       {/* Estado Legend */}
       <div className="flex flex-wrap gap-4 mb-3 text-xs">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-300" /> Pre-reserva</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-400" /> Confirmada</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-300" /> Completada</span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full bg-orange-300" /> {t('calendar.legendPreReserva')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full bg-green-400" /> {t('calendar.legendConfirmed')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded-full bg-blue-300" /> {t('calendar.legendCompleted')}
+        </span>
       </div>
 
       {/* Complejo color legend */}
@@ -217,7 +217,7 @@ export default function ReservaCalendar() {
         </div>
       )}
 
-      {isLoading && <p className="text-gray-400 text-sm mb-2">Cargando...</p>}
+      {isLoading && <p className="text-gray-400 text-sm mb-2">{t('common.loading')}</p>}
 
       {/* Grid */}
       <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -225,13 +225,15 @@ export default function ReservaCalendar() {
           <thead>
             <tr>
               <th className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-left text-gray-600 dark:text-gray-300 font-medium border-r dark:border-gray-600 min-w-[160px]">
-                Departamento
+                {t('calendar.headerDepartment')}
               </th>
               {days.map((d) => (
                 <th
                   key={d}
                   className={`px-1 py-2 text-center font-medium min-w-[28px] ${
-                    isWeekend(year, month, d) ? 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                    isWeekend(year, month, d)
+                      ? 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                   }`}
                 >
                   {d}
@@ -242,18 +244,20 @@ export default function ReservaCalendar() {
           <tbody>
             {rows.map((row) => (
               <tr key={`${row.habitacion}-${row.unitIndex}`} className="border-b dark:border-gray-700">
-                <td className={`sticky left-0 z-10 bg-white dark:bg-gray-800 px-3 py-2 font-medium text-gray-700 dark:text-gray-200 border-r dark:border-gray-600 whitespace-nowrap border-l-3 ${COMPLEJO_BORDER_COLORS[row.complejoIndex % COMPLEJO_BORDER_COLORS.length]}`}>
+                <td
+                  className={`sticky left-0 z-10 bg-white dark:bg-gray-800 px-3 py-2 font-medium text-gray-700 dark:text-gray-200 border-r dark:border-gray-600 whitespace-nowrap border-l-3 ${COMPLEJO_BORDER_COLORS[row.complejoIndex % COMPLEJO_BORDER_COLORS.length]}`}
+                >
                   <span className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${COMPLEJO_COLORS[row.complejoIndex % COMPLEJO_COLORS.length]}`} />
+                    <span
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${COMPLEJO_COLORS[row.complejoIndex % COMPLEJO_COLORS.length]}`}
+                    />
                     {row.label}
                   </span>
                 </td>
                 {days.map((d) => {
                   const r = getReservaForCell(row.habitacion, row.unitIndex, d);
                   const colors = r ? ESTADO_COLORS[r.estado] : null;
-                  const nombre = r
-                    ? r.nombreHuesped ?? r.huesped?.nombre ?? ''
-                    : '';
+                  const nombre = r ? (r.nombreHuesped ?? r.huesped?.nombre ?? '') : '';
                   const tooltip = r
                     ? `${nombre}\n${new Date(r.fechaEntrada).toLocaleDateString('es-AR')} - ${new Date(r.fechaSalida).toLocaleDateString('es-AR')}`
                     : '';
@@ -280,7 +284,7 @@ export default function ReservaCalendar() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={numDays + 1} className="px-4 py-8 text-center text-gray-400">
-                  No hay departamentos activos
+                  {t('calendar.noDepartments')}
                 </td>
               </tr>
             )}

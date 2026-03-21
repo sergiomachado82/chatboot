@@ -4,11 +4,13 @@ import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { prisma } from './lib/prisma.js';
 import { initRedis, closeRedis } from './lib/redis.js';
-import { initSocketIO } from './services/socketManager.js';
+import { initSocketIO, closeSocketAdapter } from './services/socketManager.js';
 import { startCleanupJob, stopCleanupJob } from './services/conversacionCleanup.js';
 import { startIcalSyncJob, stopIcalSyncJob } from './services/icalSyncJob.js';
 import { startGCalSyncJob, stopGCalSyncJob } from './services/gcalSyncJob.js';
 import { startEmailPollerJob, stopEmailPollerJob } from './services/emailPollerService.js';
+import { startAlertJob, stopAlertJob } from './services/alertService.js';
+import { closeAllQueues } from './lib/queue.js';
 
 const server = http.createServer(app);
 
@@ -23,6 +25,7 @@ async function start() {
   startIcalSyncJob();
   startGCalSyncJob();
   startEmailPollerJob();
+  startAlertJob();
 
   server.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} (${env.NODE_ENV})`);
@@ -39,10 +42,13 @@ async function shutdown(signal: string) {
   stopIcalSyncJob();
   stopGCalSyncJob();
   stopEmailPollerJob();
+  stopAlertJob();
+  await closeAllQueues();
 
   // Stop accepting new connections, wait for in-flight requests
   server.close(async () => {
     logger.info('HTTP server closed, cleaning up services...');
+    await closeSocketAdapter();
     await prisma.$disconnect();
     await closeRedis();
     logger.info('All services closed');

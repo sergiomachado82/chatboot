@@ -20,6 +20,9 @@ export async function listHuespedes() {
   return prisma.huesped.findMany({ orderBy: { creadoEn: 'desc' } });
 }
 
-export async function updateHuesped(id: string, data: { nombre?: string; telefono?: string; email?: string; notas?: string }) {
+export async function updateHuesped(
+  id: string,
+  data: { nombre?: string; telefono?: string; email?: string; notas?: string },
+) {
   return prisma.huesped.update({ where: { id }, data });
 }

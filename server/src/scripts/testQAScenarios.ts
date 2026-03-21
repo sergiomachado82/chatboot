@@ -27,7 +27,9 @@ const SETUP_PHONES = {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function send(from: string, body: string, name: string): Promise<void> {
   await fetch(`${BASE_URL}/api/simulator/send`, {
@@ -38,6 +40,7 @@ async function send(from: string, body: string, name: string): Promise<void> {
   await sleep(WAIT_MS);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getLastBotMsg(waId: string): Promise<{ contenido: string; metadata: any } | null> {
   const huesped = await prisma.huesped.findFirst({ where: { waId } });
   if (!huesped) return null;
@@ -50,9 +53,11 @@ async function getLastBotMsg(waId: string): Promise<{ contenido: string; metadat
     where: { conversacionId: conv.id, origen: 'bot' },
     orderBy: { creadoEn: 'desc' },
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return msg ? { contenido: msg.contenido, metadata: msg.metadata as any } : null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getAllBotMsgs(waId: string): Promise<{ contenido: string; metadata: any }[]> {
   const huesped = await prisma.huesped.findFirst({ where: { waId } });
   if (!huesped) return [];
@@ -65,7 +70,8 @@ async function getAllBotMsgs(waId: string): Promise<{ contenido: string; metadat
     where: { conversacionId: conv.id, origen: 'bot' },
     orderBy: { creadoEn: 'asc' },
   });
-  return msgs.map(m => ({ contenido: m.contenido, metadata: m.metadata as any }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return msgs.map((m) => ({ contenido: m.contenido, metadata: m.metadata as any }));
 }
 
 async function getConvEstado(waId: string): Promise<string | null> {
@@ -245,12 +251,15 @@ async function qa_s01() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Should respond with welcome, NOT list departments or min stay
-    assert('NO lista todos los departamentos proactivamente',
-      !(text.includes('pewmafe') && text.includes('luminar') && text.includes('lg')));
-    assert('NO menciona estadia minima',
-      !text.includes('mínima') && !text.includes('minima'));
-    assertRequiresAPI('responde con bienvenida',
-      text.includes('bienvenid') || text.includes('hola') || text.includes('ayudar'));
+    assert(
+      'NO lista todos los departamentos proactivamente',
+      !(text.includes('pewmafe') && text.includes('luminar') && text.includes('lg')),
+    );
+    assert('NO menciona estadia minima', !text.includes('mínima') && !text.includes('minima'));
+    assertRequiresAPI(
+      'responde con bienvenida',
+      text.includes('bienvenid') || text.includes('hola') || text.includes('ayudar'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -266,17 +275,19 @@ async function qa_s02() {
     const intent = msg.metadata?.intent;
     const entities = msg.metadata?.entities ?? {};
     // Intent should NOT be "saludo" — it has an embedded price query
-    assertRequiresAPI('intent NO es saludo',
-      intent !== 'saludo',
-      `intent: ${intent}`);
+    assertRequiresAPI('intent NO es saludo', intent !== 'saludo', `intent: ${intent}`);
     // Should extract habitacion=LG
-    assertRequiresAPI('entities.habitacion incluye LG',
+    assertRequiresAPI(
+      'entities.habitacion incluye LG',
       entities.habitacion?.toUpperCase() === 'LG',
-      `entities: ${JSON.stringify(entities)}`);
+      `entities: ${JSON.stringify(entities)}`,
+    );
     // Should ask for dates (since price requires dates)
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('pide fechas para dar precio',
-      text.includes('fecha') || text.includes('cuando') || text.includes('cuándo') || text.includes('noche'));
+    assertRequiresAPI(
+      'pide fechas para dar precio',
+      text.includes('fecha') || text.includes('cuando') || text.includes('cuándo') || text.includes('noche'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -295,15 +306,24 @@ async function qa_s03() {
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
     // Should NOT invent specific days
-    assert('NO inventa fecha_entrada con dia especifico',
+    assert(
+      'NO inventa fecha_entrada con dia especifico',
       !entities.fecha_entrada || !entities.fecha_entrada.match(/^\d{4}-04-\d{2}$/),
-      `fecha_entrada: ${entities.fecha_entrada}`);
+      `fecha_entrada: ${entities.fecha_entrada}`,
+    );
     const text = msg.contenido.toLowerCase();
     // Bot may ask for dates OR personas first (both valid progressive questions)
-    assertRequiresAPI('pide dato faltante (fechas o personas)',
-      text.includes('fecha') || text.includes('dia') || text.includes('día') ||
-      text.includes('cuando') || text.includes('cuándo') ||
-      text.includes('persona') || text.includes('cuántas') || text.includes('cuantas'));
+    assertRequiresAPI(
+      'pide dato faltante (fechas o personas)',
+      text.includes('fecha') ||
+        text.includes('dia') ||
+        text.includes('día') ||
+        text.includes('cuando') ||
+        text.includes('cuándo') ||
+        text.includes('persona') ||
+        text.includes('cuántas') ||
+        text.includes('cuantas'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -318,12 +338,17 @@ async function qa_s04() {
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
     // Should NOT assume a number
-    assert('NO asume num_personas',
-      !entities.num_personas,
-      `num_personas: ${entities.num_personas}`);
+    assert('NO asume num_personas', !entities.num_personas, `num_personas: ${entities.num_personas}`);
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('pregunta cuantas personas',
-      text.includes('persona') || text.includes('cuántos') || text.includes('cuantos') || text.includes('cuántas') || text.includes('cuantas') || text.includes('integrantes'));
+    assertRequiresAPI(
+      'pregunta cuantas personas',
+      text.includes('persona') ||
+        text.includes('cuántos') ||
+        text.includes('cuantos') ||
+        text.includes('cuántas') ||
+        text.includes('cuantas') ||
+        text.includes('integrantes'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -342,18 +367,19 @@ async function qa_s05() {
   assert('bot respondio', !!msg);
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
-    assertRequiresAPI('habitacion acumulada = Pewmafe',
+    assertRequiresAPI(
+      'habitacion acumulada = Pewmafe',
       entities.habitacion?.toLowerCase().includes('pewmafe'),
-      `habitacion: ${entities.habitacion}`);
-    assertRequiresAPI('num_personas retenido = 2',
+      `habitacion: ${entities.habitacion}`,
+    );
+    assertRequiresAPI(
+      'num_personas retenido = 2',
       entities.num_personas === '2',
-      `num_personas: ${entities.num_personas}`);
-    assertRequiresAPI('fecha_entrada retenida',
-      !!entities.fecha_entrada,
-      `fecha_entrada: ${entities.fecha_entrada}`);
+      `num_personas: ${entities.num_personas}`,
+    );
+    assertRequiresAPI('fecha_entrada retenida', !!entities.fecha_entrada, `fecha_entrada: ${entities.fecha_entrada}`);
     const text = msg.contenido.toLowerCase();
-    assert('NO re-pregunta personas',
-      !text.includes('cuántas personas') && !text.includes('cuantas personas'));
+    assert('NO re-pregunta personas', !text.includes('cuántas personas') && !text.includes('cuantas personas'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -368,15 +394,21 @@ async function qa_s06() {
   assert('bot respondio', !!msg);
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
-    assertRequiresAPI('fecha_entrada actualizada',
+    assertRequiresAPI(
+      'fecha_entrada actualizada',
       entities.fecha_entrada === futureDate(30),
-      `esperado: ${futureDate(30)}, got: ${entities.fecha_entrada}`);
-    assertRequiresAPI('num_personas retenido = 3',
+      `esperado: ${futureDate(30)}, got: ${entities.fecha_entrada}`,
+    );
+    assertRequiresAPI(
+      'num_personas retenido = 3',
       entities.num_personas === '3',
-      `num_personas: ${entities.num_personas}`);
-    assertRequiresAPI('habitacion retenida = Pewmafe',
+      `num_personas: ${entities.num_personas}`,
+    );
+    assertRequiresAPI(
+      'habitacion retenida = Pewmafe',
       entities.habitacion?.toLowerCase().includes('pewmafe'),
-      `habitacion: ${entities.habitacion}`);
+      `habitacion: ${entities.habitacion}`,
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -395,10 +427,11 @@ async function qa_s07() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Should show price or availability, not crash
-    assert('respuesta coherente (no error)',
-      !text.includes('error') && text.length > 20);
-    assertRequiresAPI('menciona precio o disponibilidad',
-      text.includes('$') || text.includes('disponib') || text.includes('noche'));
+    assert('respuesta coherente (no error)', !text.includes('error') && text.length > 20);
+    assertRequiresAPI(
+      'menciona precio o disponibilidad',
+      text.includes('$') || text.includes('disponib') || text.includes('noche'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -416,12 +449,13 @@ async function qa_s08() {
     // Note: classifier may use UTC date while local time differs — accept either
     const todayLocal = futureDate(0);
     const todayUTC = new Date().toISOString().slice(0, 10);
-    assertRequiresAPI('"hoy" resuelto a YYYY-MM-DD',
+    assertRequiresAPI(
+      '"hoy" resuelto a YYYY-MM-DD',
       entities.fecha_entrada === todayLocal || entities.fecha_entrada === todayUTC,
-      `esperado: ${todayLocal} o ${todayUTC}, got: ${entities.fecha_entrada}`);
+      `esperado: ${todayLocal} o ${todayUTC}, got: ${entities.fecha_entrada}`,
+    );
     const text = msg.contenido.toLowerCase();
-    assert('respuesta coherente',
-      !text.includes('error') && text.length > 20);
+    assert('respuesta coherente', !text.includes('error') && text.length > 20);
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -439,12 +473,16 @@ async function qa_s09() {
   assert('bot respondio', !!msg);
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
-    assertRequiresAPI('resuelve a Luminar Mono',
+    assertRequiresAPI(
+      'resuelve a Luminar Mono',
       entities.habitacion?.toLowerCase().includes('luminar') || entities.habitacion?.toLowerCase().includes('mono'),
-      `habitacion: ${entities.habitacion}`);
+      `habitacion: ${entities.habitacion}`,
+    );
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('responde sobre Luminar Mono',
-      text.includes('luminar') || text.includes('monoambiente') || text.includes('mono'));
+    assertRequiresAPI(
+      'responde sobre Luminar Mono',
+      text.includes('luminar') || text.includes('monoambiente') || text.includes('mono'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -452,7 +490,11 @@ async function qa_s09() {
 async function qa_s10() {
   section('QA-S10: Dos deptos en un mensaje ("Pewmafe o LG")');
   const phone = PHONES.QA_S10!;
-  await send(phone, `Hay disponibilidad en Pewmafe o LG del ${futureDateHuman(35)} al ${futureDateHuman(38)} para 2 personas?`, 'QA-S10');
+  await send(
+    phone,
+    `Hay disponibilidad en Pewmafe o LG del ${futureDateHuman(35)} al ${futureDateHuman(38)} para 2 personas?`,
+    'QA-S10',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
@@ -460,8 +502,7 @@ async function qa_s10() {
     const text = msg.contenido.toLowerCase();
     assert('no crasheo (respuesta coherente)', text.length > 20);
     // Should mention at least one of the requested departments
-    assertRequiresAPI('menciona al menos un depto solicitado',
-      text.includes('pewmafe') || text.includes('lg'));
+    assertRequiresAPI('menciona al menos un depto solicitado', text.includes('pewmafe') || text.includes('lg'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -482,11 +523,20 @@ async function qa_s11() {
     assert('no crasheo', text.length > 20);
     // Claude may resolve "la semana que viene" to actual dates and ask for next missing data,
     // OR ask for specific dates if it couldn't resolve. Both are valid.
-    assertRequiresAPI('pide dato faltante o resolvio fechas',
-      text.includes('fecha') || text.includes('dia') || text.includes('día') ||
-      text.includes('cuando') || text.includes('cuándo') ||
-      text.includes('persona') || text.includes('cuántas') || text.includes('cuantas') ||
-      text.includes('noche') || text.includes('marzo') || text.includes('abril'));
+    assertRequiresAPI(
+      'pide dato faltante o resolvio fechas',
+      text.includes('fecha') ||
+        text.includes('dia') ||
+        text.includes('día') ||
+        text.includes('cuando') ||
+        text.includes('cuándo') ||
+        text.includes('persona') ||
+        text.includes('cuántas') ||
+        text.includes('cuantas') ||
+        text.includes('noche') ||
+        text.includes('marzo') ||
+        text.includes('abril'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -505,9 +555,7 @@ async function qa_s12() {
     // num_personas should be a reasonable number, not an impossible value
     if (entities.num_personas) {
       const n = parseInt(entities.num_personas, 10);
-      assert('num_personas razonable (entre 2 y 5)',
-        n >= 2 && n <= 5,
-        `num_personas: ${entities.num_personas}`);
+      assert('num_personas razonable (entre 2 y 5)', n >= 2 && n <= 5, `num_personas: ${entities.num_personas}`);
     }
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
@@ -520,17 +568,25 @@ async function qa_s12() {
 async function qa_s13() {
   section('QA-S13: Exacto en limite (4 pers + Luminar 2Amb cap=4)');
   const phone = PHONES.QA_S13!;
-  await send(phone, `Somos 4 personas, quiero Luminar 2Amb del ${futureDateHuman(45)} al ${futureDateHuman(48)}`, 'QA-S13');
+  await send(
+    phone,
+    `Somos 4 personas, quiero Luminar 2Amb del ${futureDateHuman(45)} al ${futureDateHuman(48)}`,
+    'QA-S13',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // 4 personas = exact capacity for Luminar 2Amb (cap 4). Should ACCEPT, not say "excede"
-    assert('NO dice que excede capacidad',
-      !text.includes('excede') && !text.includes('supera') && !text.includes('no apto'));
-    assertRequiresAPI('menciona Luminar 2Amb o disponibilidad',
-      text.includes('luminar') || text.includes('2 amb') || text.includes('disponib') || text.includes('$'));
+    assert(
+      'NO dice que excede capacidad',
+      !text.includes('excede') && !text.includes('supera') && !text.includes('no apto'),
+    );
+    assertRequiresAPI(
+      'menciona Luminar 2Amb o disponibilidad',
+      text.includes('luminar') || text.includes('2 amb') || text.includes('disponib') || text.includes('$'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -545,10 +601,11 @@ async function qa_s14() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // All departments accept 1 person — should offer options
-    assert('NO dice que no hay capacidad',
-      !text.includes('no apto') && !text.includes('excede'));
-    assertRequiresAPI('ofrece al menos un depto',
-      text.includes('pewmafe') || text.includes('luminar') || text.includes('lg') || text.includes('disponib'));
+    assert('NO dice que no hay capacidad', !text.includes('no apto') && !text.includes('excede'));
+    assertRequiresAPI(
+      'ofrece al menos un depto',
+      text.includes('pewmafe') || text.includes('luminar') || text.includes('lg') || text.includes('disponib'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -568,10 +625,14 @@ async function qa_s15() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // 3 noches >= 3 (minimum) → should NOT warn about min stay
-    assert('NO advierte sobre estadia minima (3 >= 3)',
-      !text.includes('mínima') && !text.includes('minima') && !text.includes('mínimo') && !text.includes('minimo'));
-    assertRequiresAPI('menciona Pewmafe o disponibilidad',
-      text.includes('pewmafe') || text.includes('disponib') || text.includes('$'));
+    assert(
+      'NO advierte sobre estadia minima (3 >= 3)',
+      !text.includes('mínima') && !text.includes('minima') && !text.includes('mínimo') && !text.includes('minimo'),
+    );
+    assertRequiresAPI(
+      'menciona Pewmafe o disponibilidad',
+      text.includes('pewmafe') || text.includes('disponib') || text.includes('$'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -584,18 +645,29 @@ async function qa_s16() {
   section('QA-S16: Pre-reserva bloquea disponibilidad');
   const phone = PHONES.QA_S16!;
   // LG has a pre_reserva for futureDate(40)→futureDate(43) from setup
-  await send(phone, `Hay disponibilidad en LG del ${futureDateHuman(40)} al ${futureDateHuman(43)} para 2 personas?`, 'QA-S16');
+  await send(
+    phone,
+    `Hay disponibilidad en LG del ${futureDateHuman(40)} al ${futureDateHuman(43)} para 2 personas?`,
+    'QA-S16',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // LG should NOT be available (pre_reserva blocks it)
-    assertRequiresAPI('indica que LG NO esta disponible',
-      text.includes('no hay') || text.includes('no está') || text.includes('no esta') ||
-      text.includes('no disponib') || text.includes('no tenemos disponib') ||
-      text.includes('ocupad') || text.includes('alternativ') || text.includes('otras fecha') ||
-      text.includes('lamentablemente'));
+    assertRequiresAPI(
+      'indica que LG NO esta disponible',
+      text.includes('no hay') ||
+        text.includes('no está') ||
+        text.includes('no esta') ||
+        text.includes('no disponib') ||
+        text.includes('no tenemos disponib') ||
+        text.includes('ocupad') ||
+        text.includes('alternativ') ||
+        text.includes('otras fecha') ||
+        text.includes('lamentablemente'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -608,18 +680,26 @@ async function qa_s17() {
   section('QA-S17: Completada NO bloquea disponibilidad (CRITICO)');
   const phone = PHONES.QA_S17!;
   // Luminar 2Amb has a "completada" reservation for futureDate(50)→futureDate(53)
-  await send(phone, `Hay disponibilidad en Luminar 2Amb del ${futureDateHuman(50)} al ${futureDateHuman(53)} para 2 personas?`, 'QA-S17');
+  await send(
+    phone,
+    `Hay disponibilidad en Luminar 2Amb del ${futureDateHuman(50)} al ${futureDateHuman(53)} para 2 personas?`,
+    'QA-S17',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Completada should NOT block — department should be available
-    assertRequiresAPI('indica que SI hay disponibilidad (completada no bloquea)',
+    assertRequiresAPI(
+      'indica que SI hay disponibilidad (completada no bloquea)',
       text.includes('disponib') || text.includes('$') || text.includes('precio') || text.includes('noche'),
-      `respuesta: ${msg.contenido.substring(0, 200)}`);
-    assert('NO dice que esta ocupado',
-      !text.includes('no disponib') && !text.includes('no hay disponib') && !text.includes('ocupad'));
+      `respuesta: ${msg.contenido.substring(0, 200)}`,
+    );
+    assert(
+      'NO dice que esta ocupado',
+      !text.includes('no disponib') && !text.includes('no hay disponib') && !text.includes('ocupad'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -628,17 +708,25 @@ async function qa_s18() {
   section('QA-S18: Cancelada NO bloquea disponibilidad');
   const phone = PHONES.QA_S18!;
   // Pewmafe has a "cancelada" reservation for futureDate(55)→futureDate(58)
-  await send(phone, `Hay disponibilidad en Pewmafe del ${futureDateHuman(55)} al ${futureDateHuman(58)} para 2 personas?`, 'QA-S18');
+  await send(
+    phone,
+    `Hay disponibilidad en Pewmafe del ${futureDateHuman(55)} al ${futureDateHuman(58)} para 2 personas?`,
+    'QA-S18',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('indica que SI hay disponibilidad (cancelada no bloquea)',
+    assertRequiresAPI(
+      'indica que SI hay disponibilidad (cancelada no bloquea)',
       text.includes('disponib') || text.includes('$') || text.includes('precio') || text.includes('noche'),
-      `respuesta: ${msg.contenido.substring(0, 200)}`);
-    assert('NO dice que esta ocupado',
-      !text.includes('no disponib') && !text.includes('no hay disponib') && !text.includes('ocupad'));
+      `respuesta: ${msg.contenido.substring(0, 200)}`,
+    );
+    assert(
+      'NO dice que esta ocupado',
+      !text.includes('no disponib') && !text.includes('no hay disponib') && !text.includes('ocupad'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -656,8 +744,10 @@ async function qa_s19() {
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('menciona agente o atencion',
-      text.includes('agente') || text.includes('atender') || text.includes('contactar') || text.includes('breve'));
+    assertRequiresAPI(
+      'menciona agente o atencion',
+      text.includes('agente') || text.includes('atender') || text.includes('contactar') || text.includes('breve'),
+    );
   }
   const estado = await getConvEstado(phone);
   assert('estado = espera_humano', estado === 'espera_humano', `estado: ${estado}`);
@@ -666,17 +756,27 @@ async function qa_s19() {
 async function qa_s20() {
   section('QA-S20: Escalacion mid-reserva ("mejor un agente")');
   const phone = PHONES.QA_S20!;
-  await send(phone, `Quiero reservar LG del ${futureDateHuman(35)} al ${futureDateHuman(38)} para 2 personas`, 'QA-S20');
+  await send(
+    phone,
+    `Quiero reservar LG del ${futureDateHuman(35)} al ${futureDateHuman(38)} para 2 personas`,
+    'QA-S20',
+  );
   await send(phone, 'Sabes que, mejor comunicame con un agente humano', 'QA-S20');
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('menciona agente o comunicacion humana',
-      text.includes('agente') || text.includes('atender') || text.includes('contactar') ||
-      text.includes('breve') || text.includes('persona') || text.includes('equipo') ||
-      text.includes('comunic'));
+    assertRequiresAPI(
+      'menciona agente o comunicacion humana',
+      text.includes('agente') ||
+        text.includes('atender') ||
+        text.includes('contactar') ||
+        text.includes('breve') ||
+        text.includes('persona') ||
+        text.includes('equipo') ||
+        text.includes('comunic'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
   const estado = await getConvEstado(phone);
@@ -692,18 +792,32 @@ async function qa_s21() {
   const phone = PHONES.QA_S21!;
 
   // PASO 1: Give all data → bot should summarize and ask to proceed
-  await send(phone, `Quiero reservar Pewmafe del ${futureDateHuman(65)} al ${futureDateHuman(68)} para 2 personas`, 'QA-S21');
+  await send(
+    phone,
+    `Quiero reservar Pewmafe del ${futureDateHuman(65)} al ${futureDateHuman(68)} para 2 personas`,
+    'QA-S21',
+  );
   const msg1 = await getLastBotMsg(phone);
   assert('PASO1: bot respondio', !!msg1);
   if (msg1) {
     const text = msg1.contenido.toLowerCase();
-    assert('PASO1: NO dice "reserva confirmada"',
-      !text.includes('reserva confirmada') && !text.includes('queda confirmada'));
+    assert(
+      'PASO1: NO dice "reserva confirmada"',
+      !text.includes('reserva confirmada') && !text.includes('queda confirmada'),
+    );
     // Should NOT use "pre-reserva" (internal term)
-    assert('PASO1: NO dice "pre-reserva" (termino interno)',
-      !text.includes('pre-reserva') && !text.includes('pre reserva') && !text.includes('prereserva'));
-    assertRequiresAPI('PASO1: resume datos o pregunta si proceder',
-      text.includes('reserva') || text.includes('proceder') || text.includes('confirmar') || text.includes('resumen') || text.includes('pewmafe'));
+    assert(
+      'PASO1: NO dice "pre-reserva" (termino interno)',
+      !text.includes('pre-reserva') && !text.includes('pre reserva') && !text.includes('prereserva'),
+    );
+    assertRequiresAPI(
+      'PASO1: resume datos o pregunta si proceder',
+      text.includes('reserva') ||
+        text.includes('proceder') ||
+        text.includes('confirmar') ||
+        text.includes('resumen') ||
+        text.includes('pewmafe'),
+    );
     console.log(`  [PASO1]: ${msg1.contenido.substring(0, 300)}`);
   }
 
@@ -713,10 +827,8 @@ async function qa_s21() {
   assert('PASO2: bot respondio', !!msg2);
   if (msg2) {
     const text = msg2.contenido.toLowerCase();
-    assertRequiresAPI('PASO2: menciona transferencia',
-      text.includes('transferencia'));
-    assertRequiresAPI('PASO2: muestra alias o CBU',
-      text.includes('alias') || text.includes('cbu'));
+    assertRequiresAPI('PASO2: menciona transferencia', text.includes('transferencia'));
+    assertRequiresAPI('PASO2: muestra alias o CBU', text.includes('alias') || text.includes('cbu'));
     console.log(`  [PASO2]: ${msg2.contenido.substring(0, 300)}`);
   }
 
@@ -726,8 +838,10 @@ async function qa_s21() {
   assert('PASO3: bot respondio', !!msg3);
   if (msg3) {
     const text = msg3.contenido.toLowerCase();
-    assertRequiresAPI('PASO3: pide comprobante o DNI',
-      text.includes('comprobante') || text.includes('dni') || text.includes('documento'));
+    assertRequiresAPI(
+      'PASO3: pide comprobante o DNI',
+      text.includes('comprobante') || text.includes('dni') || text.includes('documento'),
+    );
     console.log(`  [PASO3]: ${msg3.contenido.substring(0, 300)}`);
   }
 
@@ -737,8 +851,10 @@ async function qa_s21() {
   assert('PASO4: bot respondio', !!msg4);
   if (msg4) {
     const text = msg4.contenido.toLowerCase();
-    assertRequiresAPI('PASO4: menciona agente verificara o factura',
-      text.includes('agente') || text.includes('verificar') || text.includes('factura') || text.includes('confirmar'));
+    assertRequiresAPI(
+      'PASO4: menciona agente verificara o factura',
+      text.includes('agente') || text.includes('verificar') || text.includes('factura') || text.includes('confirmar'),
+    );
     console.log(`  [PASO4]: ${msg4.contenido.substring(0, 300)}`);
   }
 }
@@ -750,7 +866,11 @@ async function qa_s21() {
 async function qa_s22() {
   section('QA-S22: Usuario pregunta tarjeta explicitamente');
   const phone = PHONES.QA_S22!;
-  await send(phone, `Quiero reservar Pewmafe del ${futureDateHuman(70)} al ${futureDateHuman(73)} para 2 personas`, 'QA-S22');
+  await send(
+    phone,
+    `Quiero reservar Pewmafe del ${futureDateHuman(70)} al ${futureDateHuman(73)} para 2 personas`,
+    'QA-S22',
+  );
   await send(phone, 'Puedo pagar con tarjeta de credito?', 'QA-S22');
 
   const msg = await getLastBotMsg(phone);
@@ -758,8 +878,10 @@ async function qa_s22() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // When user ASKS about tarjeta, bot should NOW mention MercadoPago + 8%
-    assertRequiresAPI('menciona MercadoPago o tarjeta',
-      text.includes('mercadopago') || text.includes('mercado pago') || text.includes('tarjeta'));
+    assertRequiresAPI(
+      'menciona MercadoPago o tarjeta',
+      text.includes('mercadopago') || text.includes('mercado pago') || text.includes('tarjeta'),
+    );
     assertRequiresAPI('menciona recargo 8%', text.includes('8%'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
@@ -779,8 +901,16 @@ async function qa_s23() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     // Should ask for check-in date, not invent one
-    assertRequiresAPI('pide fecha de entrada',
-      text.includes('fecha') || text.includes('cuando') || text.includes('cuándo') || text.includes('qué día') || text.includes('que dia') || text.includes('ingreso') || text.includes('llegada'));
+    assertRequiresAPI(
+      'pide fecha de entrada',
+      text.includes('fecha') ||
+        text.includes('cuando') ||
+        text.includes('cuándo') ||
+        text.includes('qué día') ||
+        text.includes('que dia') ||
+        text.includes('ingreso') ||
+        text.includes('llegada'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -794,8 +924,16 @@ async function qa_s24() {
   assert('bot respondio', !!msg);
   if (msg) {
     const text = msg.contenido.toLowerCase();
-    assertRequiresAPI('pide fecha de entrada',
-      text.includes('fecha') || text.includes('cuando') || text.includes('cuándo') || text.includes('ingreso') || text.includes('entrada') || text.includes('llegada') || text.includes('check'));
+    assertRequiresAPI(
+      'pide fecha de entrada',
+      text.includes('fecha') ||
+        text.includes('cuando') ||
+        text.includes('cuándo') ||
+        text.includes('ingreso') ||
+        text.includes('entrada') ||
+        text.includes('llegada') ||
+        text.includes('check'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -814,15 +952,13 @@ async function qa_s25() {
   assert('bot respondio', !!msg);
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
-    assertRequiresAPI('habitacion actualizada a LG',
+    assertRequiresAPI(
+      'habitacion actualizada a LG',
       entities.habitacion?.toUpperCase() === 'LG',
-      `habitacion: ${entities.habitacion}`);
-    assertRequiresAPI('fechas retenidas',
-      !!entities.fecha_entrada,
-      `fecha_entrada: ${entities.fecha_entrada}`);
-    assertRequiresAPI('personas retenidas',
-      entities.num_personas === '2',
-      `num_personas: ${entities.num_personas}`);
+      `habitacion: ${entities.habitacion}`,
+    );
+    assertRequiresAPI('fechas retenidas', !!entities.fecha_entrada, `fecha_entrada: ${entities.fecha_entrada}`);
+    assertRequiresAPI('personas retenidas', entities.num_personas === '2', `num_personas: ${entities.num_personas}`);
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -831,21 +967,31 @@ async function qa_s26() {
   section('QA-S26: Cambiar fechas Y personas a la vez');
   const phone = PHONES.QA_S26!;
   await send(phone, `Somos 2 para LG del ${futureDateHuman(80)} al ${futureDateHuman(83)}`, 'QA-S26');
-  await send(phone, `Cambio: ahora somos 4 personas, y las fechas del ${futureDateHuman(85)} al ${futureDateHuman(89)}`, 'QA-S26');
+  await send(
+    phone,
+    `Cambio: ahora somos 4 personas, y las fechas del ${futureDateHuman(85)} al ${futureDateHuman(89)}`,
+    'QA-S26',
+  );
 
   const msg = await getLastBotMsg(phone);
   assert('bot respondio', !!msg);
   if (msg) {
     const entities = msg.metadata?.entities ?? {};
-    assertRequiresAPI('num_personas actualizado a 4',
+    assertRequiresAPI(
+      'num_personas actualizado a 4',
       entities.num_personas === '4',
-      `num_personas: ${entities.num_personas}`);
-    assertRequiresAPI('fecha_entrada actualizada',
+      `num_personas: ${entities.num_personas}`,
+    );
+    assertRequiresAPI(
+      'fecha_entrada actualizada',
       entities.fecha_entrada === futureDate(85),
-      `esperado: ${futureDate(85)}, got: ${entities.fecha_entrada}`);
-    assertRequiresAPI('habitacion retenida = LG',
+      `esperado: ${futureDate(85)}, got: ${entities.fecha_entrada}`,
+    );
+    assertRequiresAPI(
+      'habitacion retenida = LG',
       entities.habitacion?.toUpperCase() === 'LG',
-      `habitacion: ${entities.habitacion}`);
+      `habitacion: ${entities.habitacion}`,
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -865,11 +1011,22 @@ async function qa_s27() {
     const text = msg.contenido.toLowerCase();
     assert('no crasheo', text.length > 20);
     // Bot may ask which department OR ask for personas/dates first (both valid)
-    assertRequiresAPI('responde coherentemente (pregunta depto, personas o fechas)',
-      text.includes('cuál') || text.includes('cual') || text.includes('departamento') || text.includes('depto') ||
-      text.includes('pewmafe') || text.includes('luminar') || text.includes('lg') ||
-      text.includes('persona') || text.includes('cuántas') || text.includes('cuantas') ||
-      text.includes('fecha') || text.includes('cuando') || text.includes('cuándo'));
+    assertRequiresAPI(
+      'responde coherentemente (pregunta depto, personas o fechas)',
+      text.includes('cuál') ||
+        text.includes('cual') ||
+        text.includes('departamento') ||
+        text.includes('depto') ||
+        text.includes('pewmafe') ||
+        text.includes('luminar') ||
+        text.includes('lg') ||
+        text.includes('persona') ||
+        text.includes('cuántas') ||
+        text.includes('cuantas') ||
+        text.includes('fecha') ||
+        text.includes('cuando') ||
+        text.includes('cuándo'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -888,13 +1045,21 @@ async function qa_s28() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     assert('no crasheo', text.length > 20);
-    assertRequiresAPI('da info sobre como llegar',
-      text.includes('ruta') || text.includes('auto') || text.includes('avion') || text.includes('avión') ||
-      text.includes('micro') || text.includes('colectivo') || text.includes('km') || text.includes('viedma') ||
-      text.includes('grutas') || text.includes('buenos aires'));
+    assertRequiresAPI(
+      'da info sobre como llegar',
+      text.includes('ruta') ||
+        text.includes('auto') ||
+        text.includes('avion') ||
+        text.includes('avión') ||
+        text.includes('micro') ||
+        text.includes('colectivo') ||
+        text.includes('km') ||
+        text.includes('viedma') ||
+        text.includes('grutas') ||
+        text.includes('buenos aires'),
+    );
     // Should NOT invent fake data
-    assert('NO inventa datos de vuelo',
-      !text.includes('vuelo directo a las grutas'));
+    assert('NO inventa datos de vuelo', !text.includes('vuelo directo a las grutas'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -909,9 +1074,16 @@ async function qa_s29() {
   if (msg) {
     const text = msg.contenido.toLowerCase();
     assert('no crasheo', text.length > 20);
-    assertRequiresAPI('menciona gastronomia o restaurantes',
-      text.includes('restaurant') || text.includes('gastronom') || text.includes('comer') ||
-      text.includes('cocina') || text.includes('playa') || text.includes('mariscos') || text.includes('bar'));
+    assertRequiresAPI(
+      'menciona gastronomia o restaurantes',
+      text.includes('restaurant') ||
+        text.includes('gastronom') ||
+        text.includes('comer') ||
+        text.includes('cocina') ||
+        text.includes('playa') ||
+        text.includes('mariscos') ||
+        text.includes('bar'),
+    );
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -946,26 +1118,33 @@ async function qa_s30() {
   await send(phone, 'Gracias por la info, lo pienso y te aviso', 'QA-S30');
 
   const allMsgs = await getAllBotMsgs(phone);
-  assert('bot respondio a los 10 mensajes (>= 10 respuestas)',
-    allMsgs.length >= 10,
-    `mensajes bot: ${allMsgs.length}`);
+  assert('bot respondio a los 10 mensajes (>= 10 respuestas)', allMsgs.length >= 10, `mensajes bot: ${allMsgs.length}`);
 
   if (allMsgs.length >= 10) {
     // Check context retention: after msg2 said "3 personas", no later message should re-ask
-    const msgsAfterPersonas = allMsgs.slice(2).map(m => m.contenido.toLowerCase()).join(' ');
-    assert('NO re-pregunta cuantas personas despues de msg2',
-      !msgsAfterPersonas.includes('cuántas personas') && !msgsAfterPersonas.includes('cuantas personas'));
+    const msgsAfterPersonas = allMsgs
+      .slice(2)
+      .map((m) => m.contenido.toLowerCase())
+      .join(' ');
+    assert(
+      'NO re-pregunta cuantas personas despues de msg2',
+      !msgsAfterPersonas.includes('cuántas personas') && !msgsAfterPersonas.includes('cuantas personas'),
+    );
 
     // Last message should be coherent
     const lastMsg = allMsgs[allMsgs.length - 1]!;
-    assert('ultimo mensaje coherente (no error)',
-      lastMsg.contenido.length > 20 && !lastMsg.contenido.toLowerCase().includes('error'));
+    assert(
+      'ultimo mensaje coherente (no error)',
+      lastMsg.contenido.length > 20 && !lastMsg.contenido.toLowerCase().includes('error'),
+    );
   }
 
   const estado = await getConvEstado(phone);
-  assert('estado valido (bot o cerrado)',
+  assert(
+    'estado valido (bot o cerrado)',
     estado === 'bot' || estado === 'cerrado' || estado === 'espera_humano',
-    `estado: ${estado}`);
+    `estado: ${estado}`,
+  );
 
   // Print last 3 messages for inspection
   const last3 = allMsgs.slice(-3);
@@ -990,12 +1169,12 @@ async function qa_s31() {
     assert('no crasheo', text.length > 20);
     const entities = msg.metadata?.entities ?? {};
     // Classifier should understand "kiero" = quiero, "lg" = LG, "pa 2" = 2 personas
-    assertRequiresAPI('entiende habitacion LG',
+    assertRequiresAPI(
+      'entiende habitacion LG',
       entities.habitacion?.toUpperCase() === 'LG',
-      `habitacion: ${entities.habitacion}`);
-    assertRequiresAPI('entiende 2 personas',
-      entities.num_personas === '2',
-      `num_personas: ${entities.num_personas}`);
+      `habitacion: ${entities.habitacion}`,
+    );
+    assertRequiresAPI('entiende 2 personas', entities.num_personas === '2', `num_personas: ${entities.num_personas}`);
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -1012,8 +1191,7 @@ async function qa_s32() {
     const text = msg.contenido.toLowerCase();
     assert('no crasheo (respuesta coherente)', text.length > 10);
     // Should continue the conversation (ask for data or acknowledge)
-    assert('respuesta NO es error',
-      !text.includes('error') && !text.includes('fallo'));
+    assert('respuesta NO es error', !text.includes('error') && !text.includes('fallo'));
     console.log(`  [BOT]: ${msg.contenido.substring(0, 300)}`);
   }
 }
@@ -1029,16 +1207,16 @@ async function qa_s33() {
     const text = msg.contenido.toLowerCase();
     assert('respuesta sustancial (> 50 chars)', text.length > 50);
     // Must clearly state NO to mascotas
-    assertRequiresAPI('dice NO a mascotas',
-      text.includes('no') && (text.includes('mascota') || text.includes('perro') || text.includes('animal')));
+    assertRequiresAPI(
+      'dice NO a mascotas',
+      text.includes('no') && (text.includes('mascota') || text.includes('perro') || text.includes('animal')),
+    );
     // Should address at least 2 of 3 questions
     let answered = 0;
     if (text.includes('wi-fi') || text.includes('wifi') || text.includes('internet')) answered++;
     if (text.includes('mascota') || text.includes('perro') || text.includes('animal')) answered++;
     if (text.includes('parrilla') || text.includes('asado') || text.includes('barbacoa')) answered++;
-    assertRequiresAPI('responde al menos 2 de 3 preguntas',
-      answered >= 2,
-      `respondidas: ${answered}/3`);
+    assertRequiresAPI('responde al menos 2 de 3 preguntas', answered >= 2, `respondidas: ${answered}/3`);
     console.log(`  [BOT]: ${msg.contenido.substring(0, 400)}`);
   }
 }
@@ -1062,9 +1240,11 @@ async function qa_s34() {
   const count2 = msgsAfter2.length;
 
   // Bot should NOT respond when conversation is in espera_humano
-  assert('bot NO respondio en espera_humano (mismo # de msgs)',
+  assert(
+    'bot NO respondio en espera_humano (mismo # de msgs)',
     count2 === count1,
-    `antes: ${count1}, despues: ${count2}`);
+    `antes: ${count1}, despues: ${count2}`,
+  );
 
   console.log(`  [Msgs bot antes/despues de msg2]: ${count1}/${count2}`);
 }
@@ -1091,7 +1271,11 @@ async function main() {
     const { env } = await import('../config/env.js');
     if (env.ANTHROPIC_API_KEY) {
       const c = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-      await c.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'OK' }] });
+      await c.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'OK' }],
+      });
       apiAvailable = true;
       console.log('\n  Claude API: \x1b[32mDISPONIBLE\x1b[0m — todos los tests se ejecutan');
     } else {
@@ -1158,7 +1342,6 @@ async function main() {
     // Phase 4: Long conversation
     console.log('\n--- Phase 4: Conversacion extendida (10 mensajes) ---');
     await qa_s30();
-
   } catch (err) {
     console.error('\n  FATAL ERROR:', err);
     failed++;
@@ -1241,7 +1424,7 @@ if (process.argv.includes('--cleanup')) {
       process.exit(1);
     });
 } else {
-  main().catch(e => {
+  main().catch((e) => {
     console.error('Error:', e);
     process.exit(1);
   });

@@ -21,7 +21,8 @@ export interface WhatsAppProfileUpdate {
 
 let simulatorProfile: WhatsAppProfile = {
   about: 'Complejo de cabañas en la Patagonia',
-  description: 'Bienvenido a nuestro complejo de alojamiento. Ofrecemos cabañas equipadas para disfrutar de la naturaleza.',
+  description:
+    'Bienvenido a nuestro complejo de alojamiento. Ofrecemos cabañas equipadas para disfrutar de la naturaleza.',
   address: 'Av. Los Arrayanes 1234, San Martín de los Andes',
   email: 'contacto@ejemplo.com',
   profile_picture_url: '',

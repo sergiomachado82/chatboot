@@ -10,11 +10,10 @@ export async function downloadMedia(mediaId: string): Promise<Buffer | null> {
   }
 
   // Step 1: Get the media URL
-  const metaRes = await fetch(
-    `https://graph.facebook.com/${env.WA_API_VERSION}/${mediaId}`,
-    { headers: { 'Authorization': `Bearer ${env.WA_ACCESS_TOKEN}` } }
-  );
-  const metaData = await metaRes.json() as { url?: string };
+  const metaRes = await fetch(`https://graph.facebook.com/${env.WA_API_VERSION}/${mediaId}`, {
+    headers: { Authorization: `Bearer ${env.WA_ACCESS_TOKEN}` },
+  });
+  const metaData = (await metaRes.json()) as { url?: string };
   if (!metaRes.ok || !metaData.url) {
     logger.error({ mediaId, metaData }, 'Failed to get media URL');
     return null;
@@ -22,7 +21,7 @@ export async function downloadMedia(mediaId: string): Promise<Buffer | null> {
 
   // Step 2: Download the binary file
   const fileRes = await fetch(metaData.url, {
-    headers: { 'Authorization': `Bearer ${env.WA_ACCESS_TOKEN}` },
+    headers: { Authorization: `Bearer ${env.WA_ACCESS_TOKEN}` },
   });
   if (!fileRes.ok) {
     logger.error({ mediaId, status: fileRes.status }, 'Failed to download media file');
@@ -90,23 +89,20 @@ async function sendText(to: string, body: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/${env.WA_API_VERSION}/${env.WA_PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.WA_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body },
-        }),
-        signal: controller.signal,
-      }
-    );
+    const res = await fetch(`https://graph.facebook.com/${env.WA_API_VERSION}/${env.WA_PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.WA_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body },
+      }),
+      signal: controller.signal,
+    });
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -140,26 +136,23 @@ export async function sendImage(to: string, imageUrl: string, caption?: string) 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/${env.WA_API_VERSION}/${env.WA_PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.WA_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
+    const res = await fetch(`https://graph.facebook.com/${env.WA_API_VERSION}/${env.WA_PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.WA_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'image',
+        image: {
+          link: imageUrl,
+          ...(caption ? { caption } : {}),
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'image',
-          image: {
-            link: imageUrl,
-            ...(caption ? { caption } : {}),
-          },
-        }),
-        signal: controller.signal,
-      }
-    );
+      }),
+      signal: controller.signal,
+    });
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));

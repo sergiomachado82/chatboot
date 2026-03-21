@@ -77,5 +77,5 @@ const MAX_REQUESTS = env.RATE_LIMIT_MAX_REQUESTS;
 export const rateLimiter = createRateLimiter('api', MAX_REQUESTS, WINDOW_SECONDS);
 
 // Stricter limiters for public routes
-export const loginRateLimiter = createRateLimiter('login', 5, 60);        // 5 attempts per minute
-export const webchatRateLimiter = createRateLimiter('webchat', 30, 60);   // 30 messages per minute
+export const loginRateLimiter = createRateLimiter('login', 5, 60); // 5 attempts per minute
+export const webchatRateLimiter = createRateLimiter('webchat', 30, 60); // 30 messages per minute

@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { isAuthenticated } from './api/authApi';
 import LoginPage from './components/auth/LoginPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
@@ -58,39 +59,49 @@ function AuthenticatedApp({ isDark, toggleDark }: { isDark: boolean; toggleDark:
   useDocumentTitle(view);
   useNotifications();
 
+  const { t } = useTranslation();
+
   return (
     <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-3 focus:bg-blue-600 focus:text-white"
+      >
+        {t('app.skipToContent')}
+      </a>
       <Header isDark={isDark} onToggleDark={toggleDark} />
       <ServiceBanner />
 
-      <Suspense fallback={<ViewSpinner />}>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/chat" element={<ChatView />} />
-          <Route path="/reservas" element={<ReservaList />} />
-          <Route path="/propiedades" element={<ComplejoList />} />
-          <Route path="/emails" element={<EmailList />} />
-          <Route path="/whatsapp" element={<WhatsAppProfilePage />} />
-          <Route path="/bot" element={<BotConfigPage />} />
-          <Route path="/logs" element={<IntegrationLogsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+      <main id="main-content">
+        <Suspense fallback={<ViewSpinner />}>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/chat" element={<ChatView />} />
+            <Route path="/reservas" element={<ReservaList />} />
+            <Route path="/propiedades" element={<ComplejoList />} />
+            <Route path="/emails" element={<EmailList />} />
+            <Route path="/whatsapp" element={<WhatsAppProfilePage />} />
+            <Route path="/bot" element={<BotConfigPage />} />
+            <Route path="/logs" element={<IntegrationLogsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </main>
     </>
   );
 }
 
 function ChatView() {
   const [selectedConv, setSelectedConv] = useState<Conversacion | null>(null);
+  const { t } = useTranslation();
 
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Chat List — hidden on mobile when conv selected */}
-      <div className={`w-full md:w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0 ${selectedConv ? 'hidden md:block' : ''}`}>
-        <ChatList
-          selectedId={selectedConv?.id ?? null}
-          onSelect={setSelectedConv}
-        />
+      <div
+        className={`w-full md:w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0 ${selectedConv ? 'hidden md:block' : ''}`}
+      >
+        <ChatList selectedId={selectedConv?.id ?? null} onSelect={setSelectedConv} />
       </div>
 
       {/* Chat Window — hidden on mobile when no conv */}
@@ -100,14 +111,14 @@ function ChatView() {
             <button
               onClick={() => setSelectedConv(null)}
               className="md:hidden px-4 py-2 text-sm text-blue-600 dark:text-blue-400 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center gap-1"
-              aria-label="Volver a la lista de conversaciones"
+              aria-label={t('app.chatBackAria')}
             >
-              &larr; Volver
+              &larr; {t('app.chatBackButton')}
             </button>
             <ChatWindow conversacion={selectedConv} onConversacionUpdate={setSelectedConv} />
           </>
         ) : (
-          <EmptyState title="Selecciona una conversacion" description="Elige una conversacion de la lista para ver los mensajes" illustration="chat" />
+          <EmptyState title={t('app.chatEmptyTitle')} description={t('app.chatEmptyDescription')} illustration="chat" />
         )}
       </div>
 
@@ -128,6 +139,7 @@ function ChatView() {
 
 function SimulatorToggle() {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <>
@@ -142,7 +154,7 @@ function SimulatorToggle() {
         onClick={() => setOpen(!open)}
         className="bg-green-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-green-700 text-sm font-medium"
       >
-        {open ? 'Cerrar simulador' : 'Simulador WA'}
+        {open ? t('app.simulatorClose') : t('app.simulatorOpen')}
       </button>
     </>
   );

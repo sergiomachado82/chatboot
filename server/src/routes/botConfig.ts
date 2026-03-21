@@ -21,8 +21,16 @@ const updateSchema = z.object({
   mensajeDespedida: z.string().min(1).max(1000).optional(),
   mensajeFueraHorario: z.string().min(1).max(1000).optional(),
   mensajeEsperaHumano: z.string().min(1).max(1000).optional(),
-  horarioInicio: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
-  horarioFin: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  horarioInicio: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .nullable()
+    .optional(),
+  horarioFin: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .nullable()
+    .optional(),
   telefonoContacto: z.string().min(1).max(50).optional(),
   titularesVerificados: z.array(z.string().min(1).max(200)).max(20).optional(),
   reglasPersonalizadas: z.array(z.string().min(1).max(500)).max(20).optional(),

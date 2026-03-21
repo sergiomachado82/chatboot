@@ -28,7 +28,9 @@ async function sendMessage(body: string): Promise<void> {
   await sleep(10000);
 }
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function getConversacionId(): Promise<string | null> {
   const huesped = await prisma.huesped.findFirst({ where: { waId: FROM } });
@@ -40,19 +42,19 @@ async function getConversacionId(): Promise<string | null> {
   return conv?.id ?? null;
 }
 
-async function getLastBotMessage(): Promise<{ contenido: string; metadata: any } | null> {
+async function getLastBotMessage(): Promise<{ contenido: string; metadata: Record<string, unknown> } | null> {
   const convId = await getConversacionId();
   if (!convId) return null;
   const msg = await prisma.mensaje.findFirst({
     where: { conversacionId: convId, origen: 'bot' },
     orderBy: { creadoEn: 'desc' },
   });
-  return msg ? { contenido: msg.contenido, metadata: msg.metadata as any } : null;
+  return msg ? { contenido: msg.contenido, metadata: msg.metadata as Record<string, unknown> } : null;
 }
 
 async function getLastBotEntities(): Promise<Record<string, string>> {
   const msg = await getLastBotMessage();
-  return msg?.metadata?.entities ?? {};
+  return (msg?.metadata?.entities as Record<string, string>) ?? {};
 }
 
 function assert(testName: string, condition: boolean, details?: string) {
@@ -141,7 +143,11 @@ async function runTests() {
   // Check bot doesn't re-ask for data it already has
   const msg4 = await getLastBotMessage();
   const text4 = msg4?.contenido?.toLowerCase() ?? '';
-  assert('bot does NOT re-ask personas', !text4.includes('cuántas personas') && !text4.includes('cuantas personas'), `response: ${text4.substring(0, 120)}`);
+  assert(
+    'bot does NOT re-ask personas',
+    !text4.includes('cuántas personas') && !text4.includes('cuantas personas'),
+    `response: ${text4.substring(0, 120)}`,
+  );
 
   // =========================================
   // TEST 5: Noches computation in same message
@@ -180,7 +186,11 @@ async function runTests() {
   // Check bot actually provides availability (doesn't re-ask)
   const msg6 = await getLastBotMessage();
   const text6 = msg6?.contenido?.toLowerCase() ?? '';
-  assert('bot provides info (no re-ask)', !text6.includes('cuántas noches') && !text6.includes('cuantas noches') && !text6.includes('cuántas personas'), `response: ${text6.substring(0, 120)}`);
+  assert(
+    'bot provides info (no re-ask)',
+    !text6.includes('cuántas noches') && !text6.includes('cuantas noches') && !text6.includes('cuántas personas'),
+    `response: ${text6.substring(0, 120)}`,
+  );
 
   // =========================================
   // TEST 7: No junk entity keys
@@ -188,7 +198,7 @@ async function runTests() {
   console.log('\nTEST 7: Only valid entity keys in output');
   entities = await getLastBotEntities();
   const validKeys = new Set(['num_personas', 'fecha_entrada', 'fecha_salida', 'habitacion']);
-  const invalidKeys = Object.keys(entities).filter(k => !validKeys.has(k));
+  const invalidKeys = Object.keys(entities).filter((k) => !validKeys.has(k));
   assert('no junk entity keys', invalidKeys.length === 0, `invalid keys: ${invalidKeys.join(', ')}`);
 
   // =========================================
@@ -201,7 +211,11 @@ async function runTests() {
   entities = await getLastBotEntities();
   console.log('  > entities after first msg:', JSON.stringify(entities));
   assert('num_personas = 2', entities.num_personas === '2', `got: ${entities.num_personas}`);
-  assert('fecha_entrada is valid YYYY-MM-DD', !!entities.fecha_entrada && /^\d{4}-\d{2}-\d{2}$/.test(entities.fecha_entrada), `got: ${entities.fecha_entrada}`);
+  assert(
+    'fecha_entrada is valid YYYY-MM-DD',
+    !!entities.fecha_entrada && /^\d{4}-\d{2}-\d{2}$/.test(entities.fecha_entrada),
+    `got: ${entities.fecha_entrada}`,
+  );
 
   await sendMessage('5 noches');
 
@@ -213,8 +227,19 @@ async function runTests() {
   assert('num_personas retained = 2', entities.num_personas === '2', `got: ${entities.num_personas}`);
   assert('fecha_entrada retained', !!entities.fecha_entrada, `got: ${entities.fecha_entrada}`);
   assert('fecha_salida computed', !!entities.fecha_salida, `got: ${entities.fecha_salida}`);
-  assert('bot NOT re-ask personas', !text8.includes('cuántas personas') && !text8.includes('cuantas personas') && !text8.includes('para cuántas') && !text8.includes('para cuantas'), `response contains re-ask`);
-  assert('bot NOT re-ask fechas', !text8.includes('qué fechas') && !text8.includes('que fechas') && !text8.includes('fecha de entrada'), `response contains re-ask`);
+  assert(
+    'bot NOT re-ask personas',
+    !text8.includes('cuántas personas') &&
+      !text8.includes('cuantas personas') &&
+      !text8.includes('para cuántas') &&
+      !text8.includes('para cuantas'),
+    `response contains re-ask`,
+  );
+  assert(
+    'bot NOT re-ask fechas',
+    !text8.includes('qué fechas') && !text8.includes('que fechas') && !text8.includes('fecha de entrada'),
+    `response contains re-ask`,
+  );
   assert('bot NOT use "somos" (grammar)', !text8.includes('somos'), `bot used 1st person plural`);
 
   // =========================================
@@ -229,7 +254,7 @@ async function runTests() {
   process.exit(failed > 0 ? 1 : 0);
 }
 
-runTests().catch(e => {
+runTests().catch((e) => {
   console.error('Test suite error:', e);
   process.exit(1);
 });

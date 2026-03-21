@@ -15,8 +15,8 @@ const simulatorSchema = z.object({
 
 const simulatorAudioSchema = z.object({
   from: z.string().default('5491155550000'),
-  audio: z.string().min(1),       // base64-encoded audio
-  mimeType: z.string().min(1),    // e.g. "audio/ogg", "audio/webm"
+  audio: z.string().min(1), // base64-encoded audio
+  mimeType: z.string().min(1), // e.g. "audio/ogg", "audio/webm"
   name: z.string().optional(),
 });
 
@@ -44,7 +44,7 @@ router.post('/simulator/send', (req, res) => {
       type: 'text',
       text: { body },
     },
-    name ?? 'Simulador'
+    name ?? 'Simulador',
   ).catch((err) => {
     logger.error({ err }, 'Simulator processing error');
   });
@@ -83,7 +83,7 @@ router.post('/simulator/send-audio', async (req, res) => {
         type: 'text',
         text: { body: transcripcion },
       },
-      name ?? 'Simulador'
+      name ?? 'Simulador',
     ).catch((err) => {
       logger.error({ err }, 'Simulator audio processing error');
     });

@@ -9,9 +9,7 @@ export async function sendSimulatorMessage(body: string, from?: string) {
 
 export async function sendSimulatorAudio(file: File, from?: string) {
   const buffer = await file.arrayBuffer();
-  const base64 = btoa(
-    new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-  );
+  const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
 
   return apiFetch<{ ok: boolean; transcripcion: string }>('/simulator/send-audio', {
     method: 'POST',

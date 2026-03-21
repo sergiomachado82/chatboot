@@ -3,7 +3,10 @@ const p = new PrismaClient();
 
 async function main() {
   const conv = await p.conversacion.findFirst({ orderBy: { ultimoMensajeEn: 'desc' } });
-  if (!conv) { console.log('No conversations'); return; }
+  if (!conv) {
+    console.log('No conversations');
+    return;
+  }
   console.log('Conv:', conv.id, 'Estado:', conv.estado);
 
   const msgs = await p.mensaje.findMany({

@@ -11,11 +11,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         {/* Logo */}
         <div className="flex flex-col items-center mb-6">
           <div className="mb-3">
-            <img
-              src="/logo.jpg"
-              alt="Las Grutas Departamentos"
-              className="h-16 w-auto object-contain"
-            />
+            <img src="/logo.jpg" alt="Las Grutas Departamentos" className="h-16 w-auto object-contain" />
           </div>
           <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Panel de Agentes</h1>
         </div>
@@ -24,9 +20,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       </div>
 
       {/* Footer */}
-      <p className="absolute bottom-4 text-xs text-gray-300">
-        lasgrutasdepartamentos.com
-      </p>
+      <p className="absolute bottom-4 text-xs text-gray-300">lasgrutasdepartamentos.com</p>
     </div>
   );
 }

@@ -9,13 +9,16 @@ const includeRelations = {
   icalFeeds: { orderBy: { creadoEn: 'asc' as const } },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeComplejo(c: any) {
   return {
     ...c,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tarifas: c.tarifas?.map((t: any) => ({
       ...t,
       precioNoche: Number(t.precioNoche),
     })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tarifasEspeciales: c.tarifasEspeciales?.map((te: any) => ({
       ...te,
       precioNoche: Number(te.precioNoche),
@@ -132,7 +135,7 @@ export async function updateComplejo(
     linkMercadoPago?: string;
     activo?: boolean;
     autoResponderEmail?: boolean;
-  }
+  },
 ) {
   const complejo = await prisma.complejo.update({
     where: { id },
@@ -157,7 +160,7 @@ export async function upsertTarifa(
   complejoId: string,
   temporada: string,
   precioNoche: number,
-  estadiaMinima?: number | null
+  estadiaMinima?: number | null,
 ) {
   const tarifa = await prisma.tarifa.upsert({
     where: { complejoId_temporada: { complejoId, temporada } },
@@ -186,7 +189,7 @@ export async function createTarifaEspecial(
     precioNoche: number;
     estadiaMinima?: number | null;
     motivo?: string | null;
-  }
+  },
 ) {
   const te = await prisma.tarifaEspecial.create({
     data: {
@@ -211,7 +214,7 @@ export async function updateTarifaEspecial(
     estadiaMinima?: number | null;
     motivo?: string | null;
     activo?: boolean;
-  }
+  },
 ) {
   const te = await prisma.tarifaEspecial.update({
     where: { id },
@@ -227,13 +230,7 @@ export async function deleteTarifaEspecial(id: string) {
   return result;
 }
 
-export async function addMedia(
-  complejoId: string,
-  url: string,
-  tipo = 'image',
-  caption?: string,
-  orden?: number
-) {
+export async function addMedia(complejoId: string, url: string, tipo = 'image', caption?: string, orden?: number) {
   if (orden === undefined) {
     const last = await prisma.mediaFile.findFirst({
       where: { complejoId },
@@ -255,9 +252,7 @@ export async function removeMedia(mediaId: string) {
 }
 
 export async function reorderMedia(complejoId: string, orderedIds: string[]) {
-  const updates = orderedIds.map((id, index) =>
-    prisma.mediaFile.update({ where: { id }, data: { orden: index } })
-  );
+  const updates = orderedIds.map((id, index) => prisma.mediaFile.update({ where: { id }, data: { orden: index } }));
   await prisma.$transaction(updates);
   invalidateContextCache();
   return prisma.mediaFile.findMany({
@@ -277,7 +272,7 @@ export async function listBloqueos(complejoId: string) {
 
 export async function createBloqueo(
   complejoId: string,
-  data: { fechaInicio: Date; fechaFin: Date; motivo?: string | null }
+  data: { fechaInicio: Date; fechaFin: Date; motivo?: string | null },
 ) {
   return prisma.bloqueo.create({
     data: {

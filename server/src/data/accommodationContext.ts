@@ -82,11 +82,11 @@ interface ComplejoWithRelations {
   cuit: string | null;
   linkMercadoPago: string | null;
   porcentajeReserva: number;
-  tarifas: { temporada: string; precioNoche: any; estadiaMinima: number | null }[];
+  tarifas: { temporada: string; precioNoche: number; estadiaMinima: number | null }[];
   tarifasEspeciales: {
     fechaInicio: Date;
     fechaFin: Date;
-    precioNoche: any;
+    precioNoche: number;
     estadiaMinima: number | null;
     motivo: string | null;
     activo: boolean;
@@ -133,9 +133,7 @@ function buildDetalle(c: ComplejoWithRelations): string {
 
   // Tarifas especiales vigentes
   const now = new Date();
-  const activeTe = c.tarifasEspeciales.filter(
-    (te) => te.activo && new Date(te.fechaFin) > now
-  );
+  const activeTe = c.tarifasEspeciales.filter((te) => te.activo && new Date(te.fechaFin) > now);
   if (activeTe.length > 0) {
     lines.push(`- Tarifas especiales vigentes:`);
     for (const te of activeTe) {
@@ -237,9 +235,7 @@ ${POLICIES}${ZONA}${CONTACTO}`;
 export async function getFilteredContext(departamentoActivo: string): Promise<string> {
   const complejos = await getActiveComplejos();
   const lower = departamentoActivo.toLowerCase();
-  const depto = complejos.find(
-    (c) => c.nombre.toLowerCase() === lower || c.aliases.some((a) => lower.includes(a))
-  );
+  const depto = complejos.find((c) => c.nombre.toLowerCase() === lower || c.aliases.some((a) => lower.includes(a)));
 
   if (!depto) {
     return getFullContext();
@@ -263,12 +259,13 @@ ${POLICIES}${ZONA}${CONTACTO}`;
  * Get image URLs for a department from DB. Returns up to `max` images.
  * Returns null if department not found.
  */
-export async function getDepartmentImages(departamento: string, max = 6): Promise<{ url: string; caption: string | null }[] | null> {
+export async function getDepartmentImages(
+  departamento: string,
+  max = 6,
+): Promise<{ url: string; caption: string | null }[] | null> {
   const complejos = await getActiveComplejos();
   const lower = departamento.toLowerCase();
-  const depto = complejos.find(
-    (c) => c.nombre.toLowerCase() === lower || c.aliases.some((a) => lower.includes(a))
-  );
+  const depto = complejos.find((c) => c.nombre.toLowerCase() === lower || c.aliases.some((a) => lower.includes(a)));
 
   if (!depto || depto.media.length === 0) return null;
   return depto.media.slice(0, max).map((m) => ({ url: m.url, caption: m.caption }));

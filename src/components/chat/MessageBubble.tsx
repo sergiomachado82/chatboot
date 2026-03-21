@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { Mensaje } from '@shared/types/mensaje';
 import Avatar from '../ui/Avatar';
 
@@ -14,13 +15,18 @@ function highlightContent(text: string, highlight?: string): React.ReactNode {
   const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
   if (parts.length === 1) return text;
   return parts.map((part, i) =>
-    part.toLowerCase() === highlight.toLowerCase()
-      ? <mark key={i} className="bg-yellow-200 rounded-sm">{part}</mark>
-      : part
+    part.toLowerCase() === highlight.toLowerCase() ? (
+      <mark key={i} className="bg-yellow-200 rounded-sm">
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
   );
 }
 
 export default function MessageBubble({ mensaje, highlightText, senderName, senderIdentifier }: MessageBubbleProps) {
+  const { t } = useTranslation();
   const time = new Date(mensaje.creadoEn).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 
   // System messages
@@ -46,20 +52,20 @@ export default function MessageBubble({ mensaje, highlightText, senderName, send
 
   const originLabel: Record<string, string> = {
     huesped: '',
-    bot: 'Bot',
-    agente: 'Agente',
+    bot: t('chat.botLabel'),
+    agente: t('chat.agentBubbleLabel'),
   };
 
   const showAvatar = mensaje.origen === 'huesped' && senderName;
 
   return (
     <div className={`flex ${align} mb-2 ${showAvatar ? 'gap-2' : ''}`}>
-      {showAvatar && (
-        <Avatar name={senderName!} identifier={senderIdentifier} size="sm" />
-      )}
+      {showAvatar && <Avatar name={senderName!} identifier={senderIdentifier} size="sm" />}
       <div className={`max-w-[75%] px-3 py-2 rounded-lg ${colorClass}`}>
         {originLabel[mensaje.origen] && (
-          <p className={`text-[10px] font-semibold mb-0.5 ${mensaje.origen === 'agente' ? 'text-blue-100' : 'text-gray-400'}`}>
+          <p
+            className={`text-[10px] font-semibold mb-0.5 ${mensaje.origen === 'agente' ? 'text-blue-100' : 'text-gray-400'}`}
+          >
             {originLabel[mensaje.origen]}
           </p>
         )}

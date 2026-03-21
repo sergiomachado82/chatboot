@@ -9,15 +9,31 @@
     "dev:server": "npm run dev --prefix server",
     "dev:test": "concurrently -n client,server -c cyan,green \"vite\" \"SIMULATOR_MODE=true npm run dev --prefix server\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"server/src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"server/src/**/*.ts\"",
+    "lint": "eslint .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --no-warn-ignored"
+    ],
+    "*.{js,json,md,css}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
+    "i18next": "^25.10.2",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.6.0",
+    "react-i18next": "^16.6.0",
     "react-router-dom": "^7.1.0",
+    "react-virtuoso": "^4.18.3",
     "socket.io-client": "^4.8.0"
   },
   "devDependencies": {
@@ -28,9 +44,14 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
     "eslint": "^9.17.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "postcss": "^8.4.49",
+    "prettier": "^3.8.1",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.7.0",
+    "typescript-eslint": "^8.57.1",
     "vite": "^6.0.0"
   }
 }

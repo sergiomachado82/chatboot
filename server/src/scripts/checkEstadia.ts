@@ -8,7 +8,10 @@ async function main() {
       nombre: true,
       estadiaMinima: true,
       tarifas: { select: { temporada: true, precioNoche: true, estadiaMinima: true } },
-      tarifasEspeciales: { where: { activo: true }, select: { fechaInicio: true, fechaFin: true, estadiaMinima: true, motivo: true } },
+      tarifasEspeciales: {
+        where: { activo: true },
+        select: { fechaInicio: true, fechaFin: true, estadiaMinima: true, motivo: true },
+      },
     },
   });
   for (const c of complejos) {

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Smartphone, Globe } from 'lucide-react';
 import type { Conversacion } from '@shared/types/conversacion';
 import Badge, { estadoColor, estadoLabel } from '../ui/Badge';
@@ -17,8 +18,17 @@ interface ChatListItemProps {
   onToggleSelect?: () => void;
 }
 
-export default function ChatListItem({ conversacion, selected, unread, onClick, selectMode, isChecked, onToggleSelect }: ChatListItemProps) {
-  const nombre = conversacion.huesped?.nombre ?? conversacion.huesped?.waId ?? 'Sin nombre';
+export default function ChatListItem({
+  conversacion,
+  selected,
+  unread,
+  onClick,
+  selectMode,
+  isChecked,
+  onToggleSelect,
+}: ChatListItemProps) {
+  const { t } = useTranslation();
+  const nombre = conversacion.huesped?.nombre ?? conversacion.huesped?.waId ?? t('chat.noName');
   const time = conversacion.ultimoMensajeEn
     ? new Date(conversacion.ultimoMensajeEn).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
     : '';
@@ -56,7 +66,9 @@ export default function ChatListItem({ conversacion, selected, unread, onClick, 
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <span className={`text-sm truncate flex items-center gap-1 ${unread ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-800 dark:text-gray-100'}`}>
+            <span
+              className={`text-sm truncate flex items-center gap-1 ${unread ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-800 dark:text-gray-100'}`}
+            >
               {isWhatsApp(conversacion.huesped?.waId) ? (
                 <Smartphone size={12} className="text-green-500 flex-shrink-0" />
               ) : (
@@ -64,11 +76,17 @@ export default function ChatListItem({ conversacion, selected, unread, onClick, 
               )}
               {nombre}
             </span>
-            <span className={`text-xs ml-2 flex-shrink-0 ${unread ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>{time}</span>
+            <span
+              className={`text-xs ml-2 flex-shrink-0 ${unread ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              {time}
+            </span>
           </div>
           <div className="flex items-center justify-between">
-            <p className={`text-xs truncate flex-1 mr-2 ${unread ? 'text-gray-700 dark:text-gray-300 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-              {conversacion.ultimoMensaje ?? 'Sin mensajes'}
+            <p
+              className={`text-xs truncate flex-1 mr-2 ${unread ? 'text-gray-700 dark:text-gray-300 font-medium' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              {conversacion.ultimoMensaje ?? t('chat.noMessages')}
             </p>
             <Badge color={estadoColor(conversacion.estado)}>{estadoLabel(conversacion.estado)}</Badge>
           </div>

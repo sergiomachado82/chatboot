@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Smartphone, AlertCircle } from 'lucide-react';
 import type { Conversacion } from '@shared/types/conversacion';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,9 +15,10 @@ interface ChatHeaderProps {
 }
 
 export default function ChatHeader({ conversacion, onConversacionUpdate }: ChatHeaderProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const health = useHealth();
-  const nombre = conversacion.huesped?.nombre ?? conversacion.huesped?.waId ?? 'Sin nombre';
+  const nombre = conversacion.huesped?.nombre ?? conversacion.huesped?.waId ?? t('chat.noName');
   const waStatus = health?.services?.whatsapp?.status;
   const [showConfirmCerrar, setShowConfirmCerrar] = useState(false);
 
@@ -25,7 +27,7 @@ export default function ChatHeader({ conversacion, onConversacionUpdate }: ChatH
     onConversacionUpdate?.(updated);
   };
 
-  const onError = (err: Error) => notify.error(err.message || 'Error en la operacion');
+  const onError = (err: Error) => notify.error(err.message || t('common.errorGeneric'));
   const tomar = useMutation({ mutationFn: () => tomarControl(conversacion.id), onSuccess: invalidate, onError });
   const devolver = useMutation({ mutationFn: () => devolverBot(conversacion.id), onSuccess: invalidate, onError });
   const cerrar = useMutation({
@@ -44,15 +46,17 @@ export default function ChatHeader({ conversacion, onConversacionUpdate }: ChatH
         <div className="flex items-center gap-2 mt-0.5">
           <Badge color={estadoColor(conversacion.estado)}>{estadoLabel(conversacion.estado)}</Badge>
           {conversacion.agente && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">Agente: {conversacion.agente.nombre}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {t('chat.agentLabel')} {conversacion.agente.nombre}
+            </span>
           )}
           {waStatus === 'error' ? (
             <span className="flex items-center gap-1 text-xs text-red-500" title="WhatsApp desconectado">
-              <AlertCircle size={12} /> WA offline
+              <AlertCircle size={12} /> {t('chat.waOffline')}
             </span>
           ) : waStatus === 'ok' ? (
             <span className="flex items-center gap-1 text-xs text-green-500" title="WhatsApp conectado">
-              <Smartphone size={12} /> WA
+              <Smartphone size={12} /> {t('chat.waOnline')}
             </span>
           ) : null}
         </div>
@@ -63,9 +67,9 @@ export default function ChatHeader({ conversacion, onConversacionUpdate }: ChatH
             onClick={() => tomar.mutate()}
             disabled={tomar.isPending}
             className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-            aria-label="Tomar control de la conversacion"
+            aria-label={t('chat.takeControlAria')}
           >
-            Tomar control
+            {t('chat.takeControl')}
           </button>
         )}
         {conversacion.estado === 'humano_activo' && (
@@ -74,7 +78,7 @@ export default function ChatHeader({ conversacion, onConversacionUpdate }: ChatH
             disabled={devolver.isPending}
             className="px-3 py-1.5 text-xs bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
           >
-            Devolver al bot
+            {t('chat.returnToBot')}
           </button>
         )}
         {conversacion.estado !== 'cerrado' && (
@@ -83,16 +87,16 @@ export default function ChatHeader({ conversacion, onConversacionUpdate }: ChatH
             disabled={cerrar.isPending}
             className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
           >
-            Cerrar
+            {t('chat.closeConversation')}
           </button>
         )}
       </div>
 
       <ConfirmDialog
         open={showConfirmCerrar}
-        title="Cerrar conversacion"
-        message="Esta accion cerrara la conversacion y el bot dejara de responder. ¿Continuar?"
-        confirmLabel="Cerrar"
+        title={t('chat.closeConversationTitle')}
+        message={t('chat.closeConversationMessage')}
+        confirmLabel={t('chat.closeConversation')}
         variant="danger"
         loading={cerrar.isPending}
         onConfirm={() => cerrar.mutate()}

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { getEmail } from '../../api/emailApi';
 import { useModalKeyboard } from '../../hooks/useModalKeyboard';
 import Badge from '../ui/Badge';
@@ -44,6 +45,7 @@ const FORM_FIELD_LABELS: Record<string, string> = {
 };
 
 export default function EmailDetailModal({ emailId, onClose }: Props) {
+  const { t } = useTranslation();
   const { data: email, isLoading } = useQuery({
     queryKey: ['emails', emailId],
     queryFn: () => getEmail(emailId),
@@ -54,46 +56,66 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
   const formFields = email?.esFormulario ? tryParseFormFields(email.bodyOriginal) : null;
 
   return (
-    <div ref={modalRef} tabIndex={-1} className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 outline-none">
+    <div
+      ref={modalRef}
+      tabIndex={-1}
+      className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 outline-none"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="email-modal-title"
+    >
       <div className="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto dark:bg-gray-800">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b sticky top-0 bg-white z-10 dark:bg-gray-800 dark:border-gray-700">
           <div className="flex items-center gap-2 min-w-0">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate dark:text-gray-100">
-              {isLoading ? 'Cargando...' : email?.subject || 'Sin asunto'}
+            <h3
+              id="email-modal-title"
+              className="text-base sm:text-lg font-semibold text-gray-800 truncate dark:text-gray-100"
+            >
+              {isLoading ? t('emails.detailLoading') : email?.subject || t('emails.noSubject')}
             </h3>
             {email && (
               <Badge color={email.error ? 'red' : email.respondido ? 'green' : 'gray'}>
-                {email.error ? 'Error' : email.respondido ? 'Respondido' : 'Pendiente'}
+                {email.error
+                  ? t('emails.statusError')
+                  : email.respondido
+                    ? t('emails.statusResponded')
+                    : t('emails.statusPending')}
               </Badge>
             )}
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 dark:text-gray-500 dark:hover:text-gray-300" aria-label="Cerrar modal">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 flex-shrink-0 dark:text-gray-500 dark:hover:text-gray-300"
+            aria-label={t('common.close')}
+          >
             <X size={20} />
           </button>
         </div>
 
         {isLoading ? (
-          <div className="p-6 text-center text-gray-400 dark:text-gray-500">Cargando...</div>
+          <div className="p-6 text-center text-gray-400 dark:text-gray-500">{t('emails.detailLoading')}</div>
         ) : email ? (
           <div className="p-4 sm:p-6 space-y-5">
             {/* Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
-                <span className="text-gray-400 text-xs">De</span>
+                <span className="text-gray-400 text-xs">{t('emails.tableFrom')}</span>
                 <p className="text-gray-800 dark:text-gray-100">{email.fromEmail}</p>
               </div>
               <div>
-                <span className="text-gray-400 text-xs">Fecha</span>
+                <span className="text-gray-400 text-xs">{t('emails.tableDate')}</span>
                 <p className="text-gray-800 dark:text-gray-100">{fmtDateTime(email.creadoEn)}</p>
               </div>
               <div>
-                <span className="text-gray-400 text-xs">Tipo</span>
-                <p className="text-gray-800 dark:text-gray-100">{email.esFormulario ? 'Formulario web' : 'Email directo'}</p>
+                <span className="text-gray-400 text-xs">{t('emails.tableType')}</span>
+                <p className="text-gray-800 dark:text-gray-100">
+                  {email.esFormulario ? t('emails.detailTypeForm') : t('emails.detailTypeDirect')}
+                </p>
               </div>
               {email.complejoId && (
                 <div>
-                  <span className="text-gray-400 text-xs">Complejo ID</span>
+                  <span className="text-gray-400 text-xs">{t('emails.detailComplejoId')}</span>
                   <p className="text-gray-800 text-xs break-all dark:text-gray-100">{email.complejoId}</p>
                 </div>
               )}
@@ -102,7 +124,7 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
             {/* Error */}
             {email.error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span className="text-xs font-medium text-red-700">Error</span>
+                <span className="text-xs font-medium text-red-700">{t('emails.detailError')}</span>
                 <p className="text-sm text-red-600 mt-1">{email.error}</p>
               </div>
             )}
@@ -110,21 +132,25 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
             {/* Email original */}
             {email.bodyOriginal && (
               <div>
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 dark:text-gray-400">Email original</h4>
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 dark:text-gray-400">
+                  {t('emails.detailOriginal')}
+                </h4>
                 {formFields ? (
                   <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 dark:bg-gray-700">
-                    {Object.entries(formFields).map(([key, value]) => (
+                    {Object.entries(formFields).map(([key, value]) =>
                       value ? (
                         <div key={key} className="text-sm">
                           <span className="text-gray-500 dark:text-gray-400">{FORM_FIELD_LABELS[key] || key}: </span>
                           <span className="text-gray-800 dark:text-gray-100">{value}</span>
                         </div>
-                      ) : null
-                    ))}
+                      ) : null,
+                    )}
                   </div>
                 ) : (
                   <div className="bg-gray-50 rounded-lg p-3 dark:bg-gray-700">
-                    <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans dark:text-gray-300">{email.bodyOriginal}</pre>
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans dark:text-gray-300">
+                      {email.bodyOriginal}
+                    </pre>
                   </div>
                 )}
               </div>
@@ -133,15 +159,19 @@ export default function EmailDetailModal({ emailId, onClose }: Props) {
             {/* Respuesta enviada */}
             {email.respuestaEnviada && (
               <div>
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 dark:text-gray-400">Respuesta enviada</h4>
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 dark:text-gray-400">
+                  {t('emails.detailResponse')}
+                </h4>
                 <div className="bg-blue-50 rounded-lg p-3">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans dark:text-gray-300">{email.respuestaEnviada}</pre>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap break-words font-sans dark:text-gray-300">
+                    {email.respuestaEnviada}
+                  </pre>
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="p-6 text-center text-gray-400 dark:text-gray-500">Email no encontrado</div>
+          <div className="p-6 text-center text-gray-400 dark:text-gray-500">{t('emails.detailNotFound')}</div>
         )}
       </div>
     </div>

@@ -1,3 +1,4 @@
+// EmptyState receives all text via props — no hardcoded strings to translate.
 type Illustration = 'chat' | 'reservas' | 'emails' | 'complejos';
 
 interface EmptyStateProps {
@@ -8,7 +9,14 @@ interface EmptyStateProps {
 
 const illustrations: Record<Illustration, JSX.Element> = {
   chat: (
-    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-300 dark:text-gray-600">
+    <svg
+      width="80"
+      height="80"
+      viewBox="0 0 80 80"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="text-gray-300 dark:text-gray-600"
+    >
       <rect x="10" y="14" width="44" height="32" rx="6" stroke="currentColor" strokeWidth="2.5" />
       <rect x="26" y="34" width="44" height="32" rx="6" stroke="currentColor" strokeWidth="2.5" />
       <circle cx="24" cy="30" r="2.5" fill="currentColor" />
@@ -19,7 +27,14 @@ const illustrations: Record<Illustration, JSX.Element> = {
     </svg>
   ),
   reservas: (
-    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-300 dark:text-gray-600">
+    <svg
+      width="80"
+      height="80"
+      viewBox="0 0 80 80"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="text-gray-300 dark:text-gray-600"
+    >
       <rect x="12" y="18" width="56" height="48" rx="6" stroke="currentColor" strokeWidth="2.5" />
       <line x1="12" y1="32" x2="68" y2="32" stroke="currentColor" strokeWidth="2" />
       <line x1="28" y1="18" x2="28" y2="12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
@@ -32,13 +47,27 @@ const illustrations: Record<Illustration, JSX.Element> = {
     </svg>
   ),
   emails: (
-    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-300 dark:text-gray-600">
+    <svg
+      width="80"
+      height="80"
+      viewBox="0 0 80 80"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="text-gray-300 dark:text-gray-600"
+    >
       <rect x="10" y="20" width="60" height="40" rx="6" stroke="currentColor" strokeWidth="2.5" />
       <path d="M10 26l30 18 30-18" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
     </svg>
   ),
   complejos: (
-    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-300 dark:text-gray-600">
+    <svg
+      width="80"
+      height="80"
+      viewBox="0 0 80 80"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="text-gray-300 dark:text-gray-600"
+    >
       <rect x="14" y="24" width="52" height="40" rx="4" stroke="currentColor" strokeWidth="2.5" />
       <rect x="24" y="34" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
       <rect x="46" y="34" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
@@ -52,11 +81,7 @@ const illustrations: Record<Illustration, JSX.Element> = {
 export default function EmptyState({ title, description, illustration }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 py-12 view-transition">
-      {illustration && (
-        <div className="mb-4">
-          {illustrations[illustration]}
-        </div>
-      )}
+      {illustration && <div className="mb-4">{illustrations[illustration]}</div>}
       <p className="text-lg font-medium">{title}</p>
       {description && <p className="text-sm mt-1">{description}</p>}
     </div>

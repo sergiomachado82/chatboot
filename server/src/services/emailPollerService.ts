@@ -4,9 +4,11 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { prisma } from '../lib/prisma.js';
 import { processIncomingEmail } from './emailAutoResponderService.js';
+import { createQueue } from '../lib/queue.js';
 import type { ParsedMail } from 'mailparser';
+import type Bull from 'bull';
 
-let intervalId: ReturnType<typeof setInterval> | null = null;
+let queue: Bull.Queue | null = null;
 let isPolling = false;
 
 function getImapConfig() {
@@ -39,8 +41,10 @@ export interface ContactFormFields {
 function isContactFormEmail(parsed: ParsedMail): boolean {
   const html = parsed.html || '';
   const text = parsed.text || '';
-  return html.includes('formulario de contacto de lasgrutasdepartamentos') ||
-         text.includes('formulario de contacto de lasgrutasdepartamentos');
+  return (
+    html.includes('formulario de contacto de lasgrutasdepartamentos') ||
+    text.includes('formulario de contacto de lasgrutasdepartamentos')
+  );
 }
 
 function extractContactFormFields(parsed: ParsedMail): ContactFormFields {
@@ -63,7 +67,7 @@ function extractContactFormFields(parsed: ParsedMail): ContactFormFields {
         fechaSalida: data.fechaSalida || null,
         mensaje: data.mensaje || null,
       };
-    } catch (e) {
+    } catch {
       logger.warn({ raw: jsonMatch[1] }, 'Failed to parse FORM_DATA JSON comment');
     }
   }
@@ -140,19 +144,30 @@ export async function processRawEmailSource(source: Buffer): Promise<{ processed
     logger.info({ replyTo, formFields }, 'Contact form detected, extracted fields');
   } else {
     // Regular email — apply anti-loop filters
-    if (fromAddress.includes('info@lasgrutasdepartamentos') ||
-        fromAddress.includes('lasgrutasdepartamentos@gmail')) {
+    if (fromAddress.includes('info@lasgrutasdepartamentos') || fromAddress.includes('lasgrutasdepartamentos@gmail')) {
       logger.debug({ from: fromAddress }, 'Skipping own email');
       return { processed: false, error: 'Own email (loop prevention)' };
     }
 
     const skipDomains = [
-      'booking.com', 'airbnb.com', 'invertironline.com', 'iol.invertironline.com',
-      'mercadolibre.com', 'mercadopago.com', 'bna.com.ar', 'mailing.bna.com.ar',
-      'noreply', 'no-reply', 'mailer-daemon', 'postmaster',
-      'newsletter', 'notifications', 'alert', 'billing',
+      'booking.com',
+      'airbnb.com',
+      'invertironline.com',
+      'iol.invertironline.com',
+      'mercadolibre.com',
+      'mercadopago.com',
+      'bna.com.ar',
+      'mailing.bna.com.ar',
+      'noreply',
+      'no-reply',
+      'mailer-daemon',
+      'postmaster',
+      'newsletter',
+      'notifications',
+      'alert',
+      'billing',
     ];
-    if (skipDomains.some(d => fromAddress.includes(d))) {
+    if (skipDomains.some((d) => fromAddress.includes(d))) {
       logger.debug({ from: fromAddress }, 'Skipping notification sender');
       return { processed: false, error: 'Notification sender' };
     }
@@ -212,7 +227,7 @@ export async function processRawEmailSource(source: Buffer): Promise<{ processed
       subject,
       body: bodyText,
       inReplyTo: parsed.messageId,
-      activeComplejos: activeComplejos.map(c => ({ id: c.id, nombre: c.nombre })),
+      activeComplejos: activeComplejos.map((c) => ({ id: c.id, nombre: c.nombre })),
       formFields: formFields || undefined,
     });
 
@@ -231,20 +246,21 @@ export async function processRawEmailSource(source: Buffer): Promise<{ processed
 
     logger.info({ replyTo, subject, complejoId, isForm }, 'Email auto-reply sent successfully');
     return { processed: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err, replyTo, subject }, 'Failed to process email');
+    const errMsg = err instanceof Error ? err.message : String(err);
     await prisma.emailProcesado.create({
       data: {
         messageId,
         fromEmail: replyTo,
         subject,
         respondido: false,
-        error: err.message?.slice(0, 500),
+        error: errMsg.slice(0, 500),
         bodyOriginal: isForm && formFields ? JSON.stringify(formFields) : bodyText.slice(0, 5000),
         esFormulario: isForm,
       },
     });
-    return { processed: false, error: err.message?.slice(0, 200) };
+    return { processed: false, error: errMsg.slice(0, 200) };
   }
 }
 
@@ -295,12 +311,16 @@ async function pollEmails(): Promise<void> {
 
       for (const uid of unseenUids) {
         try {
-          const msg = await client.fetchOne(uid, {
-            uid: true,
-            flags: true,
-            envelope: true,
-            source: true,
-          }, { uid: true });
+          const msg = await client.fetchOne(
+            uid,
+            {
+              uid: true,
+              flags: true,
+              envelope: true,
+              source: true,
+            },
+            { uid: true },
+          );
 
           if (!msg || !msg.source) {
             logger.warn({ uid }, 'Could not fetch email source');
@@ -324,7 +344,11 @@ async function pollEmails(): Promise<void> {
     logger.error({ err }, 'Email polling error');
   } finally {
     if (client && !loggedOut) {
-      try { await client.logout(); } catch { /* ignore */ }
+      try {
+        await client.logout();
+      } catch {
+        /* ignore */
+      }
     }
     isPolling = false;
   }
@@ -336,24 +360,17 @@ export function startEmailPollerJob() {
     return;
   }
 
-  setTimeout(() => {
-    pollEmails().catch((err) => {
-      logger.error({ err }, 'Error in email poll job');
-    });
-  }, 15_000);
+  queue = createQueue('email-poll');
 
-  intervalId = setInterval(() => {
-    pollEmails().catch((err) => {
-      logger.error({ err }, 'Error in email poll job');
-    });
-  }, env.EMAIL_POLL_INTERVAL_MS);
+  queue.process(async () => {
+    await pollEmails();
+  });
 
-  logger.info(`Email poller started (every ${env.EMAIL_POLL_INTERVAL_MS / 1000}s)`);
+  queue.add({}, { delay: 15_000, repeat: { every: env.EMAIL_POLL_INTERVAL_MS } });
+
+  logger.info(`Email poller started (Bull queue, every ${env.EMAIL_POLL_INTERVAL_MS / 1000}s)`);
 }
 
 export function stopEmailPollerJob() {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
-  }
+  queue = null;
 }

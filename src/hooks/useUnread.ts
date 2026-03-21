@@ -37,12 +37,15 @@ export function useUnread() {
     setReadTimestamps(updated);
   }, []);
 
-  const isUnread = useCallback((conversacionId: string, ultimoMensajeEn: string | null | undefined) => {
-    if (!ultimoMensajeEn) return false;
-    const lastRead = readTimestamps[conversacionId];
-    if (!lastRead) return true; // never opened = unread
-    return new Date(ultimoMensajeEn) > new Date(lastRead);
-  }, [readTimestamps]);
+  const isUnread = useCallback(
+    (conversacionId: string, ultimoMensajeEn: string | null | undefined) => {
+      if (!ultimoMensajeEn) return false;
+      const lastRead = readTimestamps[conversacionId];
+      if (!lastRead) return true; // never opened = unread
+      return new Date(ultimoMensajeEn) > new Date(lastRead);
+    },
+    [readTimestamps],
+  );
 
   return { markAsRead, isUnread };
 }

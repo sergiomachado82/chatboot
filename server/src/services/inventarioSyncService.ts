@@ -43,7 +43,7 @@ export async function syncTarifaEspecialToInventario(
   complejoId: string,
   fechaInicio: Date,
   fechaFin: Date,
-  precio: number
+  precio: number,
 ) {
   const complejo = await prisma.complejo.findUnique({
     where: { id: complejoId },
@@ -66,11 +66,7 @@ export async function syncTarifaEspecialToInventario(
 /**
  * Restores seasonal prices for a date range, respecting other active TarifaEspecial overrides.
  */
-export async function restoreSeasonalPrices(
-  complejoId: string,
-  fechaInicio: Date,
-  fechaFin: Date
-) {
+export async function restoreSeasonalPrices(complejoId: string, fechaInicio: Date, fechaFin: Date) {
   const complejo = await prisma.complejo.findUnique({
     where: { id: complejoId },
     select: { nombre: true },
@@ -91,9 +87,7 @@ export async function restoreSeasonalPrices(
 
   for (const date of dates) {
     // Check if another active override covers this date
-    const coveringOverride = otherOverrides.find(
-      (o) => date >= new Date(o.fechaInicio) && date < new Date(o.fechaFin)
-    );
+    const coveringOverride = otherOverrides.find((o) => date >= new Date(o.fechaInicio) && date < new Date(o.fechaFin));
 
     let precio: number;
     if (coveringOverride) {

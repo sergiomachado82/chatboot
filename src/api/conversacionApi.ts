@@ -35,7 +35,10 @@ export interface SearchMensajesParams {
   dateTo?: string;
 }
 
-export async function getMensajes(conversacionId: string, searchParams?: SearchMensajesParams): Promise<MensajesResponse> {
+export async function getMensajes(
+  conversacionId: string,
+  searchParams?: SearchMensajesParams,
+): Promise<MensajesResponse> {
   const params = new URLSearchParams();
   if (searchParams?.search) {
     params.set('search', searchParams.search);

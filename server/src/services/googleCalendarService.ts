@@ -15,7 +15,7 @@ function getAuth() {
     env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     undefined,
     env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    ['https://www.googleapis.com/auth/calendar']
+    ['https://www.googleapis.com/auth/calendar'],
   );
 }
 
@@ -73,8 +73,9 @@ export async function pushReservaToGCal(reservaId: string): Promise<void> {
         data: { googleCalEventId: null },
       });
       logger.info({ reservaId }, 'Deleted reserva event from GCal');
-    } catch (err: any) {
-      if (err.code === 404 || err.code === 410) {
+    } catch (err: unknown) {
+      const errObj = err as { code?: number };
+      if (errObj.code === 404 || errObj.code === 410) {
         // Event already deleted, clear reference
         await prisma.reserva.update({
           where: { id: reservaId },
@@ -109,8 +110,9 @@ export async function pushReservaToGCal(reservaId: string): Promise<void> {
         requestBody: eventBody,
       });
       logger.info({ reservaId }, 'Updated reserva event in GCal');
-    } catch (err: any) {
-      if (err.code === 404 || err.code === 410) {
+    } catch (err: unknown) {
+      const errObj = err as { code?: number };
+      if (errObj.code === 404 || errObj.code === 410) {
         // Event was deleted externally, create a new one
         const created = await cal.api.events.insert({
           calendarId: cal.calendarId,
@@ -174,8 +176,9 @@ export async function pushBloqueoToGCal(bloqueoId: string): Promise<void> {
         eventId: bloqueo.googleCalEventId,
         requestBody: eventBody,
       });
-    } catch (err: any) {
-      if (err.code === 404 || err.code === 410) {
+    } catch (err: unknown) {
+      const errObj = err as { code?: number };
+      if (errObj.code === 404 || errObj.code === 410) {
         const created = await cal.api.events.insert({
           calendarId: cal.calendarId,
           requestBody: eventBody,
@@ -218,8 +221,9 @@ export async function deleteBloqueoFromGCal(googleCalEventId: string): Promise<v
       eventId: googleCalEventId,
     });
     logger.info({ gcalEventId: googleCalEventId }, 'Deleted bloqueo event from GCal');
-  } catch (err: any) {
-    if (err.code !== 404 && err.code !== 410) {
+  } catch (err: unknown) {
+    const errObj = err as { code?: number };
+    if (errObj.code !== 404 && errObj.code !== 410) {
       throw err;
     }
     // Already deleted, ignore
@@ -274,8 +278,9 @@ export async function syncFromGoogleCalendar(): Promise<{
       let response: Awaited<ReturnType<typeof cal.api.events.list>>;
       try {
         response = await cal.api.events.list(params);
-      } catch (err: any) {
-        if (err.code === 410) {
+      } catch (err: unknown) {
+        const errObj = err as { code?: number };
+        if (errObj.code === 410) {
           // syncToken expired, do full sync
           syncToken = null;
           logger.info('GCal syncToken expired, performing full sync');
@@ -324,9 +329,7 @@ export async function syncFromGoogleCalendar(): Promise<{
         const startDate = event.start.date
           ? new Date(event.start.date + 'T00:00:00Z')
           : new Date(event.start.dateTime!);
-        const endDate = event.end.date
-          ? new Date(event.end.date + 'T00:00:00Z')
-          : new Date(event.end.dateTime!);
+        const endDate = event.end.date ? new Date(event.end.date + 'T00:00:00Z') : new Date(event.end.dateTime!);
 
         // Try to match complejo by name in the event summary
         const summary = event.summary ?? '';

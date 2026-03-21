@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, X, Calendar } from 'lucide-react';
 import type { SearchMensajesParams } from '../../api/conversacionApi';
 
@@ -9,20 +10,28 @@ interface ChatSearchBarProps {
 }
 
 export default function ChatSearchBar({ onSearch, resultCount, isLoading }: ChatSearchBarProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const emitSearch = useCallback((search: string, from: string, to: string) => {
-    const hasFilter = (search.length >= 2) || from || to;
-    onSearch(hasFilter ? {
-      search: search.length >= 2 ? search : undefined,
-      dateFrom: from || undefined,
-      dateTo: to || undefined,
-    } : undefined);
-  }, [onSearch]);
+  const emitSearch = useCallback(
+    (search: string, from: string, to: string) => {
+      const hasFilter = search.length >= 2 || from || to;
+      onSearch(
+        hasFilter
+          ? {
+              search: search.length >= 2 ? search : undefined,
+              dateFrom: from || undefined,
+              dateTo: to || undefined,
+            }
+          : undefined,
+      );
+    },
+    [onSearch],
+  );
 
   function handleTextChange(value: string) {
     setText(value);
@@ -61,7 +70,7 @@ export default function ChatSearchBar({ onSearch, resultCount, isLoading }: Chat
         className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-200 w-full dark:text-gray-400 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 dark:border-gray-700"
       >
         <Search size={14} />
-        Buscar en conversacion
+        {t('chat.searchInConversation')}
       </button>
     );
   }
@@ -74,11 +83,15 @@ export default function ChatSearchBar({ onSearch, resultCount, isLoading }: Chat
           type="text"
           value={text}
           onChange={(e) => handleTextChange(e.target.value)}
-          placeholder="Buscar texto (min 2 caracteres)..."
-          className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-blue-400"
+          placeholder={t('chat.searchPlaceholder')}
+          className="flex-1 text-sm border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:focus:border-blue-400"
           autoFocus
         />
-        <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" title="Cerrar busqueda">
+        <button
+          onClick={handleClose}
+          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+          title={t('chat.closeSearch')}
+        >
           <X size={16} />
         </button>
       </div>
@@ -88,19 +101,23 @@ export default function ChatSearchBar({ onSearch, resultCount, isLoading }: Chat
           type="date"
           value={dateFrom}
           onChange={(e) => handleDateFromChange(e.target.value)}
-          className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+          className="border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
         />
         <span className="text-gray-400 dark:text-gray-500">a</span>
         <input
           type="date"
           value={dateTo}
           onChange={(e) => handleDateToChange(e.target.value)}
-          className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+          className="border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-blue-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
         />
       </div>
       {hasActiveFilter && (
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          {isLoading ? 'Buscando...' : resultCount === 0 ? 'Sin resultados' : `${resultCount} mensaje${resultCount === 1 ? '' : 's'} encontrado${resultCount === 1 ? '' : 's'}`}
+          {isLoading
+            ? t('chat.searching')
+            : resultCount === 0
+              ? t('chat.noResults')
+              : t('chat.conversationFound', { count: resultCount ?? 0 })}
         </p>
       )}
     </div>

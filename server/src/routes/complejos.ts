@@ -15,13 +15,9 @@ import {
   removeMedia,
   reorderMedia,
   listBloqueos,
-  createBloqueo,
   deleteBloqueo,
 } from '../services/complejoService.js';
-import {
-  syncTarifaEspecialToInventario,
-  restoreSeasonalPrices,
-} from '../services/inventarioSyncService.js';
+import { syncTarifaEspecialToInventario, restoreSeasonalPrices } from '../services/inventarioSyncService.js';
 import { recalcDisponible, dateRange } from '../services/inventarioService.js';
 import { prisma } from '../lib/prisma.js';
 import { pushBloqueoToGCal, deleteBloqueoFromGCal } from '../services/googleCalendarService.js';
@@ -129,7 +125,7 @@ router.put('/complejos/:id/tarifas', async (req, res) => {
     req.params.id,
     parsed.data.temporada,
     parsed.data.precioNoche,
-    parsed.data.estadiaMinima
+    parsed.data.estadiaMinima,
   );
   res.json(tarifa);
 });
@@ -171,7 +167,7 @@ router.post('/complejos/:id/tarifas-especiales', async (req, res) => {
     req.params.id,
     new Date(parsed.data.fechaInicio),
     new Date(parsed.data.fechaFin),
-    parsed.data.precioNoche
+    parsed.data.precioNoche,
   );
 
   res.status(201).json(te);
@@ -184,7 +180,14 @@ router.patch('/complejos/:id/tarifas-especiales/:teId', async (req, res) => {
     return;
   }
   try {
-    const updateData: any = { ...parsed.data };
+    const updateData: {
+      fechaInicio?: Date;
+      fechaFin?: Date;
+      precioNoche?: number;
+      estadiaMinima?: number | null;
+      motivo?: string | null;
+      activo?: boolean;
+    } = { ...parsed.data };
     if (parsed.data.fechaInicio) updateData.fechaInicio = new Date(parsed.data.fechaInicio);
     if (parsed.data.fechaFin) updateData.fechaFin = new Date(parsed.data.fechaFin);
 
@@ -195,7 +198,7 @@ router.patch('/complejos/:id/tarifas-especiales/:teId', async (req, res) => {
       req.params.id,
       new Date(te.fechaInicio),
       new Date(te.fechaFin),
-      te.precioNoche
+      te.precioNoche,
     );
 
     res.json(te);
@@ -209,11 +212,7 @@ router.delete('/complejos/:id/tarifas-especiales/:teId', async (req, res) => {
     const te = await deleteTarifaEspecial(req.params.teId);
 
     // Restore seasonal prices for the deleted override's date range
-    await restoreSeasonalPrices(
-      req.params.id,
-      new Date(te.fechaInicio),
-      new Date(te.fechaFin)
-    );
+    await restoreSeasonalPrices(req.params.id, new Date(te.fechaInicio), new Date(te.fechaFin));
 
     res.json({ ok: true });
   } catch {
@@ -268,9 +267,7 @@ router.post('/complejos/:id/bloqueos', async (req, res) => {
   }
 
   // Push to Google Calendar (fire-and-forget)
-  pushBloqueoToGCal(bloqueo.id).catch((err) =>
-    console.error('GCal push failed for bloqueo', err)
-  );
+  pushBloqueoToGCal(bloqueo.id).catch((err) => console.error('GCal push failed for bloqueo', err));
 
   res.status(201).json(bloqueo);
 });
@@ -288,7 +285,7 @@ router.delete('/complejos/:id/bloqueos/:bloqueoId', async (req, res) => {
     // Delete from Google Calendar if it was synced
     if (bloqueo.googleCalEventId) {
       deleteBloqueoFromGCal(bloqueo.googleCalEventId).catch((err) =>
-        console.error('GCal delete failed for bloqueo', err)
+        console.error('GCal delete failed for bloqueo', err),
       );
     }
 
@@ -336,8 +333,8 @@ router.post('/complejos/:id/ical-feeds', async (req, res) => {
       },
     });
     res.status(201).json(feed);
-  } catch (err: any) {
-    if (err.code === 'P2002') {
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as Record<string, unknown>).code === 'P2002') {
       res.status(409).json({ error: 'Esta URL ya existe para este complejo' });
       return;
     }
@@ -373,7 +370,7 @@ router.post('/complejos/:id/media', async (req, res) => {
     parsed.data.url,
     parsed.data.tipo,
     parsed.data.caption,
-    parsed.data.orden
+    parsed.data.orden,
   );
   res.status(201).json(media);
 });

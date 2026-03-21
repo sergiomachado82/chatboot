@@ -24,18 +24,21 @@ export default function WhatsAppSimulator() {
     const socket = io({ auth: { token } });
     socketRef.current = socket;
 
-    socket.on('simulator:mensaje', (data: { from: string; type?: string; body: string; imageUrl?: string; timestamp: string }) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          from: 'bot',
-          type: (data.type as 'text' | 'image') || 'text',
-          body: data.body,
-          imageUrl: data.imageUrl,
-          timestamp: data.timestamp,
-        },
-      ]);
-    });
+    socket.on(
+      'simulator:mensaje',
+      (data: { from: string; type?: string; body: string; imageUrl?: string; timestamp: string }) => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: 'bot',
+            type: (data.type as 'text' | 'image') || 'text',
+            body: data.body,
+            imageUrl: data.imageUrl,
+            timestamp: data.timestamp,
+          },
+        ]);
+      },
+    );
 
     return () => {
       socket.disconnect();
@@ -68,15 +71,29 @@ export default function WhatsAppSimulator() {
     if (!file || sending) return;
     e.target.value = '';
 
-    setMessages((prev) => [...prev, { from: 'user', type: 'text', body: `[Nota de voz: ${file.name}]`, timestamp: new Date().toISOString() }]);
+    setMessages((prev) => [
+      ...prev,
+      { from: 'user', type: 'text', body: `[Nota de voz: ${file.name}]`, timestamp: new Date().toISOString() },
+    ]);
     setSending(true);
 
     try {
       const result = await sendSimulatorAudio(file);
-      setMessages((prev) => [...prev, { from: 'user', type: 'text', body: `Transcripcion: "${result.transcripcion}"`, timestamp: new Date().toISOString() }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          from: 'user',
+          type: 'text',
+          body: `Transcripcion: "${result.transcripcion}"`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Error al procesar audio');
-      setMessages((prev) => [...prev, { from: 'user', type: 'text', body: '[Error al procesar audio]', timestamp: new Date().toISOString() }]);
+      setMessages((prev) => [
+        ...prev,
+        { from: 'user', type: 'text', body: '[Error al procesar audio]', timestamp: new Date().toISOString() },
+      ]);
     } finally {
       setSending(false);
     }
@@ -96,15 +113,15 @@ export default function WhatsAppSimulator() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-[#e5ddd5]">
         {messages.length === 0 && (
-          <p className="text-center text-gray-500 text-sm mt-8">Escribe un mensaje para simular una conversacion de WhatsApp</p>
+          <p className="text-center text-gray-500 text-sm mt-8">
+            Escribe un mensaje para simular una conversacion de WhatsApp
+          </p>
         )}
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
-                msg.from === 'user'
-                  ? 'bg-green-100 text-gray-800'
-                  : 'bg-white text-gray-800'
+                msg.from === 'user' ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800'
               }`}
             >
               {msg.type === 'image' && msg.imageUrl ? (
@@ -131,13 +148,7 @@ export default function WhatsAppSimulator() {
 
       {/* Input */}
       <div className="p-2 bg-gray-100 flex gap-2">
-        <input
-          ref={audioInputRef}
-          type="file"
-          accept="audio/*"
-          className="hidden"
-          onChange={handleAudioUpload}
-        />
+        <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={handleAudioUpload} />
         <button
           onClick={() => audioInputRef.current?.click()}
           disabled={sending}

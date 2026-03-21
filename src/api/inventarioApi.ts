@@ -10,7 +10,11 @@ export async function getInventario(habitacion?: string, mes?: number, anio?: nu
   return apiFetch<Inventario[]>(`/inventario${q ? `?${q}` : ''}`);
 }
 
-export async function checkDisponibilidad(fechaEntrada: string, fechaSalida: string, habitacion?: string): Promise<DisponibilidadResult[]> {
+export async function checkDisponibilidad(
+  fechaEntrada: string,
+  fechaSalida: string,
+  habitacion?: string,
+): Promise<DisponibilidadResult[]> {
   const params = new URLSearchParams({ fechaEntrada, fechaSalida });
   if (habitacion) params.set('habitacion', habitacion);
   return apiFetch<DisponibilidadResult[]>(`/inventario/disponibilidad?${params}`);

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Virtuoso } from 'react-virtuoso';
 import { Search, X, Calendar, Trash2 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useConversaciones } from '../../hooks/useConversaciones';
@@ -17,15 +19,16 @@ interface ChatListProps {
   onSelect: (conv: Conversacion) => void;
 }
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'Todas' },
-  { key: 'espera_humano', label: 'En espera' },
-  { key: 'humano_activo', label: 'Mis chats' },
-  { key: 'bot', label: 'Bot' },
-  { key: 'cerrado', label: 'Cerradas' },
+const FILTER_KEYS: { key: Filter; i18nKey: string }[] = [
+  { key: 'all', i18nKey: 'chat.filterAll' },
+  { key: 'espera_humano', i18nKey: 'chat.filterWaiting' },
+  { key: 'humano_activo', i18nKey: 'chat.filterMyChats' },
+  { key: 'bot', i18nKey: 'chat.filterBot' },
+  { key: 'cerrado', i18nKey: 'chat.filterClosed' },
 ];
 
 export default function ChatList({ selectedId, onSelect }: ChatListProps) {
+  const { t } = useTranslation();
   const { markAsRead, isUnread } = useUnread();
   const [filter, setFilter] = useState<Filter>('all');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -44,14 +47,14 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
   const deleteMutation = useMutation({
     mutationFn: (ids: string[]) => deleteConversaciones(ids),
     onSuccess: (data) => {
-      notify.success(`${data.deletedCount} conversacion${data.deletedCount === 1 ? '' : 'es'} eliminada${data.deletedCount === 1 ? '' : 's'}`);
+      notify.success(t('chat.deletedCount', { count: data.deletedCount }));
       queryClient.invalidateQueries({ queryKey: ['conversaciones'] });
       setShowDeleteConfirm(false);
       setSelectMode(false);
       setSelectedIds(new Set());
     },
     onError: () => {
-      notify.error('Error al eliminar conversaciones');
+      notify.error(t('chat.errorDeleteConversations'));
     },
   });
 
@@ -116,7 +119,7 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
     <div className="flex flex-col h-full">
       {/* Filters */}
       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex gap-1 flex-wrap">
-        {FILTERS.map((f) => (
+        {FILTER_KEYS.map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
@@ -127,7 +130,7 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
-            {f.label}
+            {t(f.i18nKey)}
           </button>
         ))}
       </div>
@@ -142,22 +145,21 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
             className="accent-red-600"
           />
           <span className="text-xs text-gray-700 dark:text-gray-300 flex-1">
-            {selectedIds.size > 0
-              ? `${selectedIds.size} seleccionada${selectedIds.size === 1 ? '' : 's'}`
-              : 'Seleccionar conversaciones'}
+            {selectedIds.size > 0 ? t('chat.selected', { count: selectedIds.size }) : t('chat.cancelSelection')}
           </span>
           <button
             onClick={handleDelete}
             disabled={selectedIds.size === 0 || deleteMutation.isPending}
-            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 py-1 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+            {deleteMutation.isPending ? t('chat.deleting') : t('common.delete')}
           </button>
           <button
             onClick={handleCancelSelect}
-            className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
+            className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
+            aria-label={t('chat.cancelSelection')}
           >
-            Cancelar
+            {t('common.cancel')}
           </button>
         </div>
       )}
@@ -170,13 +172,14 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors flex-1"
           >
             <Search size={14} />
-            Buscar en conversaciones
+            {t('chat.searchInConversation')}
           </button>
           {!selectMode && (
             <button
               onClick={() => setSelectMode(true)}
               className="px-3 py-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors"
-              title="Seleccionar para eliminar"
+              title={t('chat.selectTooltip')}
+              aria-label={t('chat.deleteSelected')}
             >
               <Trash2 size={14} />
             </button>
@@ -190,11 +193,15 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
               type="text"
               value={searchText}
               onChange={(e) => handleTextChange(e.target.value)}
-              placeholder="Buscar texto (min 2 chars)..."
-              className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400"
+              placeholder={t('chat.searchPlaceholder')}
+              className="flex-1 text-sm border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:border-blue-400"
               autoFocus
             />
-            <button onClick={handleCloseSearch} className="text-gray-400 hover:text-gray-600" title="Cerrar busqueda">
+            <button
+              onClick={handleCloseSearch}
+              className="text-gray-400 hover:text-gray-600"
+              title={t('chat.closeSearch')}
+            >
               <X size={16} />
             </button>
           </div>
@@ -204,55 +211,64 @@ export default function ChatList({ selectedId, onSelect }: ChatListProps) {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
+              className="border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
             />
             <span className="text-gray-400">a</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
+              className="border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
             />
           </div>
           {hasActiveSearch && (
             <p className="text-xs text-gray-500">
               {isLoading
-                ? 'Buscando...'
+                ? t('chat.searching')
                 : conversaciones?.length === 0
-                  ? 'Sin resultados'
-                  : `${conversaciones?.length} conversacion${conversaciones?.length === 1 ? '' : 'es'} encontrada${conversaciones?.length === 1 ? '' : 's'}`}
+                  ? t('chat.noResults')
+                  : t('chat.conversationFound', { count: conversaciones?.length ?? 0 })}
             </p>
           )}
         </div>
       )}
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
-        {isLoading && <p className="p-4 text-sm text-gray-500 dark:text-gray-400">Cargando...</p>}
+      <div className="flex-1">
+        {isLoading && <p className="p-4 text-sm text-gray-500 dark:text-gray-400">{t('common.loading')}</p>}
         {!isLoading && conversaciones?.length === 0 && (
           <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-            {isSearchActive ? 'No hay conversaciones que coincidan' : 'No hay conversaciones'}
+            {isSearchActive ? t('chat.noMatching') : t('chat.noConversations')}
           </p>
         )}
-        {conversaciones?.map((conv) => (
-          <ChatListItem
-            key={conv.id}
-            conversacion={conv}
-            selected={conv.id === selectedId}
-            unread={isUnread(conv.id, conv.ultimoMensajeEn)}
-            onClick={() => { markAsRead(conv.id); onSelect(conv); }}
-            selectMode={selectMode}
-            isChecked={selectedIds.has(conv.id)}
-            onToggleSelect={() => handleToggleSelect(conv.id)}
+        {!isLoading && conversaciones && conversaciones.length > 0 && (
+          <Virtuoso
+            style={{ height: '100%' }}
+            data={conversaciones}
+            itemContent={(_index, conv) => (
+              <ChatListItem
+                key={conv.id}
+                conversacion={conv}
+                selected={conv.id === selectedId}
+                unread={isUnread(conv.id, conv.ultimoMensajeEn)}
+                onClick={() => {
+                  markAsRead(conv.id);
+                  onSelect(conv);
+                }}
+                selectMode={selectMode}
+                isChecked={selectedIds.has(conv.id)}
+                onToggleSelect={() => handleToggleSelect(conv.id)}
+              />
+            )}
           />
-        ))}
+        )}
       </div>
 
       <ConfirmDialog
         open={showDeleteConfirm}
-        title="Eliminar conversaciones"
-        message={`Se eliminaran ${selectedIds.size} conversacion${selectedIds.size === 1 ? '' : 'es'} y todos sus mensajes. Las reservas asociadas no se eliminan. Esta accion no se puede deshacer.`}
-        confirmLabel="Eliminar"
+        title={t('chat.deleteConversations')}
+        message={t('chat.deleteConversationsMessage', { count: selectedIds.size })}
+        confirmLabel={t('common.delete')}
         variant="danger"
         loading={deleteMutation.isPending}
         onConfirm={() => deleteMutation.mutate([...selectedIds])}

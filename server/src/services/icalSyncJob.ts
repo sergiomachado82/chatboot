@@ -1,10 +1,10 @@
 import { prisma } from '../lib/prisma.js';
 import { logger } from '../utils/logger.js';
 import { syncFromIcalFeed } from './icalService.js';
+import { createQueue } from '../lib/queue.js';
+import type Bull from 'bull';
 
-const SYNC_INTERVAL_MS = 30 * 60 * 1000; // Every 30 minutes
-
-let intervalId: ReturnType<typeof setInterval> | null = null;
+let queue: Bull.Queue | null = null;
 
 /**
  * Iterate all active iCal feeds and sync each one.
@@ -40,26 +40,17 @@ async function runSync(): Promise<void> {
 }
 
 export function startIcalSyncJob() {
-  // Run once on startup (delayed 10s to let server finish init)
-  setTimeout(() => {
-    runSync().catch((err) => {
-      logger.error({ err }, 'Error in iCal sync job');
-    });
-  }, 10_000);
+  queue = createQueue('ical-sync');
 
-  // Then run periodically
-  intervalId = setInterval(() => {
-    runSync().catch((err) => {
-      logger.error({ err }, 'Error in iCal sync job');
-    });
-  }, SYNC_INTERVAL_MS);
+  queue.process(async () => {
+    await runSync();
+  });
 
-  logger.info(`iCal sync job started (every ${SYNC_INTERVAL_MS / 1000 / 60} min)`);
+  queue.add({}, { delay: 10_000, repeat: { every: 1_800_000 } }); // 30 min
+
+  logger.info('iCal sync job started (Bull queue, every 30 min)');
 }
 
 export function stopIcalSyncJob() {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
-  }
+  queue = null;
 }

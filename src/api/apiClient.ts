@@ -1,6 +1,11 @@
 const API_BASE = '/api';
 const API_TIMEOUT_MS = 15_000;
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('token');
   const headers: Record<string, string> = {
@@ -10,6 +15,11 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const csrf = getCsrfToken();
+  if (csrf) {
+    headers['X-CSRF-Token'] = csrf;
   }
 
   const controller = new AbortController();

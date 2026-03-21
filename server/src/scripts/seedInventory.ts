@@ -37,9 +37,12 @@ function getSeason(date: Date): 'baja' | 'media' | 'alta' {
 function getPrecio(dept: Departamento, date: Date): number {
   const season = getSeason(date);
   switch (season) {
-    case 'alta': return dept.precioAlta;
-    case 'media': return dept.precioMedia;
-    case 'baja': return dept.precioBaja;
+    case 'alta':
+      return dept.precioAlta;
+    case 'media':
+      return dept.precioMedia;
+    case 'baja':
+      return dept.precioBaja;
   }
 }
 

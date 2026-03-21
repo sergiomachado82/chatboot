@@ -5,6 +5,7 @@ import { loginRateLimiter } from '../middleware/rateLimiter.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { z } from 'zod';
+import { passwordSchema } from '../utils/passwordPolicy.js';
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.post('/auth/forgot-password', loginRateLimiter, async (req, res) => {
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  password: passwordSchema,
 });
 
 router.post('/auth/reset-password', async (req, res) => {

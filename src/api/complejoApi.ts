@@ -54,14 +54,21 @@ export async function getTarifasEspeciales(complejoId: string): Promise<TarifaEs
   return apiFetch<TarifaEspecial[]>(`/complejos/${complejoId}/tarifas-especiales`);
 }
 
-export async function createTarifaEspecial(complejoId: string, data: CrearTarifaEspecialRequest): Promise<TarifaEspecial> {
+export async function createTarifaEspecial(
+  complejoId: string,
+  data: CrearTarifaEspecialRequest,
+): Promise<TarifaEspecial> {
   return apiFetch<TarifaEspecial>(`/complejos/${complejoId}/tarifas-especiales`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
 
-export async function updateTarifaEspecialApi(complejoId: string, teId: string, data: UpdateTarifaEspecialRequest): Promise<TarifaEspecial> {
+export async function updateTarifaEspecialApi(
+  complejoId: string,
+  teId: string,
+  data: UpdateTarifaEspecialRequest,
+): Promise<TarifaEspecial> {
   return apiFetch<TarifaEspecial>(`/complejos/${complejoId}/tarifas-especiales/${teId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),

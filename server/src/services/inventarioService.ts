@@ -17,6 +17,12 @@ function toLocalMidnight(d: Date): Date {
   return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
+/**
+ * Generates an array of dates from start (inclusive) to end (exclusive), one per calendar day.
+ * @param start - The start date of the range
+ * @param end - The end date of the range (exclusive)
+ * @returns An array of Date objects representing each day in the range
+ */
 export function dateRange(start: Date, end: Date): Date[] {
   const dates: Date[] = [];
   const current = toLocalMidnight(start);
@@ -48,7 +54,7 @@ async function countOccupiedUnits(
   habitacion: string,
   date: Date,
   cantidadUnidades: number,
-  excludeBloqueoId?: string
+  excludeBloqueoId?: string,
 ): Promise<{ reservas: number; bloqueadas: number; total: number }> {
   const reservas = await prisma.reserva.count({
     where: {
@@ -78,14 +84,12 @@ async function countOccupiedUnits(
 }
 
 /**
- * Recalculate `disponible` in Inventario for a habitacion on given dates.
- * disponible = (reservas + bloqueadas) < cantidadUnidades
+ * Recalculates the availability flag in the inventory for a room on the given dates based on reservation and block counts.
+ * @param habitacion - The room/department name
+ * @param dates - The array of dates to recalculate availability for
+ * @param excludeBloqueoId - Optional block ID to exclude from the occupied count
  */
-export async function recalcDisponible(
-  habitacion: string,
-  dates: Date[],
-  excludeBloqueoId?: string
-) {
+export async function recalcDisponible(habitacion: string, dates: Date[], excludeBloqueoId?: string) {
   if (dates.length === 0) return;
   const cantidadUnidades = await getCantidadUnidades(habitacion);
 
@@ -99,10 +103,17 @@ export async function recalcDisponible(
   }
 }
 
+/**
+ * Checks room availability for a date range, returning pricing details for each available room.
+ * @param fechaEntrada - The check-in date
+ * @param fechaSalida - The check-out date
+ * @param habitacion - Optional specific room name to check; if omitted, checks all active rooms
+ * @returns An array of availability results with per-night and total pricing for each available room
+ */
 export async function checkAvailability(
   fechaEntrada: Date,
   fechaSalida: Date,
-  habitacion?: string
+  habitacion?: string,
 ): Promise<DisponibilidadResult[]> {
   const habitaciones = habitacion ? [habitacion] : await getActiveHabitaciones();
   const results: DisponibilidadResult[] = [];
@@ -151,6 +162,12 @@ export async function checkAvailability(
   return results;
 }
 
+/**
+ * Returns the names of all departments that are fully occupied for any day within the given date range.
+ * @param fechaEntrada - The start date of the range
+ * @param fechaSalida - The end date of the range
+ * @returns An array of department names that have no available units on at least one day
+ */
 export async function getOccupiedDepartments(fechaEntrada: Date, fechaSalida: Date): Promise<string[]> {
   const occupied: string[] = [];
   const dates = dateRange(fechaEntrada, fechaSalida);
@@ -174,18 +191,37 @@ export async function getOccupiedDepartments(fechaEntrada: Date, fechaSalida: Da
   return occupied;
 }
 
+/**
+ * Blocks inventory dates for a room by recalculating availability across the given date range.
+ * @param habitacion - The room/department name
+ * @param fechaEntrada - The start date to block
+ * @param fechaSalida - The end date to block (exclusive)
+ */
 export async function blockDates(habitacion: string, fechaEntrada: Date, fechaSalida: Date) {
   const dates = dateRange(fechaEntrada, fechaSalida);
   if (dates.length === 0) return;
   await recalcDisponible(habitacion, dates);
 }
 
+/**
+ * Releases previously blocked inventory dates for a room by recalculating availability.
+ * @param habitacion - The room/department name
+ * @param fechaEntrada - The start date to release
+ * @param fechaSalida - The end date to release (exclusive)
+ */
 export async function releaseDates(habitacion: string, fechaEntrada: Date, fechaSalida: Date) {
   const dates = dateRange(fechaEntrada, fechaSalida);
   if (dates.length === 0) return;
   await recalcDisponible(habitacion, dates);
 }
 
+/**
+ * Retrieves inventory records for a given month and optional room, ordered by room and date.
+ * @param habitacion - Optional room name to filter by
+ * @param mes - The month number (0-indexed); defaults to the current month
+ * @param anio - The year; defaults to the current year
+ * @returns An array of inventory records for the specified period
+ */
 export async function getInventario(habitacion?: string, mes?: number, anio?: number) {
   const now = new Date();
   const year = anio ?? now.getFullYear();
@@ -203,15 +239,31 @@ export async function getInventario(habitacion?: string, mes?: number, anio?: nu
   });
 }
 
-export async function updateInventarioEntry(id: string, data: { disponible?: boolean; precio?: number; notas?: string }) {
+/**
+ * Updates a single inventory entry's availability, price, or notes.
+ * @param id - The inventory entry ID
+ * @param data - The fields to update (disponible, precio, notas)
+ * @returns The updated inventory record
+ */
+export async function updateInventarioEntry(
+  id: string,
+  data: { disponible?: boolean; precio?: number; notas?: string },
+) {
   return prisma.inventario.update({ where: { id }, data });
 }
 
+/**
+ * Releases blocked dates by recalculating availability, optionally excluding a specific block.
+ * @param habitacion - The room/department name
+ * @param fechaInicio - The start date of the range to release
+ * @param fechaFin - The end date of the range to release (exclusive)
+ * @param excludeBloqueoId - Optional block ID to exclude from the occupied count during recalculation
+ */
 export async function releaseDatesIfNotReserved(
   habitacion: string,
   fechaInicio: Date,
   fechaFin: Date,
-  excludeBloqueoId?: string
+  excludeBloqueoId?: string,
 ) {
   const dates = dateRange(fechaInicio, fechaFin);
   await recalcDisponible(habitacion, dates, excludeBloqueoId);

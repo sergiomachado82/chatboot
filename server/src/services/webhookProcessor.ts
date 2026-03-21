@@ -105,7 +105,9 @@ export async function processIncomingMessage(message: WhatsAppMessage, contactNa
         origen: 'sistema',
         contenido: 'Conversacion escalada: el huesped envio una imagen.',
       });
-      sendWhatsAppMessage(from, 'Recibimos tu imagen. Un agente la va a revisar y te contacta en breve.').catch(() => {});
+      sendWhatsAppMessage(from, 'Recibimos tu imagen. Un agente la va a revisar y te contacta en breve.').catch(
+        () => {},
+      );
     }
     return;
   } else {
@@ -137,7 +139,9 @@ export async function processIncomingMessage(message: WhatsAppMessage, contactNa
   // No auto-response needed
 }
 
-export function parseMetaWebhookPayload(body: Record<string, unknown>): { messages: WhatsAppMessage[]; contactName?: string } | null {
+export function parseMetaWebhookPayload(
+  body: Record<string, unknown>,
+): { messages: WhatsAppMessage[]; contactName?: string } | null {
   try {
     const entry = (body.entry as Array<Record<string, unknown>>)?.[0];
     const changes = (entry?.changes as Array<Record<string, unknown>>)?.[0];

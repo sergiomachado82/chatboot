@@ -11,7 +11,7 @@ function getAuth() {
     env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     undefined,
     env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    ['https://www.googleapis.com/auth/spreadsheets']
+    ['https://www.googleapis.com/auth/spreadsheets'],
   );
 }
 
@@ -95,7 +95,23 @@ export async function syncReservaToSheet(reserva: ReservaRow): Promise<void> {
             range: 'Reservas!A:M',
             valueInputOption: 'RAW',
             requestBody: {
-              values: [['ID', 'Huesped', 'WhatsApp', 'Telefono', 'Habitacion', 'Entrada', 'Salida', 'Personas', 'Total', 'Estado', 'Notas', 'Creada', 'Actualizada']],
+              values: [
+                [
+                  'ID',
+                  'Huesped',
+                  'WhatsApp',
+                  'Telefono',
+                  'Habitacion',
+                  'Entrada',
+                  'Salida',
+                  'Personas',
+                  'Total',
+                  'Estado',
+                  'Notas',
+                  'Creada',
+                  'Actualizada',
+                ],
+              ],
             },
           });
         }

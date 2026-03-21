@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma.js';
 import { z } from 'zod';
+import { passwordSchema } from '../utils/passwordPolicy.js';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.get('/agentes', async (_req, res) => {
 const createSchema = z.object({
   nombre: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: passwordSchema,
   rol: z.enum(['admin', 'agente']).default('agente'),
 });
 

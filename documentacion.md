@@ -33,14 +33,14 @@ Sistema de chatbot para alojamiento turistico que automatiza la atencion al hues
 
 **Stack tecnologico:**
 
-| Capa | Tecnologia |
-|------|-----------|
-| Frontend | React 19, TypeScript 5.7, Vite 6, TailwindCSS 4, TanStack Query 5 |
-| Backend | Express 5, TypeScript, Prisma 6, Pino, Zod |
-| Base de datos | PostgreSQL 16 |
-| Cache/Colas | Redis 7, Bull (preparado, no activo aun) |
-| Tiempo real | Socket.io 4 |
-| IA | Claude API (Haiku para clasificacion/audio, Sonnet para respuestas) |
+| Capa          | Tecnologia                                                                                                       |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Frontend      | React 19, TypeScript 5.7, Vite 6, TailwindCSS 4, TanStack Query 5                                                |
+| Backend       | Express 5, TypeScript, Prisma 6, Pino, Zod                                                                       |
+| Base de datos | PostgreSQL 16                                                                                                    |
+| Cache/Colas   | Redis 7, Bull (preparado, no activo aun)                                                                         |
+| Tiempo real   | Socket.io 4                                                                                                      |
+| IA            | Claude API (Haiku para clasificacion/audio, Sonnet para respuestas)                                              |
 | Integraciones | WhatsApp Cloud API (Meta), Google Sheets API, Google Calendar API, iCal multi-plataforma (Booking, Airbnb, VRBO) |
 
 ---
@@ -396,6 +396,7 @@ Peticion HTTP
 **Conversacion** (`conversaciones`): Hilo de chat entre huesped y sistema. Tiene un estado (`ConversacionEstado`) y opcionalmente un agente asignado. Relacion 1:N con mensajes y reservas.
 
 **Mensaje** (`mensajes`): Mensaje individual dentro de una conversacion. Campos clave:
+
 - `tipo`: text, image, audio, document, location, template, system
 - `direccion`: entrante (del huesped) o saliente (del sistema)
 - `origen`: huesped, bot, agente, sistema
@@ -404,6 +405,7 @@ Peticion HTTP
 - Indice compuesto en `[conversacionId, creadoEn]` para consultas eficientes
 
 **Reserva** (`reservas`): Reserva de alojamiento. Campos principales:
+
 - `huespedId` (nullable — puede ser manual), `conversacionId` (nullable)
 - `nombreHuesped`, `telefonoHuesped`, `dni` (datos del huesped, recolectados por el bot o ingresados manualmente)
 - `fechaEntrada`, `fechaSalida`, `numHuespedes`, `habitacion`
@@ -433,12 +435,12 @@ Peticion HTTP
     └──────────────► [cerrado] ◄──────────────┘
 ```
 
-| Estado | Descripcion | Quien responde |
-|--------|-------------|----------------|
-| `bot` | El bot maneja la conversacion | Bot (Claude API) |
+| Estado          | Descripcion                                   | Quien responde    |
+| --------------- | --------------------------------------------- | ----------------- |
+| `bot`           | El bot maneja la conversacion                 | Bot (Claude API)  |
 | `espera_humano` | Huesped solicito agente o se escalo por queja | Nadie (en espera) |
-| `humano_activo` | Un agente tomo el control | Agente humano |
-| `cerrado` | Conversacion finalizada | Nadie |
+| `humano_activo` | Un agente tomo el control                     | Agente humano     |
+| `cerrado`       | Conversacion finalizada                       | Nadie             |
 
 **ReservaEstado**:
 
@@ -448,20 +450,20 @@ Peticion HTTP
       └──► [cancelada] ◄┘
 ```
 
-| Estado | Descripcion |
-|--------|-------------|
+| Estado        | Descripcion                                                                  |
+| ------------- | ---------------------------------------------------------------------------- |
 | `pre_reserva` | Creada por el bot o manualmente, pendiente de confirmacion por agente humano |
-| `confirmada` | Confirmada por agente humano tras validar pago y enviar factura |
-| `cancelada` | Cancelada (libera fechas en inventario automaticamente) |
-| `completada` | Estancia finalizada |
+| `confirmada`  | Confirmada por agente humano tras validar pago y enviar factura              |
+| `cancelada`   | Cancelada (libera fechas en inventario automaticamente)                      |
+| `completada`  | Estancia finalizada                                                          |
 
 **Temporadas** (definidas en `inventarioSyncService.ts`):
 
-| Temporada | Meses |
-|-----------|-------|
-| Alta | 15 dic - 31 dic, Enero, Febrero |
-| Media | Julio, 1 dic - 14 dic |
-| Baja | Marzo - Junio, Agosto - Noviembre |
+| Temporada | Meses                             |
+| --------- | --------------------------------- |
+| Alta      | 15 dic - 31 dic, Enero, Febrero   |
+| Media     | Julio, 1 dic - 14 dic             |
+| Baja      | Marzo - Junio, Agosto - Noviembre |
 
 ---
 
@@ -469,18 +471,18 @@ Peticion HTTP
 
 ### 4.1 Rutas Publicas (sin autenticacion)
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/health` | Estado del servicio, uptime, conectividad DB y Redis |
-| `POST` | `/api/auth/login` | Autenticacion de agentes |
-| `POST` | `/api/auth/forgot-password` | Solicitar email de recuperacion de contrasena |
-| `POST` | `/api/auth/reset-password` | Resetear contrasena con token |
-| `GET` | `/api/webhook` | Verificacion de webhook de Meta |
-| `POST` | `/api/webhook` | Recepcion de mensajes de WhatsApp |
-| `POST` | `/api/simulator/send` | Enviar mensaje simulado (solo en `SIMULATOR_MODE`) |
+| Metodo | Ruta                        | Descripcion                                                                                   |
+| ------ | --------------------------- | --------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/health`               | Estado del servicio, uptime, conectividad DB y Redis                                          |
+| `POST` | `/api/auth/login`           | Autenticacion de agentes                                                                      |
+| `POST` | `/api/auth/forgot-password` | Solicitar email de recuperacion de contrasena                                                 |
+| `POST` | `/api/auth/reset-password`  | Resetear contrasena con token                                                                 |
+| `GET`  | `/api/webhook`              | Verificacion de webhook de Meta                                                               |
+| `POST` | `/api/webhook`              | Recepcion de mensajes de WhatsApp                                                             |
+| `POST` | `/api/simulator/send`       | Enviar mensaje simulado (solo en `SIMULATOR_MODE`)                                            |
 | `POST` | `/api/simulator/send-audio` | Enviar audio simulado — transcribe con Claude y procesa como texto (solo en `SIMULATOR_MODE`) |
-| `GET` | `/api/ical/:complejoId.ics` | Export calendario iCal (Booking.com lee esta URL para ver disponibilidad) |
-| `POST` | `/api/webchat/send` | Envia mensaje al bot desde la landing page y recibe respuesta JSON |
+| `GET`  | `/api/ical/:complejoId.ics` | Export calendario iCal (Booking.com lee esta URL para ver disponibilidad)                     |
+| `POST` | `/api/webchat/send`         | Envia mensaje al bot desde la landing page y recibe respuesta JSON                            |
 
 #### POST /api/auth/login
 
@@ -556,52 +558,52 @@ Peticion HTTP
 
 #### Conversaciones
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/conversaciones?estado=` | Listar conversaciones (filtro opcional) |
-| `GET` | `/api/conversaciones/:id` | Detalle de conversacion |
-| `GET` | `/api/conversaciones/:id/mensajes?limit=50&before=` | Mensajes de una conversacion |
-| `POST` | `/api/conversaciones/:id/tomar-control` | Agente toma el control → `humano_activo` |
-| `POST` | `/api/conversaciones/:id/devolver-bot` | Devuelve al bot → `bot` |
-| `POST` | `/api/conversaciones/:id/cerrar` | Cierra la conversacion → `cerrado` |
-| `POST` | `/api/conversaciones/:id/mensajes` | Agente envia mensaje al huesped |
+| Metodo | Ruta                                                | Descripcion                              |
+| ------ | --------------------------------------------------- | ---------------------------------------- |
+| `GET`  | `/api/conversaciones?estado=`                       | Listar conversaciones (filtro opcional)  |
+| `GET`  | `/api/conversaciones/:id`                           | Detalle de conversacion                  |
+| `GET`  | `/api/conversaciones/:id/mensajes?limit=50&before=` | Mensajes de una conversacion             |
+| `POST` | `/api/conversaciones/:id/tomar-control`             | Agente toma el control → `humano_activo` |
+| `POST` | `/api/conversaciones/:id/devolver-bot`              | Devuelve al bot → `bot`                  |
+| `POST` | `/api/conversaciones/:id/cerrar`                    | Cierra la conversacion → `cerrado`       |
+| `POST` | `/api/conversaciones/:id/mensajes`                  | Agente envia mensaje al huesped          |
 
 #### Complejos
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/complejos` | Listar todos (incluye tarifas, tarifas especiales, media, bloqueos) |
-| `GET` | `/api/complejos/:id` | Detalle con relaciones completas |
-| `POST` | `/api/complejos` | Crear complejo (validacion Zod) |
-| `PATCH` | `/api/complejos/:id` | Actualizar complejo |
-| `DELETE` | `/api/complejos/:id` | Soft delete (activo=false) |
-| `PUT` | `/api/complejos/:id/tarifas` | Upsert tarifa estacional |
-| `GET` | `/api/complejos/:id/tarifas-especiales` | Listar tarifas especiales |
-| `POST` | `/api/complejos/:id/tarifas-especiales` | Crear tarifa especial (auto-sync a Inventario) |
-| `PATCH` | `/api/complejos/:id/tarifas-especiales/:teId` | Actualizar tarifa especial (re-sync) |
-| `DELETE` | `/api/complejos/:id/tarifas-especiales/:teId` | Eliminar (restaura precios estacionales) |
-| `GET` | `/api/complejos/:id/bloqueos` | Listar bloqueos de disponibilidad |
-| `POST` | `/api/complejos/:id/bloqueos` | Crear bloqueo (marca fechas no disponibles) |
-| `DELETE` | `/api/complejos/:id/bloqueos/:bloqueoId` | Eliminar bloqueo (libera fechas si es seguro) |
-| `GET` | `/api/complejos/:id/ical-feeds` | Listar feeds iCal del complejo |
-| `POST` | `/api/complejos/:id/ical-feeds` | Crear feed iCal (plataforma, url, etiqueta) |
-| `DELETE` | `/api/complejos/:id/ical-feeds/:feedId` | Eliminar feed iCal |
-| `POST` | `/api/complejos/:id/media` | Agregar archivo multimedia |
-| `DELETE` | `/api/complejos/:id/media/:mediaId` | Eliminar archivo multimedia |
-| `PATCH` | `/api/complejos/:id/media/orden` | Reordenar archivos multimedia |
+| Metodo   | Ruta                                          | Descripcion                                                         |
+| -------- | --------------------------------------------- | ------------------------------------------------------------------- |
+| `GET`    | `/api/complejos`                              | Listar todos (incluye tarifas, tarifas especiales, media, bloqueos) |
+| `GET`    | `/api/complejos/:id`                          | Detalle con relaciones completas                                    |
+| `POST`   | `/api/complejos`                              | Crear complejo (validacion Zod)                                     |
+| `PATCH`  | `/api/complejos/:id`                          | Actualizar complejo                                                 |
+| `DELETE` | `/api/complejos/:id`                          | Soft delete (activo=false)                                          |
+| `PUT`    | `/api/complejos/:id/tarifas`                  | Upsert tarifa estacional                                            |
+| `GET`    | `/api/complejos/:id/tarifas-especiales`       | Listar tarifas especiales                                           |
+| `POST`   | `/api/complejos/:id/tarifas-especiales`       | Crear tarifa especial (auto-sync a Inventario)                      |
+| `PATCH`  | `/api/complejos/:id/tarifas-especiales/:teId` | Actualizar tarifa especial (re-sync)                                |
+| `DELETE` | `/api/complejos/:id/tarifas-especiales/:teId` | Eliminar (restaura precios estacionales)                            |
+| `GET`    | `/api/complejos/:id/bloqueos`                 | Listar bloqueos de disponibilidad                                   |
+| `POST`   | `/api/complejos/:id/bloqueos`                 | Crear bloqueo (marca fechas no disponibles)                         |
+| `DELETE` | `/api/complejos/:id/bloqueos/:bloqueoId`      | Eliminar bloqueo (libera fechas si es seguro)                       |
+| `GET`    | `/api/complejos/:id/ical-feeds`               | Listar feeds iCal del complejo                                      |
+| `POST`   | `/api/complejos/:id/ical-feeds`               | Crear feed iCal (plataforma, url, etiqueta)                         |
+| `DELETE` | `/api/complejos/:id/ical-feeds/:feedId`       | Eliminar feed iCal                                                  |
+| `POST`   | `/api/complejos/:id/media`                    | Agregar archivo multimedia                                          |
+| `DELETE` | `/api/complejos/:id/media/:mediaId`           | Eliminar archivo multimedia                                         |
+| `PATCH`  | `/api/complejos/:id/media/orden`              | Reordenar archivos multimedia                                       |
 
 #### Reservas
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/reservas?estado=` | Listar reservas (filtro por estado) |
-| `GET` | `/api/reservas?from=&to=` | Listar reservas por rango de fechas (para calendario) |
-| `GET` | `/api/reservas/:id` | Detalle de reserva |
-| `POST` | `/api/reservas` | Crear reserva desde bot (requiere huespedId) |
-| `POST` | `/api/reservas/manual` | Crear reserva manual (requiere nombreHuesped) |
-| `PATCH` | `/api/reservas/:id` | Actualizar reserva |
-| `PATCH` | `/api/reservas/:id/estado` | Cambiar estado de reserva |
-| `DELETE` | `/api/reservas/:id` | Eliminar reserva (recalcula inventario si tenia habitacion). Retorna 204 |
+| Metodo   | Ruta                       | Descripcion                                                              |
+| -------- | -------------------------- | ------------------------------------------------------------------------ |
+| `GET`    | `/api/reservas?estado=`    | Listar reservas (filtro por estado)                                      |
+| `GET`    | `/api/reservas?from=&to=`  | Listar reservas por rango de fechas (para calendario)                    |
+| `GET`    | `/api/reservas/:id`        | Detalle de reserva                                                       |
+| `POST`   | `/api/reservas`            | Crear reserva desde bot (requiere huespedId)                             |
+| `POST`   | `/api/reservas/manual`     | Crear reserva manual (requiere nombreHuesped)                            |
+| `PATCH`  | `/api/reservas/:id`        | Actualizar reserva                                                       |
+| `PATCH`  | `/api/reservas/:id/estado` | Cambiar estado de reserva                                                |
+| `DELETE` | `/api/reservas/:id`        | Eliminar reserva (recalcula inventario si tenia habitacion). Retorna 204 |
 
 ```json
 // POST /api/reservas/manual
@@ -626,50 +628,50 @@ Peticion HTTP
 
 #### Emails Procesados
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/emails?page=&pageSize=&respondido=&complejoId=&esFormulario=&hasError=&search=` | Listar emails procesados (paginados, con filtros) |
-| `GET` | `/api/emails/stats` | Estadisticas: emails hoy, respondidos, errores, formularios |
-| `GET` | `/api/emails/:id` | Detalle de un email procesado |
-| `DELETE` | `/api/emails/:id` | Eliminar email procesado. Retorna 204 |
+| Metodo   | Ruta                                                                                  | Descripcion                                                 |
+| -------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `GET`    | `/api/emails?page=&pageSize=&respondido=&complejoId=&esFormulario=&hasError=&search=` | Listar emails procesados (paginados, con filtros)           |
+| `GET`    | `/api/emails/stats`                                                                   | Estadisticas: emails hoy, respondidos, errores, formularios |
+| `GET`    | `/api/emails/:id`                                                                     | Detalle de un email procesado                               |
+| `DELETE` | `/api/emails/:id`                                                                     | Eliminar email procesado. Retorna 204                       |
 
 #### Inventario
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/inventario?habitacion=&mes=&anio=` | Inventario mensual |
-| `GET` | `/api/inventario/disponibilidad?fechaEntrada=&fechaSalida=&habitacion=` | Consulta disponibilidad |
-| `PUT` | `/api/inventario/:id` | Actualizar precio/disponibilidad |
+| Metodo | Ruta                                                                    | Descripcion                      |
+| ------ | ----------------------------------------------------------------------- | -------------------------------- |
+| `GET`  | `/api/inventario?habitacion=&mes=&anio=`                                | Inventario mensual               |
+| `GET`  | `/api/inventario/disponibilidad?fechaEntrada=&fechaSalida=&habitacion=` | Consulta disponibilidad          |
+| `PUT`  | `/api/inventario/:id`                                                   | Actualizar precio/disponibilidad |
 
 #### Huespedes
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/huespedes` | Listar huespedes |
-| `GET` | `/api/huespedes/:id` | Detalle (incluye reservas) |
-| `PATCH` | `/api/huespedes/:id` | Actualizar datos |
+| Metodo  | Ruta                 | Descripcion                |
+| ------- | -------------------- | -------------------------- |
+| `GET`   | `/api/huespedes`     | Listar huespedes           |
+| `GET`   | `/api/huespedes/:id` | Detalle (incluye reservas) |
+| `PATCH` | `/api/huespedes/:id` | Actualizar datos           |
 
 #### Agentes
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/agentes` | Listar agentes |
+| Metodo | Ruta           | Descripcion               |
+| ------ | -------------- | ------------------------- |
+| `GET`  | `/api/agentes` | Listar agentes            |
 | `POST` | `/api/agentes` | Crear agente (solo admin) |
 
 #### Configuracion del Bot
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/bot/config` | Obtener configuracion actual del bot (auto-create con defaults) |
-| `PATCH` | `/api/bot/config` | Actualizar configuracion parcialmente (Zod validation) |
-| `POST` | `/api/bot/logo` | Subir logo del bot (base64 en body, max 500KB) |
-| `DELETE` | `/api/bot/logo` | Eliminar logo del bot |
+| Metodo   | Ruta              | Descripcion                                                     |
+| -------- | ----------------- | --------------------------------------------------------------- |
+| `GET`    | `/api/bot/config` | Obtener configuracion actual del bot (auto-create con defaults) |
+| `PATCH`  | `/api/bot/config` | Actualizar configuracion parcialmente (Zod validation)          |
+| `POST`   | `/api/bot/logo`   | Subir logo del bot (base64 en body, max 500KB)                  |
+| `DELETE` | `/api/bot/logo`   | Eliminar logo del bot                                           |
 
 #### Perfil WhatsApp Business
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/whatsapp/profile` | Obtener perfil del negocio (about, description, address, email, websites, vertical) |
+| Metodo  | Ruta                    | Descripcion                                                                                  |
+| ------- | ----------------------- | -------------------------------------------------------------------------------------------- |
+| `GET`   | `/api/whatsapp/profile` | Obtener perfil del negocio (about, description, address, email, websites, vertical)          |
 | `PATCH` | `/api/whatsapp/profile` | Actualizar perfil (Zod: about max 139, description max 512, address max 256, websites max 2) |
 
 ---
@@ -688,22 +690,22 @@ El servidor valida el token en el middleware de Socket.io y rechaza conexiones s
 
 ### 5.2 Eventos Server → Client
 
-| Evento | Payload | Descripcion |
-|--------|---------|-------------|
-| `mensaje:nuevo` | `Mensaje` | Nuevo mensaje en una conversacion |
-| `conversacion:actualizada` | `Conversacion` | Cambio de estado, agente asignado, etc. |
-| `conversacion:nueva` | `Conversacion` | Nueva conversacion creada |
-| `agente:online` | `agenteId: string` | Agente se conecto (definido en types, no implementado aun) |
-| `agente:offline` | `agenteId: string` | Agente se desconecto (definido en types, no implementado aun) |
-| `simulator:mensaje` | `{ from, type, body, timestamp, imageUrl? }` | Respuesta del bot (solo simulador). `type` es `"text"` o `"image"` |
+| Evento                     | Payload                                      | Descripcion                                                        |
+| -------------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| `mensaje:nuevo`            | `Mensaje`                                    | Nuevo mensaje en una conversacion                                  |
+| `conversacion:actualizada` | `Conversacion`                               | Cambio de estado, agente asignado, etc.                            |
+| `conversacion:nueva`       | `Conversacion`                               | Nueva conversacion creada                                          |
+| `agente:online`            | `agenteId: string`                           | Agente se conecto (definido en types, no implementado aun)         |
+| `agente:offline`           | `agenteId: string`                           | Agente se desconecto (definido en types, no implementado aun)      |
+| `simulator:mensaje`        | `{ from, type, body, timestamp, imageUrl? }` | Respuesta del bot (solo simulador). `type` es `"text"` o `"image"` |
 
 ### 5.3 Eventos Client → Server
 
-| Evento | Payload | Descripcion |
-|--------|---------|-------------|
-| `join:conversacion` | `conversacionId: string` | Suscribirse a updates de una conversacion |
-| `leave:conversacion` | `conversacionId: string` | Desuscribirse |
-| `agente:status` | `online: boolean` | Cambiar estado de presencia (definido en types, no implementado aun) |
+| Evento               | Payload                  | Descripcion                                                          |
+| -------------------- | ------------------------ | -------------------------------------------------------------------- |
+| `join:conversacion`  | `conversacionId: string` | Suscribirse a updates de una conversacion                            |
+| `leave:conversacion` | `conversacionId: string` | Desuscribirse                                                        |
+| `agente:status`      | `online: boolean`        | Cambiar estado de presencia (definido en types, no implementado aun) |
 
 ### 5.4 Rooms
 
@@ -782,18 +784,18 @@ El bot mantiene memoria de toda la conversacion mediante `getAccumulatedEntities
 
 El sistema clasifica cada mensaje en una de 10 intenciones. Usa Claude Haiku (rapido y barato) con fallback a regex si la API key no esta configurada.
 
-| Intent | Descripcion | Accion del bot |
-|--------|-------------|----------------|
-| `saludo` | "Hola", "Buenos dias" | Bienvenida + oferta de ayuda |
-| `consulta_disponibilidad` | "Hay lugar para el 15 de marzo?" | Consulta inventario real, responde con precios |
-| `consulta_precio` | "Cuanto cuesta una noche?" | Informa tarifas por departamento y temporada |
-| `consulta_alojamiento` | "Tienen parrilla?", "Check-in?" | Responde con info del departamento |
-| `consulta_zona` | "Que hacer en la zona?" | Recomienda actividades, restaurantes |
-| `reservar` | "Quiero reservar" | Inicia flujo: pide fechas, personas, departamento |
-| `hablar_humano` | "Quiero hablar con una persona" | Escala a `espera_humano` |
-| `queja` | "Esto es inaceptable" | Auto-escala a `espera_humano` |
-| `despedida` | "Adios, gracias" | Despedida + cierra conversacion |
-| `otro` | Mensajes no clasificados | Respuesta generica amable |
+| Intent                    | Descripcion                      | Accion del bot                                    |
+| ------------------------- | -------------------------------- | ------------------------------------------------- |
+| `saludo`                  | "Hola", "Buenos dias"            | Bienvenida + oferta de ayuda                      |
+| `consulta_disponibilidad` | "Hay lugar para el 15 de marzo?" | Consulta inventario real, responde con precios    |
+| `consulta_precio`         | "Cuanto cuesta una noche?"       | Informa tarifas por departamento y temporada      |
+| `consulta_alojamiento`    | "Tienen parrilla?", "Check-in?"  | Responde con info del departamento                |
+| `consulta_zona`           | "Que hacer en la zona?"          | Recomienda actividades, restaurantes              |
+| `reservar`                | "Quiero reservar"                | Inicia flujo: pide fechas, personas, departamento |
+| `hablar_humano`           | "Quiero hablar con una persona"  | Escala a `espera_humano`                          |
+| `queja`                   | "Esto es inaceptable"            | Auto-escala a `espera_humano`                     |
+| `despedida`               | "Adios, gracias"                 | Despedida + cierra conversacion                   |
+| `otro`                    | Mensajes no clasificados         | Respuesta generica amable                         |
 
 ### 6.4 Extraccion de Entidades
 
@@ -818,6 +820,7 @@ El clasificador extrae entidades del mensaje cuando es posible:
 **Entidades validas** (`VALID_ENTITY_KEYS`): `num_personas`, `fecha_entrada`, `fecha_salida`, `habitacion`, `nombre_huesped`, `telefono`, `dni`
 
 **Reglas estrictas de extraccion:**
+
 - NUNCA inventar entidades que el usuario no dijo explicitamente
 - `num_personas`: Solo si dice explicitamente cuantas personas ("somos 3"). NUNCA confundir noches con personas
 - `fecha_entrada/fecha_salida`: Solo si menciona fechas concretas. Formato YYYY-MM-DD. Ano actual = 2026
@@ -838,6 +841,7 @@ El archivo `accommodationContext.ts` construye dinamicamente el contexto desde l
 **Cache in-memory (5 min TTL)**: Las consultas a la DB para construir el contexto se cachean en memoria durante 5 minutos. La funcion `invalidateContextCache()` borra el cache inmediatamente cuando se modifican complejos, tarifas, tarifas especiales, media o bloqueos (llamada desde `complejoService.ts`). Esto evita queries repetidos a la DB en cada mensaje del bot sin perder consistencia ante cambios del admin.
 
 **Informacion del alojamiento (Las Grutas Departamentos):**
+
 - Ubicacion: Las Grutas, Rio Negro, Patagonia Argentina
 - Departamentos: Pewmafe, Luminar Mono, Luminar 2Amb, LG (nombres configurables)
 - Cada departamento tiene: capacidad, unidades, amenities, check-in/out, politicas
@@ -845,11 +849,11 @@ El archivo `accommodationContext.ts` construye dinamicamente el contexto desde l
 
 ### 6.6 Uso de Modelos Claude
 
-| Tarea | Modelo | Max tokens | Motivo |
-|-------|--------|-----------|--------|
-| Clasificacion de intent | `claude-haiku-4-5-20251001` | 200 | Rapido, barato, suficiente para clasificacion |
-| Generacion de respuesta | `claude-sonnet-4-5-20250929` | 500 | Mas capaz para respuestas naturales y contextuales |
-| Transcripcion de audio | `claude-haiku-4-5-20251001` | 1000 | Transcripcion rapida de audios de WhatsApp |
+| Tarea                   | Modelo                       | Max tokens | Motivo                                             |
+| ----------------------- | ---------------------------- | ---------- | -------------------------------------------------- |
+| Clasificacion de intent | `claude-haiku-4-5-20251001`  | 200        | Rapido, barato, suficiente para clasificacion      |
+| Generacion de respuesta | `claude-sonnet-4-5-20250929` | 500        | Mas capaz para respuestas naturales y contextuales |
+| Transcripcion de audio  | `claude-haiku-4-5-20251001`  | 1000       | Transcripcion rapida de audios de WhatsApp         |
 
 Ambos tienen fallback local: si `ANTHROPIC_API_KEY` no esta configurada, se usan respuestas predefinidas y regex para clasificacion.
 
@@ -857,17 +861,17 @@ Ambos tienen fallback local: si `ANTHROPIC_API_KEY` no esta configurada, se usan
 
 El botEngine construye un `additionalContext` que se inyecta al prompt de Claude con informacion calculada en tiempo real:
 
-| Dato | Cuando se agrega | Ejemplo |
-|------|-----------------|---------|
-| Departamento activo | Cuando hay `habitacion` en entidades | "Responde SOLO sobre este departamento" |
-| Datos ya conocidos | Cuando hay entidades acumuladas | "Departamento: Pewmafe, Personas: 2, Nombre: Juan, Tel: 2920412345, DNI: 35123456" |
-| Analisis de capacidad | Cuando se conoce `num_personas` | "Pewmafe: APTO (4 pers/unidad), Luminar Mono: NO APTO" |
-| Datos faltantes | Cuando faltan entidades clave | "Datos que FALTAN: nombre del huesped, numero de celular, DNI" |
-| Deptos no disponibles | Cuando hay fechas y hay reservas | "Pewmafe NO DISPONIBLE para esas fechas" |
-| Disponibilidad + precios | Cuando hay fechas completas | "Luminar Mono: 5 noches, $175.000 ARS total" |
-| Estadia minima | Cuando se valida disponibilidad | "ADVERTENCIA: minimo 3 noches" o "SIN RESTRICCION" |
-| Fotos no disponibles | Si fallo el envio de fotos | "No menciones fotos, describe con palabras" |
-| Excede capacidad total | Si personas > capacidad combinada | "Sugeri contactar por telefono" |
+| Dato                     | Cuando se agrega                     | Ejemplo                                                                            |
+| ------------------------ | ------------------------------------ | ---------------------------------------------------------------------------------- |
+| Departamento activo      | Cuando hay `habitacion` en entidades | "Responde SOLO sobre este departamento"                                            |
+| Datos ya conocidos       | Cuando hay entidades acumuladas      | "Departamento: Pewmafe, Personas: 2, Nombre: Juan, Tel: 2920412345, DNI: 35123456" |
+| Analisis de capacidad    | Cuando se conoce `num_personas`      | "Pewmafe: APTO (4 pers/unidad), Luminar Mono: NO APTO"                             |
+| Datos faltantes          | Cuando faltan entidades clave        | "Datos que FALTAN: nombre del huesped, numero de celular, DNI"                     |
+| Deptos no disponibles    | Cuando hay fechas y hay reservas     | "Pewmafe NO DISPONIBLE para esas fechas"                                           |
+| Disponibilidad + precios | Cuando hay fechas completas          | "Luminar Mono: 5 noches, $175.000 ARS total"                                       |
+| Estadia minima           | Cuando se valida disponibilidad      | "ADVERTENCIA: minimo 3 noches" o "SIN RESTRICCION"                                 |
+| Fotos no disponibles     | Si fallo el envio de fotos           | "No menciones fotos, describe con palabras"                                        |
+| Excede capacidad total   | Si personas > capacidad combinada    | "Sugeri contactar por telefono"                                                    |
 
 ---
 
@@ -878,6 +882,7 @@ El botEngine construye un `additionalContext` que se inyecta al prompt de Claude
 El bot opera bajo un conjunto estricto de directivas inyectadas en el system prompt de Claude Sonnet:
 
 **Identidad y tono:**
+
 - Asistente virtual de Las Grutas Departamentos
 - Tono amable, profesional y cercano
 - Espanol de Argentina (voseo: "vos", "podes", "decile")
@@ -886,6 +891,7 @@ El bot opera bajo un conjunto estricto de directivas inyectadas en el system pro
 - Precios siempre en pesos argentinos (ARS)
 
 **Formato WhatsApp (obligatorio):**
+
 - Mensajes cortos y bien espaciados para burbujas de WhatsApp
 - Datos bancarios (CBU, alias, titular, CUIT, banco): cada dato en su propia linea, nunca en medio de un parrafo
 - Listas con saltos de linea simples (sin guiones largos)
@@ -894,18 +900,18 @@ El bot opera bajo un conjunto estricto de directivas inyectadas en el system pro
 
 ### 7.2 Reglas Estrictas del Bot
 
-| # | Regla | Detalle |
-|---|-------|---------|
-| 1 | **FOTOS** | NUNCA incluir URLs de imagenes, links a web, YouTube ni video tours en texto. Las fotos se envian automaticamente como imagenes adjuntas via `sendImage()` con caption (nombre del depto + descripcion de la imagen). Si el usuario pide fotos, responder brevemente ("Aca te muestro fotos de X") y el sistema envia las imagenes. NUNCA generar URLs de fotos en el texto |
-| 2 | **PRECIOS** | Usar EXCLUSIVAMENTE las tarifas de la tabla del contexto. NUNCA inventar ni estimar precios |
-| 3 | **CAPACIDAD** | La capacidad es POR UNIDAD (por depto individual). NUNCA sugerir un depto si personas > capacidad maxima por unidad. NUNCA ofrecer mas unidades de las que existen. Para grupos que exceden capacidad total, sugerir contactar por telefono |
-| 4 | **NO INVENTAR** | NUNCA inventar ni asumir datos que el usuario no dijo. NUNCA inventar restricciones de estadia minima que no aparezcan en el contexto adicional |
-| 5 | **INFORMACION** | Solo mencionar departamentos cuya info aparece en el contexto. NUNCA inventar datos |
-| 6 | **NO REPETIR PREGUNTAS** | Leer "DATOS YA CONOCIDOS" del contexto adicional. NUNCA volver a preguntar algo ya sabido. Solo preguntar lo que aparece en "Datos que FALTAN" |
-| 7 | **FLUJO** | Si no hay datos conocidos, preguntar progresivamente (uno a la vez): personas, fechas, departamento, nombre, celular, DNI. Si ya hay algunos, solo preguntar los faltantes. El DNI debe estar entre 5.000.000 y 99.999.999 |
-| 8 | **RESERVAS** | Ver seccion 7.3 — Flujo completo de reservas |
-| 9 | **TERMINOLOGIA** | JAMAS usar "pre-reserva", "prereserva", "reserva preliminar" ni "reserva tentativa" con el huesped (son terminos internos). Siempre usar "reserva" |
-| 10 | **DATOS BANCARIOS** | JAMAS inventar datos bancarios (CBU, alias, banco, titular, CUIT). Si el contexto adicional contiene "ADVERTENCIA DATOS BANCARIOS", NO mostrar datos de pago bajo ninguna circunstancia |
+| #   | Regla                    | Detalle                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **FOTOS**                | NUNCA incluir URLs de imagenes, links a web, YouTube ni video tours en texto. Las fotos se envian automaticamente como imagenes adjuntas via `sendImage()` con caption (nombre del depto + descripcion de la imagen). Si el usuario pide fotos, responder brevemente ("Aca te muestro fotos de X") y el sistema envia las imagenes. NUNCA generar URLs de fotos en el texto |
+| 2   | **PRECIOS**              | Usar EXCLUSIVAMENTE las tarifas de la tabla del contexto. NUNCA inventar ni estimar precios                                                                                                                                                                                                                                                                                 |
+| 3   | **CAPACIDAD**            | La capacidad es POR UNIDAD (por depto individual). NUNCA sugerir un depto si personas > capacidad maxima por unidad. NUNCA ofrecer mas unidades de las que existen. Para grupos que exceden capacidad total, sugerir contactar por telefono                                                                                                                                 |
+| 4   | **NO INVENTAR**          | NUNCA inventar ni asumir datos que el usuario no dijo. NUNCA inventar restricciones de estadia minima que no aparezcan en el contexto adicional                                                                                                                                                                                                                             |
+| 5   | **INFORMACION**          | Solo mencionar departamentos cuya info aparece en el contexto. NUNCA inventar datos                                                                                                                                                                                                                                                                                         |
+| 6   | **NO REPETIR PREGUNTAS** | Leer "DATOS YA CONOCIDOS" del contexto adicional. NUNCA volver a preguntar algo ya sabido. Solo preguntar lo que aparece en "Datos que FALTAN"                                                                                                                                                                                                                              |
+| 7   | **FLUJO**                | Si no hay datos conocidos, preguntar progresivamente (uno a la vez): personas, fechas, departamento, nombre, celular, DNI. Si ya hay algunos, solo preguntar los faltantes. El DNI debe estar entre 5.000.000 y 99.999.999                                                                                                                                                  |
+| 8   | **RESERVAS**             | Ver seccion 7.3 — Flujo completo de reservas                                                                                                                                                                                                                                                                                                                                |
+| 9   | **TERMINOLOGIA**         | JAMAS usar "pre-reserva", "prereserva", "reserva preliminar" ni "reserva tentativa" con el huesped (son terminos internos). Siempre usar "reserva"                                                                                                                                                                                                                          |
+| 10  | **DATOS BANCARIOS**      | JAMAS inventar datos bancarios (CBU, alias, banco, titular, CUIT). Si el contexto adicional contiene "ADVERTENCIA DATOS BANCARIOS", NO mostrar datos de pago bajo ninguna circunstancia                                                                                                                                                                                     |
 
 ### 7.3 Flujo Completo de Reservas (Regla 8)
 
@@ -944,15 +950,16 @@ PASO 4: Huesped envia comprobante y DNI (o reserva sin sena)
 
 El PASO 2 tiene un guardrail de seguridad en `botEngine.ts` que valida los datos bancarios antes de pasarlos a Claude:
 
-| Escenario | Condicion | Accion del bot |
-|-----------|-----------|----------------|
-| 1. Titular de confianza | Datos bancarios cargados + titular en lista de `titularesVerificados` (configurable en BotConfig) | Muestra datos bancarios normalmente |
-| 2. Sin datos bancarios | Complejo no tiene titular/CBU/banco configurados | Bot dice "un agente te va a contactar" + conversacion pasa a `espera_humano` |
-| 3. Titular desconocido | Datos bancarios cargados pero titular NO esta en whitelist | Bot NO muestra datos (riesgo de fraude) + conversacion pasa a `espera_humano` |
+| Escenario               | Condicion                                                                                         | Accion del bot                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1. Titular de confianza | Datos bancarios cargados + titular en lista de `titularesVerificados` (configurable en BotConfig) | Muestra datos bancarios normalmente                                           |
+| 2. Sin datos bancarios  | Complejo no tiene titular/CBU/banco configurados                                                  | Bot dice "un agente te va a contactar" + conversacion pasa a `espera_humano`  |
+| 3. Titular desconocido  | Datos bancarios cargados pero titular NO esta en whitelist                                        | Bot NO muestra datos (riesgo de fraude) + conversacion pasa a `espera_humano` |
 
 Si se detecta el escenario 2 o 3, Claude recibe una "ADVERTENCIA DATOS BANCARIOS" en el contexto adicional con instruccion de NUNCA mostrar datos de cuenta, y la conversacion se escala automaticamente.
 
 **Lo que hace el agente humano (fuera del bot):**
+
 1. Verifica el comprobante de pago
 2. Genera la factura digital
 3. Envia la factura al huesped por WhatsApp
@@ -960,20 +967,20 @@ Si se detecta el escenario 2 o 3, Claude recibe una "ADVERTENCIA DATOS BANCARIOS
 
 ### 7.4 Instrucciones por Intencion
 
-| Intent | Comportamiento del bot |
-|--------|----------------------|
-| `saludo` | Da la bienvenida y pregunta en que puede ayudar |
-| `consulta_disponibilidad` | Si tiene fechas completas, informa disponibilidad real del inventario. Si faltan datos, pide SOLO los que faltan |
-| `consulta_precio` | Informa precios usando la tabla de tarifas. Filtra por capacidad si se conoce num_personas |
-| `consulta_alojamiento` | Responde sobre el departamento activo o presenta opciones filtradas por capacidad |
-| `consulta_zona` | Recomienda actividades y lugares cercanos (buceo, kayak, pinguinera, etc.) |
-| `reservar` | Pide SOLO los datos que faltan (personas, fechas, depto, nombre, celular, DNI). Cuando tiene los 7 campos y el usuario confirma, se auto-crea la reserva y se guardan los datos en el huesped. Sigue el flujo de la regla 8 (NUNCA confirmar) |
-| `cancelar_reserva` | Informa al huesped que un agente gestionara la cancelacion. Escala a `espera_humano` con mensaje de sistema |
-| `cambiar_reserva` | Informa al huesped que un agente gestionara la modificacion. Escala a `espera_humano` con mensaje de sistema |
-| `hablar_humano` | Indica que un agente se pondra en contacto pronto. Escala conversacion |
-| `queja` | Pide disculpas y escala automaticamente a un agente humano |
-| `despedida` | Se despide amablemente y cierra la conversacion |
-| `otro` | Responde de forma generica y ofrece ayuda |
+| Intent                    | Comportamiento del bot                                                                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `saludo`                  | Da la bienvenida y pregunta en que puede ayudar                                                                                                                                                                                               |
+| `consulta_disponibilidad` | Si tiene fechas completas, informa disponibilidad real del inventario. Si faltan datos, pide SOLO los que faltan                                                                                                                              |
+| `consulta_precio`         | Informa precios usando la tabla de tarifas. Filtra por capacidad si se conoce num_personas                                                                                                                                                    |
+| `consulta_alojamiento`    | Responde sobre el departamento activo o presenta opciones filtradas por capacidad                                                                                                                                                             |
+| `consulta_zona`           | Recomienda actividades y lugares cercanos (buceo, kayak, pinguinera, etc.)                                                                                                                                                                    |
+| `reservar`                | Pide SOLO los datos que faltan (personas, fechas, depto, nombre, celular, DNI). Cuando tiene los 7 campos y el usuario confirma, se auto-crea la reserva y se guardan los datos en el huesped. Sigue el flujo de la regla 8 (NUNCA confirmar) |
+| `cancelar_reserva`        | Informa al huesped que un agente gestionara la cancelacion. Escala a `espera_humano` con mensaje de sistema                                                                                                                                   |
+| `cambiar_reserva`         | Informa al huesped que un agente gestionara la modificacion. Escala a `espera_humano` con mensaje de sistema                                                                                                                                  |
+| `hablar_humano`           | Indica que un agente se pondra en contacto pronto. Escala conversacion                                                                                                                                                                        |
+| `queja`                   | Pide disculpas y escala automaticamente a un agente humano                                                                                                                                                                                    |
+| `despedida`               | Se despide amablemente y cierra la conversacion                                                                                                                                                                                               |
+| `otro`                    | Responde de forma generica y ofrece ayuda                                                                                                                                                                                                     |
 
 ### 7.5 Reglas de Extraccion de Entidades (Clasificador)
 
@@ -1023,70 +1030,70 @@ Las fotos se envian directamente por codigo, sin pasar por Claude:
 
 La lista de habitaciones se obtiene dinamicamente de la tabla `complejos` (activos) via `getActiveHabitaciones()`, no esta hardcodeada.
 
-| Funcion | Parametros | Descripcion |
-|---------|-----------|-------------|
-| `getActiveHabitaciones` | — | Retorna nombres de complejos activos desde la DB (reemplaza array hardcoded) |
-| `checkAvailability` | `fechaEntrada, fechaSalida, habitacion?` | Consulta disponibilidad real contra Inventario y Reservas. Retorna `DisponibilidadResult[]` con precios por noche |
-| `getOccupiedDepartments` | `fechaEntrada, fechaSalida` | Retorna lista de nombres de deptos que tienen reserva activa (no cancelada) en ese rango |
-| `blockDates` | `habitacion, fechaEntrada, fechaSalida` | Marca fechas como `disponible=false` en Inventario |
-| `releaseDates` | `habitacion, fechaEntrada, fechaSalida` | Marca fechas como `disponible=true` (al cancelar reserva) |
-| `releaseDatesIfNotReserved` | `habitacion, fechaInicio, fechaFin, excludeBloqueoId?` | Libera fechas SOLO si no hay reservas activas ni otros bloqueos. Usado al eliminar un Bloqueo |
-| `getInventario` | `habitacion?, mes?, anio?` | Retorna registros de inventario filtrados |
-| `updateInventarioEntry` | `id, {disponible?, precio?, notas?}` | Actualiza un registro individual |
+| Funcion                     | Parametros                                             | Descripcion                                                                                                       |
+| --------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `getActiveHabitaciones`     | —                                                      | Retorna nombres de complejos activos desde la DB (reemplaza array hardcoded)                                      |
+| `checkAvailability`         | `fechaEntrada, fechaSalida, habitacion?`               | Consulta disponibilidad real contra Inventario y Reservas. Retorna `DisponibilidadResult[]` con precios por noche |
+| `getOccupiedDepartments`    | `fechaEntrada, fechaSalida`                            | Retorna lista de nombres de deptos que tienen reserva activa (no cancelada) en ese rango                          |
+| `blockDates`                | `habitacion, fechaEntrada, fechaSalida`                | Marca fechas como `disponible=false` en Inventario                                                                |
+| `releaseDates`              | `habitacion, fechaEntrada, fechaSalida`                | Marca fechas como `disponible=true` (al cancelar reserva)                                                         |
+| `releaseDatesIfNotReserved` | `habitacion, fechaInicio, fechaFin, excludeBloqueoId?` | Libera fechas SOLO si no hay reservas activas ni otros bloqueos. Usado al eliminar un Bloqueo                     |
+| `getInventario`             | `habitacion?, mes?, anio?`                             | Retorna registros de inventario filtrados                                                                         |
+| `updateInventarioEntry`     | `id, {disponible?, precio?, notas?}`                   | Actualiza un registro individual                                                                                  |
 
 ### 8.2 inventarioSyncService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `getSeason(date)` | Determina temporada (baja/media/alta) segun fecha |
-| `getSeasonalPrice(complejoId, date)` | Obtiene precio de Tarifa para la temporada de esa fecha |
-| `syncTarifaEspecialToInventario(complejoId, desde, hasta, precio)` | Actualiza precios en Inventario para el rango de fechas |
-| `restoreSeasonalPrices(complejoId, desde, hasta)` | Restaura precios estacionales tras eliminar TarifaEspecial |
+| Funcion                                                            | Descripcion                                                |
+| ------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `getSeason(date)`                                                  | Determina temporada (baja/media/alta) segun fecha          |
+| `getSeasonalPrice(complejoId, date)`                               | Obtiene precio de Tarifa para la temporada de esa fecha    |
+| `syncTarifaEspecialToInventario(complejoId, desde, hasta, precio)` | Actualiza precios en Inventario para el rango de fechas    |
+| `restoreSeasonalPrices(complejoId, desde, hasta)`                  | Restaura precios estacionales tras eliminar TarifaEspecial |
 
 ### 8.3 complejoService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `listComplejos()` | Lista todos con tarifas, tarifas especiales, media y bloqueos |
-| `getComplejoById(id)` | Detalle con relaciones completas |
-| `createComplejo(data)` | Crear nuevo departamento |
-| `updateComplejo(id, data)` | Actualizar parcialmente |
-| `deleteComplejo(id)` | Soft delete (activo=false) |
-| `upsertTarifa(complejoId, temporada, precio, minNoches?)` | Crear o actualizar tarifa estacional |
-| `listTarifasEspeciales(complejoId)` | Listar tarifas especiales |
-| `createTarifaEspecial(complejoId, data)` | Crear tarifa especial |
-| `updateTarifaEspecial(id, data)` | Actualizar tarifa especial |
-| `deleteTarifaEspecial(id)` | Eliminar tarifa especial |
-| `addMedia(complejoId, url, tipo?, caption?, orden?)` | Agregar foto/video |
-| `removeMedia(mediaId)` | Eliminar archivo multimedia |
-| `reorderMedia(complejoId, orderedIds)` | Reordenar galeria |
-| `listBloqueos(complejoId)` | Listar bloqueos ordenados por fechaInicio |
-| `createBloqueo(complejoId, data)` | Crear bloqueo de disponibilidad |
-| `deleteBloqueo(id)` | Eliminar bloqueo |
+| Funcion                                                   | Descripcion                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| `listComplejos()`                                         | Lista todos con tarifas, tarifas especiales, media y bloqueos |
+| `getComplejoById(id)`                                     | Detalle con relaciones completas                              |
+| `createComplejo(data)`                                    | Crear nuevo departamento                                      |
+| `updateComplejo(id, data)`                                | Actualizar parcialmente                                       |
+| `deleteComplejo(id)`                                      | Soft delete (activo=false)                                    |
+| `upsertTarifa(complejoId, temporada, precio, minNoches?)` | Crear o actualizar tarifa estacional                          |
+| `listTarifasEspeciales(complejoId)`                       | Listar tarifas especiales                                     |
+| `createTarifaEspecial(complejoId, data)`                  | Crear tarifa especial                                         |
+| `updateTarifaEspecial(id, data)`                          | Actualizar tarifa especial                                    |
+| `deleteTarifaEspecial(id)`                                | Eliminar tarifa especial                                      |
+| `addMedia(complejoId, url, tipo?, caption?, orden?)`      | Agregar foto/video                                            |
+| `removeMedia(mediaId)`                                    | Eliminar archivo multimedia                                   |
+| `reorderMedia(complejoId, orderedIds)`                    | Reordenar galeria                                             |
+| `listBloqueos(complejoId)`                                | Listar bloqueos ordenados por fechaInicio                     |
+| `createBloqueo(complejoId, data)`                         | Crear bloqueo de disponibilidad                               |
+| `deleteBloqueo(id)`                                       | Eliminar bloqueo                                              |
 
 ### 8.4 reservaService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `createReserva(params)` | Desde bot/conversacion. Crea en `pre_reserva`, bloquea fechas, sync Sheets. Params incluyen `nombreHuesped`, `telefonoHuesped`, `dni` |
-| `createReservaManual(params)` | Entrada manual (requiere nombreHuesped). Bloquea fechas si hay habitacion. Acepta `dni` opcional |
-| `updateReserva(id, params)` | Actualiza campos. Si cancela, libera fechas |
-| `updateReservaEstado(id, estado)` | Cambia estado. Si cancela, libera fechas. Sync Sheets |
-| `getReservaById(id)` | Detalle con relacion huesped |
-| `getReservasByHuesped(huespedId)` | Reservas de un huesped |
-| `getReservasByDateRange(from, to)` | Reservas no canceladas que se solapan con el rango. Usado por calendario |
-| `deleteReserva(id)` | Elimina reserva de la DB. Si tenia habitacion asignada, recalcula disponibilidad del inventario |
-| `listReservas(estado?)` | Lista filtrada por estado |
+| Funcion                            | Descripcion                                                                                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `createReserva(params)`            | Desde bot/conversacion. Crea en `pre_reserva`, bloquea fechas, sync Sheets. Params incluyen `nombreHuesped`, `telefonoHuesped`, `dni` |
+| `createReservaManual(params)`      | Entrada manual (requiere nombreHuesped). Bloquea fechas si hay habitacion. Acepta `dni` opcional                                      |
+| `updateReserva(id, params)`        | Actualiza campos. Si cancela, libera fechas                                                                                           |
+| `updateReservaEstado(id, estado)`  | Cambia estado. Si cancela, libera fechas. Sync Sheets                                                                                 |
+| `getReservaById(id)`               | Detalle con relacion huesped                                                                                                          |
+| `getReservasByHuesped(huespedId)`  | Reservas de un huesped                                                                                                                |
+| `getReservasByDateRange(from, to)` | Reservas no canceladas que se solapan con el rango. Usado por calendario                                                              |
+| `deleteReserva(id)`                | Elimina reserva de la DB. Si tenia habitacion asignada, recalcula disponibilidad del inventario                                       |
+| `listReservas(estado?)`            | Lista filtrada por estado                                                                                                             |
 
 **Atomicidad**: `createReserva` y `createReservaManual` usan `prisma.$transaction()` para crear la reserva y bloquear las fechas en el inventario de forma atomica. Si alguna operacion falla, se revierte todo. Nota: no usa `SERIALIZABLE` isolation porque el riesgo de concurrencia es bajo en este dominio (alquiler turistico, no ticketing masivo) y todas las reservas son `pre_reserva` que requieren confirmacion humana.
 
 ### 8.5 claudeService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `classifyIntent(message, history?)` | Clasifica intent con Claude Haiku. 12 intents: saludo, consulta_disponibilidad, consulta_precio, consulta_alojamiento, consulta_zona, reservar, cancelar_reserva, cambiar_reserva, hablar_humano, queja, despedida, otro. Retorna {intent, confidence, entities}. Timeout configurable via `CLAUDE_TIMEOUT_MS` (default 30s) |
-| `generateResponse(intent, entities, history, additionalContext?)` | Genera respuesta con Claude Sonnet. Timeout configurable via `CLAUDE_TIMEOUT_MS` |
-| `transcribeAudio(audioBuffer, mimeType)` | Transcribe audio a texto con Claude Haiku |
+| Funcion                                                           | Descripcion                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `classifyIntent(message, history?)`                               | Clasifica intent con Claude Haiku. 12 intents: saludo, consulta_disponibilidad, consulta_precio, consulta_alojamiento, consulta_zona, reservar, cancelar_reserva, cambiar_reserva, hablar_humano, queja, despedida, otro. Retorna {intent, confidence, entities}. Timeout configurable via `CLAUDE_TIMEOUT_MS` (default 30s) |
+| `generateResponse(intent, entities, history, additionalContext?)` | Genera respuesta con Claude Sonnet. Timeout configurable via `CLAUDE_TIMEOUT_MS`                                                                                                                                                                                                                                             |
+| `transcribeAudio(audioBuffer, mimeType)`                          | Transcribe audio a texto con Claude Haiku                                                                                                                                                                                                                                                                                    |
 
 **Timeout y fallback**: Todas las llamadas a Claude tienen timeout configurable (`CLAUDE_TIMEOUT_MS`, default 30000ms). Si Claude no responde a tiempo o la API falla, el sistema usa fallback local: regex para clasificacion y respuestas predefinidas para generacion. Esto garantiza que el bot nunca queda colgado esperando a la API.
 
@@ -1096,46 +1103,46 @@ Sincronizacion fire-and-forget con Google Sheets. Si falla, loguea error pero no
 
 ### 8.7 authService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
+| Funcion                              | Descripcion                                                                          |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
 | `verifyCredentials(email, password)` | Busca agente por email, compara password con bcrypt. Retorna datos del agente o null |
-| `generateToken(payload)` | Firma JWT con `{id, email, rol}`, expira en 24h |
-| `verifyToken(token)` | Verifica JWT y retorna payload o null |
+| `generateToken(payload)`             | Firma JWT con `{id, email, rol}`, expira en 24h                                      |
+| `verifyToken(token)`                 | Verifica JWT y retorna payload o null                                                |
 
 ### 8.8 huespedService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `findOrCreateHuesped(waId, nombre?)` | Busca huesped por waId, si no existe lo crea |
-| `getHuespedById(id)` | Retorna huesped por ID |
-| `listHuespedes()` | Lista todos los huespedes ordenados por fecha de creacion |
-| `updateHuesped(id, data)` | Actualiza nombre, telefono, dni, email o notas |
+| Funcion                              | Descripcion                                               |
+| ------------------------------------ | --------------------------------------------------------- |
+| `findOrCreateHuesped(waId, nombre?)` | Busca huesped por waId, si no existe lo crea              |
+| `getHuespedById(id)`                 | Retorna huesped por ID                                    |
+| `listHuespedes()`                    | Lista todos los huespedes ordenados por fecha de creacion |
+| `updateHuesped(id, data)`            | Actualiza nombre, telefono, dni, email o notas            |
 
 ### 8.9 conversacionService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `findOrCreateConversacion(huespedId)` | Busca conversacion abierta (no cerrada) para el huesped, si no existe crea una nueva en estado `bot`. Emite `conversacion:nueva` |
-| `updateConversacionEstado(id, estado, agenteId?)` | Cambia estado y opcionalmente asigna agente. Emite `conversacion:actualizada` |
-| `updateUltimoMensaje(id, contenido)` | Actualiza el campo `ultimoMensaje` y `ultimoMensajeEn` |
-| `getConversacionById(id)` | Detalle con huesped, agente y conteo de mensajes |
-| `listConversaciones(estado?)` | Lista con filtro opcional por estado |
+| Funcion                                           | Descripcion                                                                                                                      |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `findOrCreateConversacion(huespedId)`             | Busca conversacion abierta (no cerrada) para el huesped, si no existe crea una nueva en estado `bot`. Emite `conversacion:nueva` |
+| `updateConversacionEstado(id, estado, agenteId?)` | Cambia estado y opcionalmente asigna agente. Emite `conversacion:actualizada`                                                    |
+| `updateUltimoMensaje(id, contenido)`              | Actualiza el campo `ultimoMensaje` y `ultimoMensajeEn`                                                                           |
+| `getConversacionById(id)`                         | Detalle con huesped, agente y conteo de mensajes                                                                                 |
+| `listConversaciones(estado?)`                     | Lista con filtro opcional por estado                                                                                             |
 
 ### 8.10 mensajeService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `createMensaje(params)` | Crea mensaje en DB, actualiza `ultimoMensaje` de la conversacion, emite `mensaje:nuevo` via Socket.io |
-| `getByConversacion(conversacionId, limit?, before?)` | Mensajes paginados de una conversacion, ordenados por fecha |
+| Funcion                                              | Descripcion                                                                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `createMensaje(params)`                              | Crea mensaje en DB, actualiza `ultimoMensaje` de la conversacion, emite `mensaje:nuevo` via Socket.io |
+| `getByConversacion(conversacionId, limit?, before?)` | Mensajes paginados de una conversacion, ordenados por fecha                                           |
 
 ### 8.11 whatsappService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `sendWhatsAppMessage(to, body)` | Envia mensaje de texto. Extrae URLs de imagenes del body y las envia por separado. En modo simulador emite via Socket.io. Para usuarios web (`web_*`) no envia por WhatsApp (la respuesta se guarda en DB) |
-| `sendImage(to, imageUrl, caption?)` | Envia imagen al huesped con caption opcional. En modo simulador emite `simulator:mensaje` con `type: 'image'`. Para usuarios web (`web_*`) se omite el envio (imagenes en `metadata.imageUrls`) |
-| `downloadMedia(mediaId)` | Descarga archivo multimedia de WhatsApp Cloud API. Retorna Buffer o null |
-| `extractImages(body)` | (interna) Extrae URLs de imagenes (jpg/jpeg/png/gif/webp) del texto y las separa. Retorna `{ text, imageUrls }` |
+| Funcion                             | Descripcion                                                                                                                                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sendWhatsAppMessage(to, body)`     | Envia mensaje de texto. Extrae URLs de imagenes del body y las envia por separado. En modo simulador emite via Socket.io. Para usuarios web (`web_*`) no envia por WhatsApp (la respuesta se guarda en DB) |
+| `sendImage(to, imageUrl, caption?)` | Envia imagen al huesped con caption opcional. En modo simulador emite `simulator:mensaje` con `type: 'image'`. Para usuarios web (`web_*`) se omite el envio (imagenes en `metadata.imageUrls`)            |
+| `downloadMedia(mediaId)`            | Descarga archivo multimedia de WhatsApp Cloud API. Retorna Buffer o null                                                                                                                                   |
+| `extractImages(body)`               | (interna) Extrae URLs de imagenes (jpg/jpeg/png/gif/webp) del texto y las separa. Retorna `{ text, imageUrls }`                                                                                            |
 
 ### 8.12 webhookProcessor.ts
 
@@ -1143,38 +1150,38 @@ Orquesta el procesamiento de mensajes entrantes (WhatsApp o simulador). Flujo: `
 
 **Tipos de mensajes soportados:**
 
-| Tipo | Procesamiento |
-|------|--------------|
-| `text` | Se procesa normalmente por el bot |
-| `audio` | Se transcribe via Claude Haiku, se procesa como texto |
-| `image` | Se guarda con metadata (`mediaId`, `mimeType`) + caption del usuario. Escala a `espera_humano` con mensaje "Un agente la va a revisar". El bot no interpreta imagenes (ej: comprobantes de pago, DNI) |
-| otros (`document`, `sticker`, etc.) | Se loguea warning, se guarda como texto plano |
+| Tipo                                | Procesamiento                                                                                                                                                                                         |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text`                              | Se procesa normalmente por el bot                                                                                                                                                                     |
+| `audio`                             | Se transcribe via Claude Haiku, se procesa como texto                                                                                                                                                 |
+| `image`                             | Se guarda con metadata (`mediaId`, `mimeType`) + caption del usuario. Escala a `espera_humano` con mensaje "Un agente la va a revisar". El bot no interpreta imagenes (ej: comprobantes de pago, DNI) |
+| otros (`document`, `sticker`, etc.) | Se loguea warning, se guarda como texto plano                                                                                                                                                         |
 
 **Deduplicacion por waMessageId**: Antes de procesar un mensaje, verifica si ya existe un registro con el mismo `waMessageId` en la DB. Si existe, hace `return` sin procesar. Esto protege contra los reintentos frecuentes del webhook de WhatsApp, evitando mensajes duplicados, respuestas dobles del bot y reservas duplicadas.
 
 ### 8.13 conversacionCleanup.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
+| Funcion                        | Descripcion                                                                                                                                                                                   |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `closeInactiveConversations()` | Busca conversaciones en estado `bot` o `espera_humano` sin actividad en las ultimas 48h, agrega mensaje de sistema y cambia estado a `cerrado`. Emite evento socket para actualizar el panel. |
-| `startCleanupJob()` | Inicia cron job: ejecucion al startup + cada 60 minutos. |
-| `stopCleanupJob()` | Detiene el cron job (llamado en graceful shutdown). |
+| `startCleanupJob()`            | Inicia cron job: ejecucion al startup + cada 60 minutos.                                                                                                                                      |
+| `stopCleanupJob()`             | Detiene el cron job (llamado en graceful shutdown).                                                                                                                                           |
 
 ### 8.14 icalService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `generateIcal(complejoId)` | Genera string VCALENDAR (RFC 5545) con VEVENTs para reservas activas (pre_reserva, confirmada) y bloqueos del complejo. Formato VALUE=DATE (all-day). No expone datos del huesped. |
+| Funcion                                             | Descripcion                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generateIcal(complejoId)`                          | Genera string VCALENDAR (RFC 5545) con VEVENTs para reservas activas (pre_reserva, confirmada) y bloqueos del complejo. Formato VALUE=DATE (all-day). No expone datos del huesped.                                                                                                                                                 |
 | `syncFromIcalFeed(complejoId, icalUrl, plataforma)` | Fetch URL iCal de cualquier plataforma, parsea con node-ical. Crea reservas nuevas con `origenReserva=plataforma` y `nombreHuesped='Reserva {Plataforma}'`, actualiza fechas modificadas, cancela reservas cuyo UID desaparecio del feed. Recalcula disponibilidad. Push a Google Calendar para reservas nuevas (fire-and-forget). |
 
 **UID tracking**: Cada reserva importada por iCal se identifica por `notas: 'ical-uid:<uid>'`. Esto permite detectar cambios y cancelaciones en syncs posteriores. Las reservas existentes se filtran por `origenReserva: plataforma`, lo que permite feeds de multiples plataformas sin interferencia.
 
 ### 8.15 icalSyncJob.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
+| Funcion              | Descripcion                                                                                                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `startIcalSyncJob()` | Inicia cron job: primera ejecucion 10s despues del startup, luego cada 30 minutos. Consulta `IcalFeed` activos con complejo activo y ejecuta `syncFromIcalFeed()` para cada uno. Actualiza `ultimoSync` despues de cada sync exitoso. |
-| `stopIcalSyncJob()` | Detiene el cron job (llamado en graceful shutdown). |
+| `stopIcalSyncJob()`  | Detiene el cron job (llamado en graceful shutdown).                                                                                                                                                                                   |
 
 ### 8.16 googleCalendarService.ts
 
@@ -1182,68 +1189,68 @@ Servicio de sincronizacion bidireccional con Google Calendar. Usa la misma Servi
 
 **Push (Sistema → Google Calendar):**
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `pushReservaToGCal(reservaId)` | Crea/actualiza/elimina evento en GCal segun estado de la reserva. Summary: `Reserva: {habitacion} - {nombreHuesped}`. Guarda `googleCalEventId` en la reserva. Si la reserva esta cancelada, elimina el evento. Marca eventos con `extendedProperties.private.chatbootManaged = 'true'`. |
-| `pushBloqueoToGCal(bloqueoId)` | Crea evento en GCal para un bloqueo. Skip si `origenGoogle=true` (evita loops). Summary: `Bloqueado: {complejo} - {motivo}`. Guarda `googleCalEventId` en el bloqueo. |
-| `deleteBloqueoFromGCal(googleCalEventId)` | Elimina evento de GCal por su ID. Ignora errores 404/410 (evento ya eliminado). |
+| Funcion                                   | Descripcion                                                                                                                                                                                                                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pushReservaToGCal(reservaId)`            | Crea/actualiza/elimina evento en GCal segun estado de la reserva. Summary: `Reserva: {habitacion} - {nombreHuesped}`. Guarda `googleCalEventId` en la reserva. Si la reserva esta cancelada, elimina el evento. Marca eventos con `extendedProperties.private.chatbootManaged = 'true'`. |
+| `pushBloqueoToGCal(bloqueoId)`            | Crea evento en GCal para un bloqueo. Skip si `origenGoogle=true` (evita loops). Summary: `Bloqueado: {complejo} - {motivo}`. Guarda `googleCalEventId` en el bloqueo.                                                                                                                    |
+| `deleteBloqueoFromGCal(googleCalEventId)` | Elimina evento de GCal por su ID. Ignora errores 404/410 (evento ya eliminado).                                                                                                                                                                                                          |
 
 **Pull (Google Calendar → Sistema):**
 
-| Funcion | Descripcion |
-|---------|-------------|
+| Funcion                    | Descripcion                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `syncFromGoogleCalendar()` | Poll incremental con `syncToken` (full sync al restart del server). Solo importa eventos SIN `chatbootManaged` (evita loops). Eventos cancelados → elimina bloqueo correspondiente. Eventos nuevos → crea `Bloqueo` con `origenGoogle: true`. Matchea complejo por nombre/alias en el summary del evento, fallback al primer complejo activo. Recalcula inventario para complejos afectados. |
 
 **Proteccion anti-loop**: Los eventos creados por el sistema llevan `extendedProperties.private.chatbootManaged = 'true'`. Al importar, se ignoran eventos con esta propiedad. Los bloqueos importados desde GCal tienen `origenGoogle: true`, lo que previene que se re-pusheen a GCal.
 
 ### 8.17 gcalSyncJob.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
+| Funcion              | Descripcion                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `startGCalSyncJob()` | Inicia cron job: primera ejecucion 15s despues del startup, luego cada 5 minutos. Si `GOOGLE_CALENDAR_ID` no esta configurado, no inicia. |
-| `stopGCalSyncJob()` | Detiene el cron job (llamado en graceful shutdown). |
+| `stopGCalSyncJob()`  | Detiene el cron job (llamado en graceful shutdown).                                                                                       |
 
 ### 8.18 emailQueryService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
+| Funcion                               | Descripcion                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `listEmails(filters, page, pageSize)` | Lista emails procesados con filtros (respondido, complejoId, esFormulario, hasError, search). Paginado |
-| `getEmailStats()` | Estadisticas: emails de hoy, respondidos, con error, formularios |
-| `getEmailById(id)` | Detalle de un email procesado |
-| `deleteEmail(id)` | Elimina un email procesado de la DB |
+| `getEmailStats()`                     | Estadisticas: emails de hoy, respondidos, con error, formularios                                       |
+| `getEmailById(id)`                    | Detalle de un email procesado                                                                          |
+| `deleteEmail(id)`                     | Elimina un email procesado de la DB                                                                    |
 
 ### 8.19 emailService.ts (SMTP)
 
-| Funcion | Descripcion |
-|---------|-------------|
+| Funcion                                | Descripcion                                                                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `sendResetPasswordEmail(email, token)` | Envia email con link de recuperacion de contrasena via SMTP (Gmail). Requiere `SMTP_USER` y `SMTP_PASS` configurados. |
 
 ### 8.20 botConfigService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `getBotConfig()` | Retorna config del bot. Cache in-memory 5 min TTL. Si no existe registro, lo crea con defaults |
-| `updateBotConfig(data)` | Actualiza config en DB e invalida cache inmediatamente |
-| `invalidateBotConfigCache()` | Limpia cache manualmente (para tests) |
+| Funcion                      | Descripcion                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| `getBotConfig()`             | Retorna config del bot. Cache in-memory 5 min TTL. Si no existe registro, lo crea con defaults |
+| `updateBotConfig(data)`      | Actualiza config en DB e invalida cache inmediatamente                                         |
+| `invalidateBotConfigCache()` | Limpia cache manualmente (para tests)                                                          |
 
 ### 8.21 whatsappProfileService.ts
 
-| Funcion | Descripcion |
-|---------|-------------|
-| `getBusinessProfile()` | Obtiene perfil WA Business via Meta Graph API (v20.0+). En modo simulador retorna datos dummy |
-| `updateBusinessProfile(data)` | Actualiza perfil via Meta API POST. En modo simulador retorna success sin persistir |
-| `isSimulatorMode()` | Verifica si esta en modo simulador (sin credenciales WA configuradas) |
+| Funcion                       | Descripcion                                                                                   |
+| ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `getBusinessProfile()`        | Obtiene perfil WA Business via Meta Graph API (v20.0+). En modo simulador retorna datos dummy |
+| `updateBusinessProfile(data)` | Actualiza perfil via Meta API POST. En modo simulador retorna success sin persistir           |
+| `isSimulatorMode()`           | Verifica si esta en modo simulador (sin credenciales WA configuradas)                         |
 
 ### 8.22 Utilidades (utils/)
 
 **errors.ts** — Clases de error custom para respuestas HTTP consistentes:
 
-| Clase | Status | Code |
-|-------|--------|------|
-| `AppError` | configurable | configurable |
-| `ValidationError` | 400 | `VALIDATION_ERROR` |
-| `NotFoundError` | 404 | `NOT_FOUND` |
-| `UnauthorizedError` | 401 | `UNAUTHORIZED` |
+| Clase               | Status       | Code               |
+| ------------------- | ------------ | ------------------ |
+| `AppError`          | configurable | configurable       |
+| `ValidationError`   | 400          | `VALIDATION_ERROR` |
+| `NotFoundError`     | 404          | `NOT_FOUND`        |
+| `UnauthorizedError` | 401          | `UNAUTHORIZED`     |
 
 **asyncHandler.ts** — HOF que wrappea handlers async para capturar Promise rejections y pasarlas a `next()` de Express, previniendo errores no manejados.
 
@@ -1284,6 +1291,7 @@ Admin elimina bloqueo (DELETE /complejos/:id/bloqueos/:bloqueoId)
 ### 9.4 UI de Bloqueos
 
 Seccion en el tab "Tarifas" del modal de edicion de complejo, con fondo rojo-50:
+
 - Lista de bloqueos existentes con rango de fechas y motivo
 - Formulario inline: fecha inicio, fecha fin, motivo (opcional)
 - Boton "Bloquear fechas" para crear
@@ -1306,11 +1314,11 @@ Vista de grilla donde filas = departamentos/unidades, columnas = dias del mes, c
 
 ### 10.3 Colores
 
-| Estado | Color |
-|--------|-------|
+| Estado        | Color                     |
+| ------------- | ------------------------- |
 | `pre_reserva` | Naranja (`bg-orange-300`) |
-| `confirmada` | Verde (`bg-green-400`) |
-| `completada` | Azul (`bg-blue-300`) |
+| `confirmada`  | Verde (`bg-green-400`)    |
+| `completada`  | Azul (`bg-blue-300`)      |
 
 ### 10.4 Algoritmo de Distribucion
 
@@ -1324,6 +1332,7 @@ Para departamentos con multiples unidades, las reservas se distribuyen visualmen
 ### 10.5 Toggle en ReservaList
 
 La vista de reservas tiene un toggle tabla/calendario:
+
 - Icono `List` → vista de tabla con filtros y acciones
 - Icono `CalendarDays` → vista de calendario mensual
 - Filtro de estado y boton "Nueva Reserva" solo se muestran en modo tabla
@@ -1363,12 +1372,12 @@ La vista de reservas tiene un toggle tabla/calendario:
 
 ### 11.2 Colores de Mensajes
 
-| Origen | Color de fondo | Posicion |
-|--------|---------------|----------|
-| Huesped | Verde claro (`bg-green-100`) | Izquierda |
-| Bot | Gris claro (`bg-gray-100`) | Izquierda |
-| Agente | Azul (`bg-blue-500`, texto blanco) | Derecha |
-| Sistema | Gris centrado, texto pequeno | Centro |
+| Origen  | Color de fondo                     | Posicion  |
+| ------- | ---------------------------------- | --------- |
+| Huesped | Verde claro (`bg-green-100`)       | Izquierda |
+| Bot     | Gris claro (`bg-gray-100`)         | Izquierda |
+| Agente  | Azul (`bg-blue-500`, texto blanco) | Derecha   |
+| Sistema | Gris centrado, texto pequeno       | Centro    |
 
 ### 11.3 Flujo de Intervencion del Agente
 
@@ -1384,19 +1393,20 @@ Todas las acciones son en tiempo real: otros agentes conectados ven los cambios 
 
 Modal de edicion con 7 tabs:
 
-| Tab | Contenido |
-|-----|-----------|
-| **Datos** | Nombre, tipo, superficie, direccion, ubicacion, capacidad, unidades, dormitorios, banos, estadia minima, check-in/out, video tour |
-| **Amenities** | Agregar/eliminar tags de amenities (WiFi, A/C, parrilla, etc.) |
-| **Politicas** | Toggles: mascotas, fumar, fiestas (ninos eliminado — todos aceptan ninos, ver 45.12) |
-| **Tarifas** | Tarifas estacionales (baja/media/alta) + Tarifas especiales (rango de fechas) + Bloqueos de disponibilidad |
-| **Reserva** | Datos bancarios: titular cuenta, CUIT, banco, CBU, alias CBU, link MercadoPago |
-| **Media** | Galeria de fotos/videos: agregar, eliminar, reordenar por drag |
-| **Sync** | Feeds iCal multi-plataforma (agregar/eliminar Booking, Airbnb, VRBO, otro) + URL de exportacion iCal con boton copiar |
+| Tab           | Contenido                                                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Datos**     | Nombre, tipo, superficie, direccion, ubicacion, capacidad, unidades, dormitorios, banos, estadia minima, check-in/out, video tour |
+| **Amenities** | Agregar/eliminar tags de amenities (WiFi, A/C, parrilla, etc.)                                                                    |
+| **Politicas** | Toggles: mascotas, fumar, fiestas (ninos eliminado — todos aceptan ninos, ver 45.12)                                              |
+| **Tarifas**   | Tarifas estacionales (baja/media/alta) + Tarifas especiales (rango de fechas) + Bloqueos de disponibilidad                        |
+| **Reserva**   | Datos bancarios: titular cuenta, CUIT, banco, CBU, alias CBU, link MercadoPago                                                    |
+| **Media**     | Galeria de fotos/videos: agregar, eliminar, reordenar por drag                                                                    |
+| **Sync**      | Feeds iCal multi-plataforma (agregar/eliminar Booking, Airbnb, VRBO, otro) + URL de exportacion iCal con boton copiar             |
 
 ### 11.5 Gestion de Reservas
 
 **Vista tabla:**
+
 - Columnas: Nombre, Depto, Personas, Entrada, Salida, Dias, Telefono, DNI, Tarifa/noche, Total, Monto reserva, Saldo, Origen, Nro Factura, USD, Estado, Acciones
 - Filtro por estado: Todas, pre_reserva, confirmada, cancelada, completada
 - Boton "Nueva Reserva" abre modal de creacion manual
@@ -1406,6 +1416,7 @@ Modal de edicion con 7 tabs:
 - Boton Eliminar (Trash2 rojo) en todas las reservas, con `window.confirm` antes de ejecutar. Disponible en tabla desktop y cards mobile
 
 **Vista calendario:**
+
 - Grilla mensual con departamentos como filas y dias como columnas
 - Colores por estado, hover muestra tooltip con nombre de huesped y fechas
 
@@ -1427,21 +1438,21 @@ La hoja debe tener una pestana llamada `Reservas`.
 
 ### 12.2 Estructura de la Hoja
 
-| Columna | Campo |
-|---------|-------|
-| A | ID de reserva |
-| B | Nombre del huesped |
-| C | WhatsApp ID |
-| D | Telefono |
-| E | Habitacion |
-| F | Fecha de entrada |
-| G | Fecha de salida |
-| H | Numero de personas |
-| I | Precio total |
-| J | Estado |
-| K | Notas |
-| L | Fecha de creacion |
-| M | Ultima actualizacion |
+| Columna | Campo                |
+| ------- | -------------------- |
+| A       | ID de reserva        |
+| B       | Nombre del huesped   |
+| C       | WhatsApp ID          |
+| D       | Telefono             |
+| E       | Habitacion           |
+| F       | Fecha de entrada     |
+| G       | Fecha de salida      |
+| H       | Numero de personas   |
+| I       | Precio total         |
+| J       | Estado               |
+| K       | Notas                |
+| L       | Fecha de creacion    |
+| M       | Ultima actualizacion |
 
 ### 12.3 Comportamiento
 
@@ -1456,18 +1467,20 @@ La hoja debe tener una pestana llamada `Reservas`.
 
 ### 13.1 Modos de Operacion
 
-| Modo | Variable | Comportamiento |
-|------|----------|----------------|
-| Simulador | `SIMULATOR_MODE=true` | Mensajes via Socket.io, sin Meta API |
+| Modo       | Variable               | Comportamiento                        |
+| ---------- | ---------------------- | ------------------------------------- |
+| Simulador  | `SIMULATOR_MODE=true`  | Mensajes via Socket.io, sin Meta API  |
 | Produccion | `SIMULATOR_MODE=false` | Mensajes via WhatsApp Cloud API v21.0 |
 
 ### 13.2 Webhook de Meta
 
 **Verificacion (GET /api/webhook)**:
+
 - Meta envia `hub.mode=subscribe`, `hub.verify_token`, `hub.challenge`
 - El servidor verifica el token y devuelve el challenge
 
 **Recepcion (POST /api/webhook)**:
+
 - Meta envia payload con mensajes
 - Se valida firma HMAC SHA256 (`x-hub-signature-256`) contra `WA_APP_SECRET`
 - Se responde 200 inmediatamente (requisito de Meta)
@@ -1514,36 +1527,36 @@ El caption se obtiene del campo `caption` de la tabla `MediaFile`. Si no tiene c
 
 ## 14. Variables de Entorno
 
-| Variable | Requerida | Default | Descripcion |
-|----------|-----------|---------|-------------|
-| `PORT` | No | `5050` | Puerto del servidor |
-| `NODE_ENV` | No | `development` | Entorno de ejecucion |
-| `DATABASE_URL` | Si | — | URL de conexion PostgreSQL |
-| `REDIS_URL` | No | `redis://localhost:6380` | URL de conexion Redis |
-| `JWT_SECRET` | Si | — | Secreto para firmar JWT (min 10 chars) |
-| `JWT_EXPIRY` | No | `24h` | Duracion del token JWT |
-| `WA_PHONE_NUMBER_ID` | No | `""` | ID del numero de telefono en Meta |
-| `WA_ACCESS_TOKEN` | No | `""` | Token de acceso de Meta |
-| `WA_VERIFY_TOKEN` | No | `chatboot-verify-token` | Token de verificacion del webhook |
-| `WA_APP_SECRET` | No | `""` | Secret de la app para validar firmas |
-| `WA_API_VERSION` | No | `v21.0` | Version de la WhatsApp Cloud API |
-| `ANTHROPIC_API_KEY` | No | `""` | API key de Claude (sin ella usa fallback) |
-| `CLAUDE_CLASSIFIER_MODEL` | No | `claude-haiku-4-5-20251001` | Modelo para clasificacion de intents |
-| `CLAUDE_RESPONSE_MODEL` | No | `claude-sonnet-4-5-20250929` | Modelo para generacion de respuestas |
-| `CLAUDE_TIMEOUT_MS` | No | `30000` | Timeout para llamadas a Claude API (ms) |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | No | `""` | Email de la service account de Google |
-| `GOOGLE_PRIVATE_KEY` | No | `""` | Private key de la service account |
-| `GOOGLE_SHEET_ID` | No | `""` | ID de la hoja de Google Sheets |
-| `GOOGLE_CALENDAR_ID` | No | `""` | ID del calendario de Google (para sync bidireccional) |
-| `SMTP_HOST` | No | `""` | Host SMTP. Usar `host.docker.internal` en produccion (Postfix local) o servidor SMTP externo |
-| `SMTP_PORT` | No | `25` | Puerto SMTP |
-| `SMTP_USER` | No | `""` | Email SMTP para envio de correos. Vacio si se usa Postfix local |
-| `SMTP_PASS` | No | `""` | Contrasena de aplicacion SMTP. Vacio si se usa Postfix local |
-| `FRONTEND_URL` | No | `http://localhost:5173` | URL del frontend (para links en emails) |
-| `SIMULATOR_MODE` | No | `true` | Habilita simulador local |
-| `ALLOWED_ORIGINS` | No | `*` | Origenes CORS permitidos (separados por coma) |
-| `RATE_LIMIT_WINDOW_MS` | No | `60000` | Ventana del rate limiter general (ms) |
-| `RATE_LIMIT_MAX_REQUESTS` | No | `100` | Max requests por ventana por IP |
+| Variable                       | Requerida | Default                      | Descripcion                                                                                  |
+| ------------------------------ | --------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `PORT`                         | No        | `5050`                       | Puerto del servidor                                                                          |
+| `NODE_ENV`                     | No        | `development`                | Entorno de ejecucion                                                                         |
+| `DATABASE_URL`                 | Si        | —                            | URL de conexion PostgreSQL                                                                   |
+| `REDIS_URL`                    | No        | `redis://localhost:6380`     | URL de conexion Redis                                                                        |
+| `JWT_SECRET`                   | Si        | —                            | Secreto para firmar JWT (min 10 chars)                                                       |
+| `JWT_EXPIRY`                   | No        | `24h`                        | Duracion del token JWT                                                                       |
+| `WA_PHONE_NUMBER_ID`           | No        | `""`                         | ID del numero de telefono en Meta                                                            |
+| `WA_ACCESS_TOKEN`              | No        | `""`                         | Token de acceso de Meta                                                                      |
+| `WA_VERIFY_TOKEN`              | No        | `chatboot-verify-token`      | Token de verificacion del webhook                                                            |
+| `WA_APP_SECRET`                | No        | `""`                         | Secret de la app para validar firmas                                                         |
+| `WA_API_VERSION`               | No        | `v21.0`                      | Version de la WhatsApp Cloud API                                                             |
+| `ANTHROPIC_API_KEY`            | No        | `""`                         | API key de Claude (sin ella usa fallback)                                                    |
+| `CLAUDE_CLASSIFIER_MODEL`      | No        | `claude-haiku-4-5-20251001`  | Modelo para clasificacion de intents                                                         |
+| `CLAUDE_RESPONSE_MODEL`        | No        | `claude-sonnet-4-5-20250929` | Modelo para generacion de respuestas                                                         |
+| `CLAUDE_TIMEOUT_MS`            | No        | `30000`                      | Timeout para llamadas a Claude API (ms)                                                      |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | No        | `""`                         | Email de la service account de Google                                                        |
+| `GOOGLE_PRIVATE_KEY`           | No        | `""`                         | Private key de la service account                                                            |
+| `GOOGLE_SHEET_ID`              | No        | `""`                         | ID de la hoja de Google Sheets                                                               |
+| `GOOGLE_CALENDAR_ID`           | No        | `""`                         | ID del calendario de Google (para sync bidireccional)                                        |
+| `SMTP_HOST`                    | No        | `""`                         | Host SMTP. Usar `host.docker.internal` en produccion (Postfix local) o servidor SMTP externo |
+| `SMTP_PORT`                    | No        | `25`                         | Puerto SMTP                                                                                  |
+| `SMTP_USER`                    | No        | `""`                         | Email SMTP para envio de correos. Vacio si se usa Postfix local                              |
+| `SMTP_PASS`                    | No        | `""`                         | Contrasena de aplicacion SMTP. Vacio si se usa Postfix local                                 |
+| `FRONTEND_URL`                 | No        | `http://localhost:5173`      | URL del frontend (para links en emails)                                                      |
+| `SIMULATOR_MODE`               | No        | `true`                       | Habilita simulador local                                                                     |
+| `ALLOWED_ORIGINS`              | No        | `*`                          | Origenes CORS permitidos (separados por coma)                                                |
+| `RATE_LIMIT_WINDOW_MS`         | No        | `60000`                      | Ventana del rate limiter general (ms)                                                        |
+| `RATE_LIMIT_MAX_REQUESTS`      | No        | `100`                        | Max requests por ventana por IP                                                              |
 
 ---
 
@@ -1593,34 +1606,34 @@ npm run dev
 
 **Root (`package.json`):**
 
-| Script | Comando | Descripcion |
-|--------|---------|-------------|
-| `dev` | `concurrently vite + server dev` | Ejecuta frontend y backend |
-| `dev:client` | `vite` | Solo frontend |
-| `dev:server` | `npm run dev --prefix server` | Solo backend |
-| `build` | `tsc -b && vite build` | Build de produccion |
-| `preview` | `vite preview` | Preview del build de produccion |
+| Script       | Comando                          | Descripcion                     |
+| ------------ | -------------------------------- | ------------------------------- |
+| `dev`        | `concurrently vite + server dev` | Ejecuta frontend y backend      |
+| `dev:client` | `vite`                           | Solo frontend                   |
+| `dev:server` | `npm run dev --prefix server`    | Solo backend                    |
+| `build`      | `tsc -b && vite build`           | Build de produccion             |
+| `preview`    | `vite preview`                   | Preview del build de produccion |
 
 **Server (`server/package.json`):**
 
-| Script | Comando | Descripcion |
-|--------|---------|-------------|
-| `dev` | `tsx watch src/index.ts` | Backend con hot reload |
-| `build` | `tsc` | Compilar TypeScript a JavaScript |
-| `start` | `node dist/index.js` | Ejecutar build de produccion |
-| `db:migrate` | `prisma migrate dev` | Ejecutar migraciones |
-| `db:push` | `prisma db push` | Push schema sin migracion |
-| `db:seed` | `tsx src/scripts/seedAgente.ts` | Seed de agente admin |
-| `db:seed-inventory` | `tsx src/scripts/seedInventory.ts` | Seed de inventario |
+| Script              | Comando                            | Descripcion                      |
+| ------------------- | ---------------------------------- | -------------------------------- |
+| `dev`               | `tsx watch src/index.ts`           | Backend con hot reload           |
+| `build`             | `tsc`                              | Compilar TypeScript a JavaScript |
+| `start`             | `node dist/index.js`               | Ejecutar build de produccion     |
+| `db:migrate`        | `prisma migrate dev`               | Ejecutar migraciones             |
+| `db:push`           | `prisma db push`                   | Push schema sin migracion        |
+| `db:seed`           | `tsx src/scripts/seedAgente.ts`    | Seed de agente admin             |
+| `db:seed-inventory` | `tsx src/scripts/seedInventory.ts` | Seed de inventario               |
 
 ### 15.4 Puertos
 
-| Servicio | Puerto | Notas |
-|----------|--------|-------|
-| Frontend (Vite dev) | 5173 | Proxy a backend |
-| Backend (Express) | 5050 | API + Socket.io |
-| PostgreSQL | 5433 | No-default para evitar conflicto |
-| Redis | 6380 | No-default para evitar conflicto |
+| Servicio            | Puerto | Notas                            |
+| ------------------- | ------ | -------------------------------- |
+| Frontend (Vite dev) | 5173   | Proxy a backend                  |
+| Backend (Express)   | 5050   | API + Socket.io                  |
+| PostgreSQL          | 5433   | No-default para evitar conflicto |
+| Redis               | 6380   | No-default para evitar conflicto |
 
 ---
 
@@ -1629,6 +1642,7 @@ npm run dev
 ### 16.1 Autenticacion y Gestion de Usuarios
 
 **Tecnologia:**
+
 - Passwords hasheados con **bcrypt** (12 rounds de salt)
 - **JWT** (JSON Web Token) con expiracion configurable (`JWT_EXPIRY`, default 24h)
 - Token firmado con `JWT_SECRET` (variable de entorno)
@@ -1638,10 +1652,10 @@ npm run dev
 
 **Roles de usuario:**
 
-| Rol | Permisos |
-|-----|----------|
-| `admin` | Acceso total: crear/editar agentes, gestionar complejos, reservas, configuracion del bot, ver todas las conversaciones |
-| `agente` | Gestionar conversaciones (tomar, responder, cerrar), ver reservas y complejos. NO puede crear otros agentes |
+| Rol      | Permisos                                                                                                               |
+| -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `admin`  | Acceso total: crear/editar agentes, gestionar complejos, reservas, configuracion del bot, ver todas las conversaciones |
+| `agente` | Gestionar conversaciones (tomar, responder, cerrar), ver reservas y complejos. NO puede crear otros agentes            |
 
 **Creacion del primer administrador (seed):**
 
@@ -1652,6 +1666,7 @@ npx tsx server/src/scripts/seedAgente.ts
 ```
 
 Este script crea (o actualiza si ya existe) un agente admin con:
+
 - Email: `admin@chatboot.com`
 - Password: `admin123` (hasheado con bcrypt 12 rounds)
 - Rol: `admin`
@@ -1685,16 +1700,16 @@ Authorization: Bearer <token-admin>
 
 ### 16.2 Middleware de Seguridad
 
-| Middleware | Ubicacion | Descripcion |
-|-----------|-----------|-------------|
-| **helmet** | Global | Headers HTTP de seguridad: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy |
-| **cors** | Global | CORS habilitado para el origin del frontend. Configurable via variable de entorno |
-| **express.json()** | Global | Parseo de body JSON con limite de tamano |
-| **requestId** | Global | Genera `X-Request-ID` unico (UUID) por cada request para trazabilidad |
-| **requestLogger** | Global | Log de cada peticion: method, url, status, duracion en ms |
-| **authMiddleware** | Rutas protegidas | Extrae token del header `Authorization: Bearer <token>`, verifica firma y expiracion JWT. Inyecta `req.user = { id, email, rol }`. Retorna 401 si el token falta, es invalido o expiro |
-| **rateLimiter** | Rutas protegidas | Limite de requests por IP (ver 16.4) |
-| **webhookSignature** | POST /api/webhook | Validacion HMAC SHA256 de payloads de Meta (ver 16.3) |
+| Middleware           | Ubicacion         | Descripcion                                                                                                                                                                            |
+| -------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **helmet**           | Global            | Headers HTTP de seguridad: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy                                                                                         |
+| **cors**             | Global            | CORS habilitado para el origin del frontend. Configurable via variable de entorno                                                                                                      |
+| **express.json()**   | Global            | Parseo de body JSON con limite de tamano                                                                                                                                               |
+| **requestId**        | Global            | Genera `X-Request-ID` unico (UUID) por cada request para trazabilidad                                                                                                                  |
+| **requestLogger**    | Global            | Log de cada peticion: method, url, status, duracion en ms                                                                                                                              |
+| **authMiddleware**   | Rutas protegidas  | Extrae token del header `Authorization: Bearer <token>`, verifica firma y expiracion JWT. Inyecta `req.user = { id, email, rol }`. Retorna 401 si el token falta, es invalido o expiro |
+| **rateLimiter**      | Rutas protegidas  | Limite de requests por IP (ver 16.4)                                                                                                                                                   |
+| **webhookSignature** | POST /api/webhook | Validacion HMAC SHA256 de payloads de Meta (ver 16.3)                                                                                                                                  |
 
 ### 16.3 Seguridad del Webhook de WhatsApp
 
@@ -1709,12 +1724,14 @@ Meta firma cada payload del webhook con HMAC SHA256 usando el `WA_APP_SECRET`:
 ### 16.4 Rate Limiting (2 niveles)
 
 **Nivel 1 — API por IP** (`rateLimiter.ts`):
+
 - Limite: 100 requests/minuto por IP (configurable via `RATE_LIMIT_MAX_REQUESTS` y `RATE_LIMIT_WINDOW_MS`)
 - Implementacion: Redis (`INCR` + `EXPIRE`) con fallback in-memory si Redis no esta disponible
 - Aplica a todas las rutas protegidas (panel de agentes)
 - Respuesta si excede: `429 Too Many Requests`
 
 **Nivel 2 — WhatsApp por numero** (`rateLimitWhatsApp.ts`):
+
 - Limite: 10 mensajes/minuto por numero de WhatsApp (`waId`)
 - Implementacion: Redis sliding window counter
 - Aplica en `webhookProcessor.ts` antes de procesar el mensaje
@@ -1739,16 +1756,17 @@ La lista de titulares de confianza se almacena en el campo `titularesVerificados
 
 ```typescript
 // botEngine.ts — lee de la DB en vez de hardcoded
-const trustedHolders = (botConfig.titularesVerificados ?? []).map(h => h.toLowerCase().trim());
+const trustedHolders = (botConfig.titularesVerificados ?? []).map((h) => h.toLowerCase().trim());
 ```
 
-| Escenario | Condicion | Accion |
-|-----------|-----------|--------|
-| Titular verificado | CBU/alias cargados + titular en `titularesVerificados` | Bot muestra datos bancarios normalmente |
-| Sin datos bancarios | Complejo no tiene CBU/alias configurados | Bot dice "un agente te contactara" + escala a `espera_humano` |
+| Escenario           | Condicion                                                    | Accion                                                          |
+| ------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Titular verificado  | CBU/alias cargados + titular en `titularesVerificados`       | Bot muestra datos bancarios normalmente                         |
+| Sin datos bancarios | Complejo no tiene CBU/alias configurados                     | Bot dice "un agente te contactara" + escala a `espera_humano`   |
 | Titular desconocido | CBU/alias cargados pero titular NO en `titularesVerificados` | Bot NO muestra datos (riesgo fraude) + escala a `espera_humano` |
 
 Si se detecta escenario 2 o 3:
+
 - Claude recibe `ADVERTENCIA DATOS BANCARIOS` en contexto adicional con prohibicion absoluta de mostrar datos
 - La conversacion se escala automaticamente a `espera_humano`
 - Se crea mensaje de sistema: "Conversacion escalada: datos bancarios no disponibles o no verificados"
@@ -1781,6 +1799,7 @@ Logger: **Pino** con formato pretty en desarrollo y JSON en produccion.
 ### 17.2 Health Check
 
 `GET /api/health` devuelve:
+
 - Estado general del servicio
 - Tiempo de actividad (uptime)
 - Conectividad con PostgreSQL
@@ -1853,12 +1872,12 @@ Sin verificacion, el limite es de 250 conversaciones iniciadas por el negocio ca
 
 **Impacto de no estar verificada:**
 
-| Aspecto | Sin verificar | Verificada |
-|---------|--------------|-----------|
-| Conversaciones iniciadas/24h | 250 | 1,000 → 10,000 → 100,000 → ilimitadas |
-| Numeros de telefono adicionales | Maximo 2 | Sin limite |
-| Nombre mostrado | "No verificado" | Nombre de la empresa |
-| Templates | Limitados | Sin restricciones |
+| Aspecto                         | Sin verificar   | Verificada                            |
+| ------------------------------- | --------------- | ------------------------------------- |
+| Conversaciones iniciadas/24h    | 250             | 1,000 → 10,000 → 100,000 → ilimitadas |
+| Numeros de telefono adicionales | Maximo 2        | Sin limite                            |
+| Nombre mostrado                 | "No verificado" | Nombre de la empresa                  |
+| Templates                       | Limitados       | Sin restricciones                     |
 
 ---
 
@@ -1939,21 +1958,21 @@ Este token **NO expira** (a menos que se revoque manualmente).
 
 #### Correspondencia con variables de entorno del proyecto
 
-| Credencial obtenida | Variable en `.env` |
-|---------------------|-------------------|
-| System User Access Token | `WA_ACCESS_TOKEN` |
-| Phone Number ID | `WA_PHONE_NUMBER_ID` |
-| App Secret | `WA_APP_SECRET` |
-| Tu verify token elegido | `WA_VERIFY_TOKEN` |
-| (desactivar simulador) | `SIMULATOR_MODE=false` |
+| Credencial obtenida      | Variable en `.env`     |
+| ------------------------ | ---------------------- |
+| System User Access Token | `WA_ACCESS_TOKEN`      |
+| Phone Number ID          | `WA_PHONE_NUMBER_ID`   |
+| App Secret               | `WA_APP_SECRET`        |
+| Tu verify token elegido  | `WA_VERIFY_TOKEN`      |
+| (desactivar simulador)   | `SIMULATOR_MODE=false` |
 
 #### Precios de WhatsApp Business (por conversacion)
 
-| Categoria | Quien la inicia | Costo aprox. |
-|-----------|----------------|-------------------------------|
-| **Service** | Usuario | ~$0.005 - $0.015 |
-| **Utility** | Negocio | ~$0.005 - $0.015 |
-| **Marketing** | Negocio | ~$0.025 - $0.080 |
+| Categoria     | Quien la inicia | Costo aprox.     |
+| ------------- | --------------- | ---------------- |
+| **Service**   | Usuario         | ~$0.005 - $0.015 |
+| **Utility**   | Negocio         | ~$0.005 - $0.015 |
+| **Marketing** | Negocio         | ~$0.025 - $0.080 |
 
 - **1,000 conversaciones de servicio (user-initiated) por mes son GRATIS** por WABA
 - Cada conversacion abre una **ventana de 24 horas** con mensajes ilimitados
@@ -1989,10 +2008,10 @@ cloudflared tunnel --url http://localhost:5050
 3. Generar API Key en `https://console.anthropic.com/settings/keys`
 4. Copiar la key (formato: `sk-ant-api03-...`)
 
-| Tarea | Modelo | Costo input | Costo output |
-|-------|--------|-------------|-------------|
-| Clasificacion | `claude-haiku-4-5-20251001` | $1/MTok | $5/MTok |
-| Respuesta | `claude-sonnet-4-5-20250929` | $3/MTok | $15/MTok |
+| Tarea         | Modelo                       | Costo input | Costo output |
+| ------------- | ---------------------------- | ----------- | ------------ |
+| Clasificacion | `claude-haiku-4-5-20251001`  | $1/MTok     | $5/MTok      |
+| Respuesta     | `claude-sonnet-4-5-20250929` | $3/MTok     | $15/MTok     |
 
 Estimacion: ~$0.004 por intercambio. 100 conversaciones/dia ≈ **$36/mes**.
 
@@ -2015,52 +2034,52 @@ Estimacion: ~$0.004 por intercambio. 100 conversaciones/dia ≈ **$36/mes**.
 
 ### 18.6 Resumen de Credenciales
 
-| Servicio | Variable `.env` | Donde obtenerla |
-|----------|----------------|-----------------|
-| WhatsApp | `WA_ACCESS_TOKEN` | Meta Business Settings > System Users |
-| WhatsApp | `WA_PHONE_NUMBER_ID` | App Dashboard > WhatsApp > API Setup |
-| WhatsApp | `WA_APP_SECRET` | App Dashboard > Settings > Basic |
-| WhatsApp | `WA_VERIFY_TOKEN` | Lo defines tu mismo |
-| Claude | `ANTHROPIC_API_KEY` | console.anthropic.com/settings/keys |
-| Google | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Campo `client_email` del JSON |
-| Google | `GOOGLE_PRIVATE_KEY` | Campo `private_key` del JSON |
-| Google | `GOOGLE_SHEET_ID` | URL de la hoja de Google Sheets |
-| Google | `GOOGLE_CALENDAR_ID` | Settings del calendario > "Integrate calendar" |
-| SMTP | `SMTP_USER` | Email de Gmail para envio de correos |
-| SMTP | `SMTP_PASS` | Contrasena de aplicacion de Gmail |
+| Servicio | Variable `.env`                | Donde obtenerla                                |
+| -------- | ------------------------------ | ---------------------------------------------- |
+| WhatsApp | `WA_ACCESS_TOKEN`              | Meta Business Settings > System Users          |
+| WhatsApp | `WA_PHONE_NUMBER_ID`           | App Dashboard > WhatsApp > API Setup           |
+| WhatsApp | `WA_APP_SECRET`                | App Dashboard > Settings > Basic               |
+| WhatsApp | `WA_VERIFY_TOKEN`              | Lo defines tu mismo                            |
+| Claude   | `ANTHROPIC_API_KEY`            | console.anthropic.com/settings/keys            |
+| Google   | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Campo `client_email` del JSON                  |
+| Google   | `GOOGLE_PRIVATE_KEY`           | Campo `private_key` del JSON                   |
+| Google   | `GOOGLE_SHEET_ID`              | URL de la hoja de Google Sheets                |
+| Google   | `GOOGLE_CALENDAR_ID`           | Settings del calendario > "Integrate calendar" |
+| SMTP     | `SMTP_USER`                    | Email de Gmail para envio de correos           |
+| SMTP     | `SMTP_PASS`                    | Contrasena de aplicacion de Gmail              |
 
 ---
 
 ## 19. Glosario
 
-| Termino | Definicion |
-|---------|-----------|
-| **Huesped** | Persona que contacta al alojamiento por WhatsApp |
-| **Agente** | Operador humano del panel web |
-| **Conversacion** | Hilo de chat entre huesped y sistema (bot o agente) |
-| **Bot** | Asistente automatico basado en Claude AI |
-| **Complejo** | Departamento o unidad de alojamiento (Pewmafe, Luminar, LG, etc.) |
-| **Escalado** | Transicion de conversacion de bot a agente humano |
-| **Pre-reserva** | Reserva creada pero pendiente de confirmacion por agente humano |
-| **Bloqueo** | Cierre de disponibilidad de un departamento para un rango de fechas |
-| **Inventario** | Registro diario de disponibilidad y precios por departamento |
-| **Tarifa** | Precio por noche por temporada (baja/media/alta) |
-| **Tarifa Especial** | Override de precio para un rango de fechas especifico |
-| **waId** | Identificador unico del huesped en WhatsApp (numero de telefono) |
-| **Simulador** | Interfaz de prueba que emula WhatsApp para desarrollo local |
-| **Fire-and-forget** | Patron donde la operacion secundaria no bloquea la principal |
-| **Sena** | Pago parcial (porcentaje variable por departamento, configurado en `porcentajeReserva`) para confirmar la reserva. Si es 0%, la reserva queda de palabra |
-| **WABA** | WhatsApp Business Account — cuenta de negocio en WhatsApp |
-| **System User** | Usuario de servicio en Meta Business para tokens permanentes |
-| **Cloud API** | API de WhatsApp alojada por Meta |
-| **Template** | Mensaje pre-aprobado por Meta, requerido fuera de la ventana de 24h |
-| **IcalFeed** | Feed iCal de una plataforma externa (Booking, Airbnb, VRBO) vinculado a un complejo |
-| **syncToken** | Token de Google Calendar API para sincronizacion incremental (solo eventos nuevos/modificados) |
-| **chatbootManaged** | Extended property en eventos GCal que marca eventos creados por el sistema (evita re-importacion) |
-| **origenGoogle** | Flag en Bloqueo que indica que fue importado desde Google Calendar |
-| **Service Account** | Cuenta de servicio de Google Cloud para autenticacion maquina-a-maquina |
-| **MTok** | Millon de tokens — unidad de facturacion de la API de Claude |
-| **Sanitizacion de entidades** | Proceso de filtrar solo las claves reconocidas por el bot (num_personas, fecha_entrada, fecha_salida, habitacion) y descartar las no estandar |
+| Termino                       | Definicion                                                                                                                                               |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Huesped**                   | Persona que contacta al alojamiento por WhatsApp                                                                                                         |
+| **Agente**                    | Operador humano del panel web                                                                                                                            |
+| **Conversacion**              | Hilo de chat entre huesped y sistema (bot o agente)                                                                                                      |
+| **Bot**                       | Asistente automatico basado en Claude AI                                                                                                                 |
+| **Complejo**                  | Departamento o unidad de alojamiento (Pewmafe, Luminar, LG, etc.)                                                                                        |
+| **Escalado**                  | Transicion de conversacion de bot a agente humano                                                                                                        |
+| **Pre-reserva**               | Reserva creada pero pendiente de confirmacion por agente humano                                                                                          |
+| **Bloqueo**                   | Cierre de disponibilidad de un departamento para un rango de fechas                                                                                      |
+| **Inventario**                | Registro diario de disponibilidad y precios por departamento                                                                                             |
+| **Tarifa**                    | Precio por noche por temporada (baja/media/alta)                                                                                                         |
+| **Tarifa Especial**           | Override de precio para un rango de fechas especifico                                                                                                    |
+| **waId**                      | Identificador unico del huesped en WhatsApp (numero de telefono)                                                                                         |
+| **Simulador**                 | Interfaz de prueba que emula WhatsApp para desarrollo local                                                                                              |
+| **Fire-and-forget**           | Patron donde la operacion secundaria no bloquea la principal                                                                                             |
+| **Sena**                      | Pago parcial (porcentaje variable por departamento, configurado en `porcentajeReserva`) para confirmar la reserva. Si es 0%, la reserva queda de palabra |
+| **WABA**                      | WhatsApp Business Account — cuenta de negocio en WhatsApp                                                                                                |
+| **System User**               | Usuario de servicio en Meta Business para tokens permanentes                                                                                             |
+| **Cloud API**                 | API de WhatsApp alojada por Meta                                                                                                                         |
+| **Template**                  | Mensaje pre-aprobado por Meta, requerido fuera de la ventana de 24h                                                                                      |
+| **IcalFeed**                  | Feed iCal de una plataforma externa (Booking, Airbnb, VRBO) vinculado a un complejo                                                                      |
+| **syncToken**                 | Token de Google Calendar API para sincronizacion incremental (solo eventos nuevos/modificados)                                                           |
+| **chatbootManaged**           | Extended property en eventos GCal que marca eventos creados por el sistema (evita re-importacion)                                                        |
+| **origenGoogle**              | Flag en Bloqueo que indica que fue importado desde Google Calendar                                                                                       |
+| **Service Account**           | Cuenta de servicio de Google Cloud para autenticacion maquina-a-maquina                                                                                  |
+| **MTok**                      | Millon de tokens — unidad de facturacion de la API de Claude                                                                                             |
+| **Sanitizacion de entidades** | Proceso de filtrar solo las claves reconocidas por el bot (num_personas, fecha_entrada, fecha_salida, habitacion) y descartar las no estandar            |
 
 ---
 
@@ -2104,21 +2123,21 @@ Script automatizado que prueba TODOS los endpoints HTTP del sistema de forma sec
 
 ### 21.2 Modulos de Prueba (12 grupos, 97 assertions)
 
-| # | Modulo | Tests | Que prueba |
-|---|--------|-------|------------|
-| 1 | Health Check | 4 | `GET /api/health` — status ok, servicios database y redis |
-| 2 | Autenticacion | 6 | Login valido/invalido, proteccion JWT, acceso con/sin token |
-| 3 | Complejos CRUD | 8 | Crear, leer, actualizar, listar complejos |
-| 4 | Tarifas Estandar | 5 | Upsert tarifa estacional, verificar no duplicacion |
-| 5 | Tarifas Especiales | 7 | CRUD completo de tarifas especiales con sync a inventario |
-| 6 | Bloqueos | 6 | Crear/listar/eliminar bloqueos de disponibilidad |
-| 7 | Inventario | 6 | Consulta mensual, disponibilidad, actualizacion de entries |
-| 8 | Reservas CRUD + Estados | 16 | Crear manual, listar, filtrar por rango, actualizar, transiciones de estado (pre_reserva → confirmada → completada → cancelada) |
-| 9 | Huespedes | 6 | Listar, detalle con reservas, actualizar nombre |
-| 10 | Agentes | 6 | Listar, crear agente (admin only), verificar en lista |
-| 11 | Conversaciones | 12 | Listar, crear via simulador, mensajes, tomar-control, devolver-bot, cerrar |
-| 12 | Simulator + Bot Engine | 11 | Envio de mensajes, creacion de huesped/conversacion, clasificacion de intent, retencion de entidades, reset con "hola" |
-| 3b | Soft Delete Complejo | 4 | Soft delete y verificacion de activo=false |
+| #   | Modulo                  | Tests | Que prueba                                                                                                                      |
+| --- | ----------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Health Check            | 4     | `GET /api/health` — status ok, servicios database y redis                                                                       |
+| 2   | Autenticacion           | 6     | Login valido/invalido, proteccion JWT, acceso con/sin token                                                                     |
+| 3   | Complejos CRUD          | 8     | Crear, leer, actualizar, listar complejos                                                                                       |
+| 4   | Tarifas Estandar        | 5     | Upsert tarifa estacional, verificar no duplicacion                                                                              |
+| 5   | Tarifas Especiales      | 7     | CRUD completo de tarifas especiales con sync a inventario                                                                       |
+| 6   | Bloqueos                | 6     | Crear/listar/eliminar bloqueos de disponibilidad                                                                                |
+| 7   | Inventario              | 6     | Consulta mensual, disponibilidad, actualizacion de entries                                                                      |
+| 8   | Reservas CRUD + Estados | 16    | Crear manual, listar, filtrar por rango, actualizar, transiciones de estado (pre_reserva → confirmada → completada → cancelada) |
+| 9   | Huespedes               | 6     | Listar, detalle con reservas, actualizar nombre                                                                                 |
+| 10  | Agentes                 | 6     | Listar, crear agente (admin only), verificar en lista                                                                           |
+| 11  | Conversaciones          | 12    | Listar, crear via simulador, mensajes, tomar-control, devolver-bot, cerrar                                                      |
+| 12  | Simulator + Bot Engine  | 11    | Envio de mensajes, creacion de huesped/conversacion, clasificacion de intent, retencion de entidades, reset con "hola"          |
+| 3b  | Soft Delete Complejo    | 4     | Soft delete y verificacion de activo=false                                                                                      |
 
 ### 21.3 Estructura del Script
 
@@ -2127,11 +2146,13 @@ Pre-cleanup → Ejecuta 12 modulos secuencialmente → Post-cleanup → Resumen
 ```
 
 **Helpers principales:**
+
 - `api(method, path, body?, token?)` — Wrapper de fetch con auth JWT automatico
 - `assert(name, condition, details?)` — Assertion con contadores PASS/FAIL y colores
 - `cleanupTestData()` — Limpia datos de test (complejo, agente, reserva, huesped simulado)
 
 **Datos de test** (se crean y eliminan automaticamente):
+
 - Complejo: `TEST_COMPLEJO_AUTO`
 - Agente: `test_agent@testall.com`
 - Reserva: huesped `TEST_HUESPED_AUTO`
@@ -2146,6 +2167,7 @@ Pre-cleanup → Ejecuta 12 modulos secuencialmente → Post-cleanup → Resumen
 ```
 
 Todos los 97 tests pasaron exitosamente, cubriendo:
+
 - Todas las rutas publicas y protegidas
 - CRUD completo de cada entidad
 - Transiciones de estado de reservas y conversaciones
@@ -2158,26 +2180,27 @@ Todos los 97 tests pasaron exitosamente, cubriendo:
 **Ejecucion**: `npx tsx server/src/scripts/testQA.ts`
 **Assertions**: 97
 
-| # | Modulo | Tests | Que prueba |
-|---|--------|-------|------------|
-| QA-01 | Data Integrity | 35 | Capacidades > 0, tarifas 3 temporadas, precios > 0, estadiaMinima solo donde corresponde |
-| QA-02 | Inventory Integrity | 12 | Inventario mensual existe, precios > 0 para todas las habitaciones |
-| QA-03 | Context Generation | 9 | Contexto para Claude correcto: menciona todos los deptos, solo Pewmafe con estadia minima, tabla de tarifas con precios |
-| QA-04 | Bot Minimum Stay | 5 | Bot NO inventa estadia minima para deptos sin configuracion |
-| QA-05 | Bot Capacity | 2 | Bot NO ofrece departamento individual si excede capacidad |
-| QA-06 | Entity Retention | 6 | Acumulacion de entidades, reset con "hola" |
-| QA-07 | Reservation Rules | 5 | Estado inicial pre_reserva, transiciones correctas, cancelacion |
-| QA-08 | Auth & Authorization | 2 | Non-admin no puede crear agentes (403), token invalido (401) |
-| QA-09 | Conversation State Machine | 7 | bot → humano_activo → bot → cerrado, mensajes de sistema |
-| QA-10 | Bloqueo + Availability | 3 | Crear bloqueo marca inventario como no disponible, eliminar bloqueo restaura |
-| QA-11 | Tarifa Especial Sync | 3 | Precio especial sincroniza a inventario, eliminar restaura precio estacional |
-| QA-12 | Bot No Inventa | 2 | Menciona actividades reales de la zona, no inventa departamentos |
-| QA-13 | Validation Errors | 4 | Zod rechaza datos incompletos (400) en complejos, reservas, login, estados |
-| QA-14 | Bot Escalation | 2 | Queja escala a espera_humano con mensaje de sistema |
+| #     | Modulo                     | Tests | Que prueba                                                                                                              |
+| ----- | -------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------- |
+| QA-01 | Data Integrity             | 35    | Capacidades > 0, tarifas 3 temporadas, precios > 0, estadiaMinima solo donde corresponde                                |
+| QA-02 | Inventory Integrity        | 12    | Inventario mensual existe, precios > 0 para todas las habitaciones                                                      |
+| QA-03 | Context Generation         | 9     | Contexto para Claude correcto: menciona todos los deptos, solo Pewmafe con estadia minima, tabla de tarifas con precios |
+| QA-04 | Bot Minimum Stay           | 5     | Bot NO inventa estadia minima para deptos sin configuracion                                                             |
+| QA-05 | Bot Capacity               | 2     | Bot NO ofrece departamento individual si excede capacidad                                                               |
+| QA-06 | Entity Retention           | 6     | Acumulacion de entidades, reset con "hola"                                                                              |
+| QA-07 | Reservation Rules          | 5     | Estado inicial pre_reserva, transiciones correctas, cancelacion                                                         |
+| QA-08 | Auth & Authorization       | 2     | Non-admin no puede crear agentes (403), token invalido (401)                                                            |
+| QA-09 | Conversation State Machine | 7     | bot → humano_activo → bot → cerrado, mensajes de sistema                                                                |
+| QA-10 | Bloqueo + Availability     | 3     | Crear bloqueo marca inventario como no disponible, eliminar bloqueo restaura                                            |
+| QA-11 | Tarifa Especial Sync       | 3     | Precio especial sincroniza a inventario, eliminar restaura precio estacional                                            |
+| QA-12 | Bot No Inventa             | 2     | Menciona actividades reales de la zona, no inventa departamentos                                                        |
+| QA-13 | Validation Errors          | 4     | Zod rechaza datos incompletos (400) en complejos, reservas, login, estados                                              |
+| QA-14 | Bot Escalation             | 2     | Queja escala a espera_humano con mensaje de sistema                                                                     |
 
 ### 21.6 Bugs Encontrados y Corregidos (2026-03-08)
 
 #### BUG-1: Bot inventaba estadia minima para departamentos sin configuracion (CRITICO)
+
 - **Sintoma**: Bot informaba "Luminar Mono: minimo 4 noches, LG: minimo 5 noches" cuando solo Pewmafe tiene estadia minima
 - **Causa raiz**: Datos incorrectos en DB — Luminar Mono tenia `estadiaMinima=4`, Luminar 2Amb `=4`, LG `=5` a nivel complejo
 - **Propagacion**: `accommodationContext.ts` linea 113 usa `t.estadiaMinima ?? c.estadiaMinima` como fallback, propagando el valor del complejo a todas las temporadas
@@ -2186,6 +2209,7 @@ Todos los 97 tests pasaron exitosamente, cubriendo:
 - **Verificacion**: QA-01 valida que solo Pewmafe tiene estadiaMinima, QA-03 valida contexto, QA-04 valida respuesta del bot
 
 #### BUG-2: Bloqueos de disponibilidad no funcionaban (CRITICO)
+
 - **Sintoma**: `blockDates`, `releaseDates` y `releaseDatesIfNotReserved` no bloqueaban/liberaban fechas en inventario — `updateMany matched: 0 rows`
 - **Causa raiz**: Bug de timezone. `seedInventory.ts` crea fechas en local midnight (`setHours(0,0,0,0)`) que en UTC-3 se almacenan como `T03:00:00Z`. Pero las funciones de bloqueo usaban `new Date('2026-10-01')` que crea UTC midnight `T00:00:00Z`. La query `{ in: dates }` nunca coincidia porque `T00:00:00Z ≠ T03:00:00Z`
 - **Impacto**: TODOS los bloqueos creados desde el panel de admin eran silenciosamente inefectivos — las fechas aparecian como bloqueadas en la UI pero el inventario nunca se marcaba como no disponible
@@ -2196,6 +2220,7 @@ Todos los 97 tests pasaron exitosamente, cubriendo:
 - **Verificacion**: QA-10 valida bloqueo + disponibilidad, QA-11 valida sync de tarifa especial
 
 #### BUG-3: Frontend caido con backend activo — No detectado (OPERACIONAL)
+
 - **Sintoma**: Despues de matar todos los procesos node (`taskkill /F /IM node.exe`) y reiniciar solo el backend, el frontend Vite (puerto 5173) quedaba caido sin que nadie lo detectara. El usuario navegaba a `http://localhost:5173/` y la app no respondia.
 - **Causa raiz**: Al reiniciar manualmente solo el servidor Express (puerto 5050), el frontend Vite no se reiniciaba. Los test suites (`testAll.ts`, `testQA.ts`) solo verificaban el backend, no el frontend.
 - **Impacto**: Sesiones de QA perdidas y confusion al pensar que la app estaba operativa cuando solo el API respondia.
@@ -2209,6 +2234,7 @@ Todos los 97 tests pasaron exitosamente, cubriendo:
 - **Verificacion**: Matar frontend → ejecutar tests → debe fallar con "FATAL: Frontend no disponible en puerto 5173"
 
 #### BUG-4: Bot sigue inventando estadia minima para departamentos sin restriccion (CRITICO — REINCIDENTE)
+
 - **Sintoma**: El bot respondia "Todos nuestros departamentos requieren una estadía mínima (entre 2 y 5 noches según el tipo)" cuando el usuario consultaba por 1 noche. Solo Pewmafe tiene estadia minima configurada; Luminar Mono, Luminar 2Amb y LG NO tienen — aceptan desde 1 noche.
 - **Causa raiz (3 fallas simultaneas)**:
   1. **`accommodationContext.ts`**: Departamentos sin estadia minima simplemente NO mostraban nada en el contexto. Claude veia la estadia minima de Pewmafe y **generalizaba** a todos.
@@ -2232,19 +2258,19 @@ Todos los 97 tests pasaron exitosamente, cubriendo:
 
 Script: `npx tsx server/src/scripts/testSimulaciones.ts`
 
-| Conv | Nombre         | Escenario                                | Validacion principal                                      |
-|------|----------------|------------------------------------------|-----------------------------------------------------------|
-| 01   | Maria Lopez    | Saludo simple                            | Bienvenida, sin inventar datos                            |
-| 02   | Carlos Diaz    | 1 noche / 2 personas                    | NO inventar estadia minima para Luminar/LG                |
-| 03   | Pedro Martinez | 10 personas / 1 noche (bug reportado)   | NO generalizar estadia minima, sugerir combinar deptos    |
-| 04   | Ana Garcia     | Precio LG                                | Mostrar precio real con $, sin inventar minimo            |
-| 05   | Laura Fernandez| Actividades zona                         | Mencionar actividades reales (buceo, kayak, etc)          |
-| 06   | Roberto Sosa   | Pewmafe 1 noche                          | Mencionar minimo real O no disponible                     |
-| 07   | Sofia Ruiz     | Amenities LG                             | Describir amenities, sin inventar minimo                  |
-| 08   | Diego Morales  | Reserva paso a paso                      | Acumulacion de entidades, no re-preguntar datos conocidos |
-| 09   | Marta Gimenez  | Queja / escalacion                       | Disculparse, escalar a espera_humano                      |
-| 10   | Juan Perez     | Despedida                                | Despedida amable, cerrar conversacion                     |
-| 11   | Lucia Torres   | Reserva sin tarjeta                      | NO mencionar MercadoPago/tarjeta proactivamente           |
+| Conv | Nombre          | Escenario                             | Validacion principal                                      |
+| ---- | --------------- | ------------------------------------- | --------------------------------------------------------- |
+| 01   | Maria Lopez     | Saludo simple                         | Bienvenida, sin inventar datos                            |
+| 02   | Carlos Diaz     | 1 noche / 2 personas                  | NO inventar estadia minima para Luminar/LG                |
+| 03   | Pedro Martinez  | 10 personas / 1 noche (bug reportado) | NO generalizar estadia minima, sugerir combinar deptos    |
+| 04   | Ana Garcia      | Precio LG                             | Mostrar precio real con $, sin inventar minimo            |
+| 05   | Laura Fernandez | Actividades zona                      | Mencionar actividades reales (buceo, kayak, etc)          |
+| 06   | Roberto Sosa    | Pewmafe 1 noche                       | Mencionar minimo real O no disponible                     |
+| 07   | Sofia Ruiz      | Amenities LG                          | Describir amenities, sin inventar minimo                  |
+| 08   | Diego Morales   | Reserva paso a paso                   | Acumulacion de entidades, no re-preguntar datos conocidos |
+| 09   | Marta Gimenez   | Queja / escalacion                    | Disculparse, escalar a espera_humano                      |
+| 10   | Juan Perez      | Despedida                             | Despedida amable, cerrar conversacion                     |
+| 11   | Lucia Torres    | Reserva sin tarjeta                   | NO mencionar MercadoPago/tarjeta proactivamente           |
 
 ### 21.8 Resultados Finales (2026-03-08)
 
@@ -2288,17 +2314,18 @@ Proteccion contra abuso y control de costos de IA mediante limitacion por numero
 
 Endpoint `GET /api/health` ampliado para verificar:
 
-| Servicio | Verificacion |
-|----------|-------------|
-| Database | `SELECT 1` con medicion de latencia (ms) |
-| Redis    | `PING` con medicion de latencia (ms) |
-| Claude   | Verificacion de API key configurada |
+| Servicio | Verificacion                                      |
+| -------- | ------------------------------------------------- |
+| Database | `SELECT 1` con medicion de latencia (ms)          |
+| Redis    | `PING` con medicion de latencia (ms)              |
+| Claude   | Verificacion de API key configurada               |
 | WhatsApp | Verificacion de token/phone ID (o modo simulador) |
-| Sheets   | Verificacion de credenciales configuradas |
+| Sheets   | Verificacion de credenciales configuradas         |
 
 Estado general: `ok` si todos los servicios estan OK o no configurados, `degraded` si alguno falla.
 
 En el frontend, se agrego un indicador compacto en el header:
+
 - Punto verde/amarillo/gris segun estado general
 - Click para expandir detalle de cada servicio con latencia
 - Auto-refresh cada 30 segundos
@@ -2308,6 +2335,7 @@ En el frontend, se agrego un indicador compacto en el header:
 **Archivo**: `server/src/services/botEngine.ts`
 
 Validacion automatica cuando `fecha_entrada > fecha_salida`:
+
 - Detecta la inversion y las swapea automaticamente
 - Loguea warning para debugging
 - Agrega contexto adicional para que Claude confirme las fechas con el huesped: "Las fechas estaban invertidas. Se corrigieron automaticamente: entrada X, salida Y. Confirma amablemente con el huesped que esas son las fechas correctas."
@@ -2374,20 +2402,20 @@ Corregido `cantUnid` a `cantidadUn` en el diagrama ER para consistencia con el n
 
 Nuevo script con 12 escenarios diseñados para encontrar bugs especificos del bot. Usa telefonos en rango `54911000300XX` (separados de testSimulaciones).
 
-| # | Test | Vector de ataque | Que valida |
-|---|------|------------------|-----------|
-| ST-01 | Capacidad excedida | 4 personas → NO ofrecer Luminar Mono (cap 3) | Regla de capacidad por unidad |
-| ST-02 | Depto inexistente | "Premium Suite" | NO inventar departamentos |
-| ST-03 | Noches vs personas | "3 noches" != "3 personas" | Clasificador no confunde entidades |
-| ST-04 | Mascotas | "puedo llevar mi perro?" | Responde NO (prohibido en todos) |
-| ST-05 | Fechas invertidas | "del 20 al 15 de mayo" | Swap automatico o pedido de correccion |
-| ST-06 | Precio con fechas | Abril = baja → solo UNA temporada | NO lista baja/media/alta |
-| ST-07 | URLs en texto | "ver fotos del Pewmafe" | NO incluir http/https/YouTube |
-| ST-08 | Confirmar reserva | Datos completos de reserva | Solo "pre-reserva", NUNCA "confirmada" |
-| ST-09 | Unidades limite | 6 personas | NO ofrecer 2 Luminar Mono (solo 1 existe) |
-| ST-10 | MercadoPago | Reserva directa | NO mencionar tarjeta/MercadoPago proactivamente |
-| ST-11 | Cambio personas | "somos 2" → "en realidad somos 4" | Actualiza entidad, NO ofrece Mono |
-| ST-12 | Estadia minima | Pewmafe 1 noche temp alta (min 3) | DEBE advertir, NO generalizar |
+| #     | Test               | Vector de ataque                             | Que valida                                      |
+| ----- | ------------------ | -------------------------------------------- | ----------------------------------------------- |
+| ST-01 | Capacidad excedida | 4 personas → NO ofrecer Luminar Mono (cap 3) | Regla de capacidad por unidad                   |
+| ST-02 | Depto inexistente  | "Premium Suite"                              | NO inventar departamentos                       |
+| ST-03 | Noches vs personas | "3 noches" != "3 personas"                   | Clasificador no confunde entidades              |
+| ST-04 | Mascotas           | "puedo llevar mi perro?"                     | Responde NO (prohibido en todos)                |
+| ST-05 | Fechas invertidas  | "del 20 al 15 de mayo"                       | Swap automatico o pedido de correccion          |
+| ST-06 | Precio con fechas  | Abril = baja → solo UNA temporada            | NO lista baja/media/alta                        |
+| ST-07 | URLs en texto      | "ver fotos del Pewmafe"                      | NO incluir http/https/YouTube                   |
+| ST-08 | Confirmar reserva  | Datos completos de reserva                   | Solo "pre-reserva", NUNCA "confirmada"          |
+| ST-09 | Unidades limite    | 6 personas                                   | NO ofrecer 2 Luminar Mono (solo 1 existe)       |
+| ST-10 | MercadoPago        | Reserva directa                              | NO mencionar tarjeta/MercadoPago proactivamente |
+| ST-11 | Cambio personas    | "somos 2" → "en realidad somos 4"            | Actualiza entidad, NO ofrece Mono               |
+| ST-12 | Estadia minima     | Pewmafe 1 noche temp alta (min 3)            | DEBE advertir, NO generalizar                   |
 
 **Deteccion de API**: El script verifica si Claude API esta disponible. Tests que requieren IA (extraccion de entidades, respuestas contextuales) se marcan `SKIP` en vez de `FAIL` cuando la API no tiene credito.
 
@@ -2400,17 +2428,18 @@ Nuevo script con 12 escenarios diseñados para encontrar bugs especificos del bo
 3. **Fallback de `consulta_precio` listaba rangos de precios** — Daba precios de referencia sin preguntar fechas. Ya corregido anteriormente (seccion 22.8).
 
 **Resultados** (sin credito API):
+
 ```
 34 passed, 0 failed, 9 skipped (requieren Claude API)
 ```
 
 ### 22.11 Mejoras descartadas (con justificacion)
 
-| Mejora propuesta | Razon de descarte |
-|-----------------|-------------------|
-| Conversational Analytics (panel) | Feature grande que requiere planificacion propia. No es una correccion. |
+| Mejora propuesta                      | Razon de descarte                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Conversational Analytics (panel)      | Feature grande que requiere planificacion propia. No es una correccion.                    |
 | Context Manager separado en botEngine | Refactoring de arquitectura. botEngine funciona correctamente. Riesgo sin valor inmediato. |
-| Simulador con replay/regresiones | Ya cubierto por testSimulaciones, testQA y testBotMemory (194+ tests existentes). |
+| Simulador con replay/regresiones      | Ya cubierto por testSimulaciones, testQA y testBotMemory (194+ tests existentes).          |
 
 ---
 
@@ -2422,23 +2451,23 @@ Sincronizacion de disponibilidad con Booking.com mediante el protocolo iCal (RFC
 
 ### 23.1 Archivos creados
 
-| Archivo | Descripcion |
-|---------|-------------|
+| Archivo                              | Descripcion                                                                                        |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | `server/src/services/icalService.ts` | Logica core: generacion de VCALENDAR (export) y sincronizacion desde feed iCal de Booking (import) |
-| `server/src/routes/ical.ts` | Endpoint publico `GET /api/ical/:complejoId.ics` (sin auth, Content-Type: text/calendar) |
-| `server/src/services/icalSyncJob.ts` | Cron job cada 30 min para sincronizar complejos con icalUrl configurada |
+| `server/src/routes/ical.ts`          | Endpoint publico `GET /api/ical/:complejoId.ics` (sin auth, Content-Type: text/calendar)           |
+| `server/src/services/icalSyncJob.ts` | Cron job cada 30 min para sincronizar complejos con icalUrl configurada                            |
 
 ### 23.2 Archivos modificados
 
-| Archivo | Cambio |
-|---------|--------|
-| `server/prisma/schema.prisma` | Agregado `icalUrl String? @map("ical_url")` al modelo Complejo |
-| `shared/types/complejo.ts` | Agregado `icalUrl: string \| null` a Complejo y `icalUrl?: string` a CrearComplejoRequest |
-| `server/src/routes/complejos.ts` | Agregado `icalUrl: z.string().url().optional()` al schema Zod de validacion |
-| `server/src/services/complejoService.ts` | Agregado `icalUrl` a los tipos de createComplejo y updateComplejo + pasarlo al Prisma create |
-| `server/src/app.ts` | Montado `icalRouter` como ruta publica (antes del protectedRouter) |
-| `server/src/index.ts` | Agregado `startIcalSyncJob()` en startup y `stopIcalSyncJob()` en shutdown |
-| `src/components/complejos/ComplejoEditModal.tsx` | Agregado campo "Sincronizar Reservas - URL iCal Booking" en tab Datos |
+| Archivo                                          | Cambio                                                                                       |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `server/prisma/schema.prisma`                    | Agregado `icalUrl String? @map("ical_url")` al modelo Complejo                               |
+| `shared/types/complejo.ts`                       | Agregado `icalUrl: string \| null` a Complejo y `icalUrl?: string` a CrearComplejoRequest    |
+| `server/src/routes/complejos.ts`                 | Agregado `icalUrl: z.string().url().optional()` al schema Zod de validacion                  |
+| `server/src/services/complejoService.ts`         | Agregado `icalUrl` a los tipos de createComplejo y updateComplejo + pasarlo al Prisma create |
+| `server/src/app.ts`                              | Montado `icalRouter` como ruta publica (antes del protectedRouter)                           |
+| `server/src/index.ts`                            | Agregado `startIcalSyncJob()` en startup y `stopIcalSyncJob()` en shutdown                   |
+| `src/components/complejos/ComplejoEditModal.tsx` | Agregado campo "Sincronizar Reservas - URL iCal Booking" en tab Datos                        |
 
 ### 23.3 Export — Booking lee nuestro calendario
 
@@ -2453,6 +2482,7 @@ Booking.com ──(cada ~4h)──> GET /api/ical/:complejoId.ics
 ```
 
 **Headers de respuesta:**
+
 - `Content-Type: text/calendar; charset=utf-8`
 - `Cache-Control: no-cache, no-store, must-revalidate`
 
@@ -2472,6 +2502,7 @@ Booking.com ──(genera iCal)──> URL en extranet de Booking
 ```
 
 **Identificacion de reservas de Booking:**
+
 - `origenReserva = 'booking'`
 - `notas = 'ical-uid:<uid_del_evento>'` (permite matchear en syncs posteriores)
 - `nombreHuesped = 'Reserva Booking'` (Booking no expone datos del huesped via iCal)
@@ -2498,34 +2529,34 @@ Cuando el bot crea una reserva automaticamente desde una conversacion de WhatsAp
 
 ### 24.1 Archivos modificados
 
-| Archivo | Cambio |
-|---------|--------|
+| Archivo                                 | Cambio                                                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `server/src/services/reservaService.ts` | Agregados `nombreHuesped` y `telefonoHuesped` opcionales a `CreateReservaParams`, pasados al Prisma create |
-| `server/src/services/botEngine.ts` | Al crear reserva, se consulta el huesped y se pasan `nombre` y `telefono` (o `waId` como fallback) |
+| `server/src/services/botEngine.ts`      | Al crear reserva, se consulta el huesped y se pasan `nombre` y `telefono` (o `waId` como fallback)         |
 
 ### 24.2 Campos que se llenan desde conversacion
 
-| Campo | Origen |
-|-------|--------|
-| `nombreHuesped` | `huesped.nombre` de la DB |
-| `telefonoHuesped` | `huesped.telefono` o `huesped.waId` (fallback) |
-| `habitacion` | Entidad extraida por el clasificador |
-| `fechaEntrada` / `fechaSalida` | Entidades extraidas por el clasificador |
-| `numHuespedes` | Entidad extraida por el clasificador |
-| `precioTotal` | Calculado por `checkAvailability()` |
-| `tarifaNoche` | Promedio de `precioPorNoche[]` del resultado de disponibilidad |
-| `montoReserva` | `precioTotal * porcentajeReserva / 100` |
-| `saldo` | `precioTotal - montoReserva` |
-| `origenReserva` | Siempre `'WhatsApp'` |
-| `estado` | Siempre `'pre_reserva'` |
+| Campo                          | Origen                                                         |
+| ------------------------------ | -------------------------------------------------------------- |
+| `nombreHuesped`                | `huesped.nombre` de la DB                                      |
+| `telefonoHuesped`              | `huesped.telefono` o `huesped.waId` (fallback)                 |
+| `habitacion`                   | Entidad extraida por el clasificador                           |
+| `fechaEntrada` / `fechaSalida` | Entidades extraidas por el clasificador                        |
+| `numHuespedes`                 | Entidad extraida por el clasificador                           |
+| `precioTotal`                  | Calculado por `checkAvailability()`                            |
+| `tarifaNoche`                  | Promedio de `precioPorNoche[]` del resultado de disponibilidad |
+| `montoReserva`                 | `precioTotal * porcentajeReserva / 100`                        |
+| `saldo`                        | `precioTotal - montoReserva`                                   |
+| `origenReserva`                | Siempre `'WhatsApp'`                                           |
+| `estado`                       | Siempre `'pre_reserva'`                                        |
 
 ### 24.3 Campos que quedan vacios (no colectados en conversacion)
 
-| Campo | Motivo |
-|-------|--------|
+| Campo        | Motivo                                |
+| ------------ | ------------------------------------- |
 | `nroFactura` | Se completa manualmente por el agente |
 | `importeUsd` | Se completa manualmente por el agente |
-| `notas` | Se completa manualmente por el agente |
+| `notas`      | Se completa manualmente por el agente |
 
 ---
 
@@ -2566,71 +2597,72 @@ model BotConfig {
 
 ### 25.2 Archivos nuevos
 
-| Archivo | Responsabilidad |
-|---------|----------------|
-| `server/src/services/botConfigService.ts` | `getBotConfig()` con cache 5 min, `updateBotConfig()`, `invalidateBotConfigCache()` |
-| `server/src/routes/botConfig.ts` | `GET /api/bot/config`, `PATCH /api/bot/config` con Zod validation |
-| `src/api/botConfigApi.ts` | Cliente API frontend |
-| `src/components/bot/BotConfigPage.tsx` | Pagina admin con 6 secciones (Logo, Identidad, Comportamiento con titulares verificados, Reglas personalizadas, Mensajes, Horario) |
+| Archivo                                   | Responsabilidad                                                                                                                    |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/services/botConfigService.ts` | `getBotConfig()` con cache 5 min, `updateBotConfig()`, `invalidateBotConfigCache()`                                                |
+| `server/src/routes/botConfig.ts`          | `GET /api/bot/config`, `PATCH /api/bot/config` con Zod validation                                                                  |
+| `src/api/botConfigApi.ts`                 | Cliente API frontend                                                                                                               |
+| `src/components/bot/BotConfigPage.tsx`    | Pagina admin con 6 secciones (Logo, Identidad, Comportamiento con titulares verificados, Reglas personalizadas, Mensajes, Horario) |
 
 ### 25.3 Archivos modificados
 
-| Archivo | Cambio |
-|---------|--------|
-| `server/prisma/schema.prisma` | Agregado modelo `BotConfig` |
-| `server/src/app.ts` | Montado `botConfigRouter` en rutas protegidas |
+| Archivo                                | Cambio                                                                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `server/prisma/schema.prisma`          | Agregado modelo `BotConfig`                                                                                                |
+| `server/src/app.ts`                    | Montado `botConfigRouter` en rutas protegidas                                                                              |
 | `server/src/services/claudeService.ts` | Prompt dinamico usa `botConfig` (nombre, ubicacion, tono, idioma, emojis, longitud). Fallbacks usan mensajes configurables |
-| `server/src/services/botEngine.ts` | Usa `botConfig` para fotos, escalacion, telefono, auto pre-reserva |
-| `src/App.tsx` | Agregada vista `'bot'` con `BotConfigPage` |
-| `src/components/layout/Header.tsx` | Agregado boton "Bot" en navegacion |
+| `server/src/services/botEngine.ts`     | Usa `botConfig` para fotos, escalacion, telefono, auto pre-reserva                                                         |
+| `src/App.tsx`                          | Agregada vista `'bot'` con `BotConfigPage`                                                                                 |
+| `src/components/layout/Header.tsx`     | Agregado boton "Bot" en navegacion                                                                                         |
 
 ### 25.4 Campos editables desde panel admin
 
 **Seccion 1 — Identidad del agente:**
 
-| Campo | Default | Efecto |
-|-------|---------|--------|
-| `nombreAgente` | Las Grutas Departamentos | Primera linea del prompt: "Eres el asistente virtual de {nombre}" |
-| `ubicacion` | Las Grutas, Rio Negro, Patagonia Argentina | "alojamiento turistico en {ubicacion}" |
-| `tono` | amable, profesional y cercano | "Tu tono es {tono}" |
-| `idioma` | es_AR | es_AR → "espanol de Argentina (voseo)", es → "espanol neutro", en → "English" |
-| `usarEmojis` | false | false → "No uses markdown ni emojis excesivos", true → "Podes usar emojis moderadamente" |
-| `longitudRespuesta` | corta | corta → "max 3-4 frases", media → "max 5-7 frases", detallada → "max 8-10 frases" |
+| Campo               | Default                                    | Efecto                                                                                   |
+| ------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `nombreAgente`      | Las Grutas Departamentos                   | Primera linea del prompt: "Eres el asistente virtual de {nombre}"                        |
+| `ubicacion`         | Las Grutas, Rio Negro, Patagonia Argentina | "alojamiento turistico en {ubicacion}"                                                   |
+| `tono`              | amable, profesional y cercano              | "Tu tono es {tono}"                                                                      |
+| `idioma`            | es_AR                                      | es_AR → "espanol de Argentina (voseo)", es → "espanol neutro", en → "English"            |
+| `usarEmojis`        | false                                      | false → "No uses markdown ni emojis excesivos", true → "Podes usar emojis moderadamente" |
+| `longitudRespuesta` | corta                                      | corta → "max 3-4 frases", media → "max 5-7 frases", detallada → "max 8-10 frases"        |
 
 **Seccion 2 — Comportamiento:**
 
-| Campo | Default | Efecto |
-|-------|---------|--------|
-| `autoPreReserva` | true | Si false, el bot NO crea pre-reservas automaticamente en PASO 1 |
-| `modoEnvioFotos` | auto | auto/on_request → envia fotos cuando el huesped pide, off → nunca envia fotos |
-| `escalarSiQueja` | true | Si false, quejas NO escalan a `espera_humano` (bot responde normalmente) |
-| `escalarSiPago` | true | Si false, problemas bancarios NO escalan a `espera_humano` |
-| `telefonoContacto` | +54 2920 561033 | Usado en mensaje de capacidad excedida |
-| `titularesVerificados` | [] | Lista de nombres de titulares bancarios autorizados. El bot solo muestra datos de pago si el titular del complejo esta en esta lista (comparacion case-insensitive). Se gestiona con UI de agregar/eliminar chips |
+| Campo                  | Default         | Efecto                                                                                                                                                                                                            |
+| ---------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `autoPreReserva`       | true            | Si false, el bot NO crea pre-reservas automaticamente en PASO 1                                                                                                                                                   |
+| `modoEnvioFotos`       | auto            | auto/on_request → envia fotos cuando el huesped pide, off → nunca envia fotos                                                                                                                                     |
+| `escalarSiQueja`       | true            | Si false, quejas NO escalan a `espera_humano` (bot responde normalmente)                                                                                                                                          |
+| `escalarSiPago`        | true            | Si false, problemas bancarios NO escalan a `espera_humano`                                                                                                                                                        |
+| `telefonoContacto`     | +54 2920 561033 | Usado en mensaje de capacidad excedida                                                                                                                                                                            |
+| `titularesVerificados` | []              | Lista de nombres de titulares bancarios autorizados. El bot solo muestra datos de pago si el titular del complejo esta en esta lista (comparacion case-insensitive). Se gestiona con UI de agregar/eliminar chips |
 
 **Seccion 3 — Mensajes personalizados:**
 
-| Campo | Uso |
-|-------|-----|
-| `mensajeBienvenida` | Respuesta fallback para intent `saludo` (sin API key o error de Claude) |
-| `mensajeDespedida` | Respuesta fallback para intent `despedida` |
-| `mensajeFueraHorario` | Almacenado para uso futuro (horario no implementado aun) |
-| `mensajeEsperaHumano` | Respuesta fallback para intent `hablar_humano` |
+| Campo                 | Uso                                                                     |
+| --------------------- | ----------------------------------------------------------------------- |
+| `mensajeBienvenida`   | Respuesta fallback para intent `saludo` (sin API key o error de Claude) |
+| `mensajeDespedida`    | Respuesta fallback para intent `despedida`                              |
+| `mensajeFueraHorario` | Almacenado para uso futuro (horario no implementado aun)                |
+| `mensajeEsperaHumano` | Respuesta fallback para intent `hablar_humano`                          |
 
 **Seccion 4 — Horario de atencion:**
 
-| Campo | Estado |
-|-------|--------|
+| Campo                          | Estado                                                       |
+| ------------------------------ | ------------------------------------------------------------ |
 | `horarioInicio` / `horarioFin` | Almacenados para uso futuro. El bot responde 24h actualmente |
 
 ### 25.5 API
 
-| Metodo | Ruta | Autenticacion | Descripcion |
-|--------|------|---------------|-------------|
-| GET | `/api/bot/config` | Si (JWT) | Obtener configuracion actual (auto-create con defaults si no existe) |
-| PATCH | `/api/bot/config` | Si (JWT) | Actualizar campos (todos opcionales, Zod validation) |
+| Metodo | Ruta              | Autenticacion | Descripcion                                                          |
+| ------ | ----------------- | ------------- | -------------------------------------------------------------------- |
+| GET    | `/api/bot/config` | Si (JWT)      | Obtener configuracion actual (auto-create con defaults si no existe) |
+| PATCH  | `/api/bot/config` | Si (JWT)      | Actualizar campos (todos opcionales, Zod validation)                 |
 
 **Zod validation del PATCH:**
+
 - `nombreAgente`, `ubicacion`, `tono`: string, min 1, max 200-300
 - `idioma`: enum `es_AR | es | en`
 - `longitudRespuesta`: enum `corta | media | detallada`
@@ -2642,6 +2674,7 @@ model BotConfig {
 ### 25.6 Cache
 
 `botConfigService.ts` implementa cache en memoria con TTL de 5 minutos (mismo patron que `accommodationContext.ts`):
+
 - `getBotConfig()`: Lee de cache si < 5 min, sino consulta DB. Si no existe registro, lo crea con defaults
 - `updateBotConfig()`: Actualiza DB e invalida cache inmediatamente
 - `invalidateBotConfigCache()`: Disponible para tests
@@ -2649,6 +2682,7 @@ model BotConfig {
 ### 25.7 Que NO cambia con BotConfig
 
 Las 10 reglas de negocio del prompt (R1-R10 en seccion 7.2) son fijas y NO se pueden editar desde el panel. Esto incluye:
+
 - Reglas de fotos, precios, capacidad, estadia minima
 - Reglas conversacionales (persistencia de contexto, preguntas progresivas)
 - Flujo de reserva (PASO 1-4)
@@ -2693,6 +2727,7 @@ Se agrego busqueda por texto y filtro por rango de fechas en dos niveles:
 Ubicado en el panel izquierdo, debajo de los filtros de estado (Todas / En espera / Mis chats / Bot / Cerradas).
 
 **Funcionalidad:**
+
 - Input de texto con debounce 400ms (minimo 2 caracteres)
 - Rango de fechas (desde / hasta) con inputs `<input type="date">`
 - Se combina con el filtro de estado existente (ejemplo: "En espera" + buscar "reserva")
@@ -2702,19 +2737,20 @@ Ubicado en el panel izquierdo, debajo de los filtros de estado (Todas / En esper
 
 **Archivos modificados:**
 
-| Archivo | Cambio |
-|---------|--------|
+| Archivo                                      | Cambio                                                                                                                                                                      |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/src/services/conversacionService.ts` | `listConversaciones()` acepta `{ estado, search, dateFrom, dateTo }`. Usa Prisma `mensajes: { some: { AND: [...] } }` para filtrar conversaciones por contenido de mensajes |
-| `server/src/routes/conversaciones.ts` | Schema Zod `conversacionesQuerySchema` con validacion de `search` (1-200 chars), `dateFrom`/`dateTo` (YYYY-MM-DD regex) |
-| `src/api/conversacionApi.ts` | `getConversaciones()` acepta `SearchConversacionesParams` y construye query string |
-| `src/hooks/useConversaciones.ts` | Acepta params completos, query key incluye search params, desactiva refetchInterval durante busqueda |
-| `src/components/chat/ChatList.tsx` | Panel de busqueda colapsable integrado entre filtros de estado y lista |
+| `server/src/routes/conversaciones.ts`        | Schema Zod `conversacionesQuerySchema` con validacion de `search` (1-200 chars), `dateFrom`/`dateTo` (YYYY-MM-DD regex)                                                     |
+| `src/api/conversacionApi.ts`                 | `getConversaciones()` acepta `SearchConversacionesParams` y construye query string                                                                                          |
+| `src/hooks/useConversaciones.ts`             | Acepta params completos, query key incluye search params, desactiva refetchInterval durante busqueda                                                                        |
+| `src/components/chat/ChatList.tsx`           | Panel de busqueda colapsable integrado entre filtros de estado y lista                                                                                                      |
 
 ### 27.3 Busqueda dentro de Conversacion
 
 Ubicado en el panel central, entre el ChatHeader y el area de mensajes.
 
 **Funcionalidad:**
+
 - Input de texto con debounce 400ms (minimo 2 caracteres)
 - Rango de fechas (desde / hasta)
 - Texto coincidente se resalta en amarillo con `<mark class="bg-yellow-200">`
@@ -2726,33 +2762,33 @@ Ubicado en el panel central, entre el ChatHeader y el area de mensajes.
 
 **Archivos modificados:**
 
-| Archivo | Cambio |
-|---------|--------|
+| Archivo                                 | Cambio                                                                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/src/services/mensajeService.ts` | `getByConversacion()` acepta `{ search, dateFrom, dateTo }`. Usa `contenido: { contains, mode: 'insensitive' }` (ILIKE en PostgreSQL) |
-| `server/src/routes/conversaciones.ts` | Schema Zod `mensajesQuerySchema` extendido con `search`, `dateFrom`, `dateTo` |
-| `src/api/conversacionApi.ts` | `getMensajes()` acepta `SearchMensajesParams`, setea `limit=200` con filtros activos |
-| `src/hooks/useChat.ts` | Acepta `searchParams`, cache independiente por filtro, skip Socket.IO durante busqueda |
-| `src/components/chat/ChatSearchBar.tsx` | **Nuevo**. Panel colapsable con input de texto, rango de fechas, contador de resultados |
-| `src/components/chat/MessageBubble.tsx` | Prop `highlightText`, funcion `highlightContent()` que split por regex y wrap en `<mark>` |
-| `src/components/chat/ChatWindow.tsx` | Orquesta estado de busqueda, pasa `searchParams` a hook y `highlightText` a burbujas |
+| `server/src/routes/conversaciones.ts`   | Schema Zod `mensajesQuerySchema` extendido con `search`, `dateFrom`, `dateTo`                                                         |
+| `src/api/conversacionApi.ts`            | `getMensajes()` acepta `SearchMensajesParams`, setea `limit=200` con filtros activos                                                  |
+| `src/hooks/useChat.ts`                  | Acepta `searchParams`, cache independiente por filtro, skip Socket.IO durante busqueda                                                |
+| `src/components/chat/ChatSearchBar.tsx` | **Nuevo**. Panel colapsable con input de texto, rango de fechas, contador de resultados                                               |
+| `src/components/chat/MessageBubble.tsx` | Prop `highlightText`, funcion `highlightContent()` que split por regex y wrap en `<mark>`                                             |
+| `src/components/chat/ChatWindow.tsx`    | Orquesta estado de busqueda, pasa `searchParams` a hook y `highlightText` a burbujas                                                  |
 
 ### 27.4 API
 
 **Lista de conversaciones con filtros:**
 
-| Metodo | Ruta | Params | Descripcion |
-|--------|------|--------|-------------|
-| GET | `/api/conversaciones` | `?search=texto` | Conversaciones con mensajes que contengan "texto" |
-| GET | `/api/conversaciones` | `?dateFrom=2026-03-01&dateTo=2026-03-05` | Conversaciones con mensajes en ese rango |
-| GET | `/api/conversaciones` | `?estado=bot&search=reserva` | Combinable con filtro de estado |
+| Metodo | Ruta                  | Params                                   | Descripcion                                       |
+| ------ | --------------------- | ---------------------------------------- | ------------------------------------------------- |
+| GET    | `/api/conversaciones` | `?search=texto`                          | Conversaciones con mensajes que contengan "texto" |
+| GET    | `/api/conversaciones` | `?dateFrom=2026-03-01&dateTo=2026-03-05` | Conversaciones con mensajes en ese rango          |
+| GET    | `/api/conversaciones` | `?estado=bot&search=reserva`             | Combinable con filtro de estado                   |
 
 **Mensajes de conversacion con filtros:**
 
-| Metodo | Ruta | Params | Descripcion |
-|--------|------|--------|-------------|
-| GET | `/api/conversaciones/:id/mensajes` | `?search=hola` | Solo mensajes que contengan "hola" |
-| GET | `/api/conversaciones/:id/mensajes` | `?dateFrom=2026-03-01&dateTo=2026-03-05` | Solo mensajes en ese rango |
-| GET | `/api/conversaciones/:id/mensajes` | `?search=hola&limit=200` | Automatico cuando hay filtros |
+| Metodo | Ruta                               | Params                                   | Descripcion                        |
+| ------ | ---------------------------------- | ---------------------------------------- | ---------------------------------- |
+| GET    | `/api/conversaciones/:id/mensajes` | `?search=hola`                           | Solo mensajes que contengan "hola" |
+| GET    | `/api/conversaciones/:id/mensajes` | `?dateFrom=2026-03-01&dateTo=2026-03-05` | Solo mensajes en ese rango         |
+| GET    | `/api/conversaciones/:id/mensajes` | `?search=hola&limit=200`                 | Automatico cuando hay filtros      |
 
 ### 27.5 Detalles Tecnicos
 
@@ -2789,6 +2825,7 @@ Constraint unico en `[complejoId, url]` para evitar duplicados.
 ### 28.3 Migracion de Datos
 
 La migracion `20260317020000_ical_feeds_and_gcal_sync` realiza:
+
 1. Crea tabla `ical_feeds`
 2. Inserta registros para todos los complejos que tenian `ical_url` no nulo (como plataforma `booking`)
 3. Elimina la columna `ical_url` de `complejos`
@@ -2802,6 +2839,7 @@ La migracion `20260317020000_ical_feeds_and_gcal_sync` realiza:
 ### 28.5 Reservas Importadas
 
 Cada plataforma genera reservas con `origenReserva` distinto:
+
 - Feed de Booking → `origenReserva: 'booking'`, `nombreHuesped: 'Reserva Booking'`
 - Feed de Airbnb → `origenReserva: 'airbnb'`, `nombreHuesped: 'Reserva Airbnb'`
 - Feed de VRBO → `origenReserva: 'vrbo'`, `nombreHuesped: 'Reserva Vrbo'`
@@ -2811,6 +2849,7 @@ Las cancelaciones se detectan por plataforma: solo se cancelan reservas con el m
 ### 28.6 UI — Tab "Sync" en ComplejoEditModal
 
 Nueva tab en el modal de edicion de complejo:
+
 - Lista de feeds existentes con badge de plataforma, URL truncada, fecha de ultimo sync y boton eliminar
 - Formulario para agregar: select de plataforma + input de URL + boton "Agregar"
 - URL de exportacion iCal read-only con boton "Copiar" (`{origin}/api/ical/{id}.ics`)
@@ -2822,6 +2861,7 @@ Nueva tab en el modal de edicion de complejo:
 ### 29.1 Descripcion
 
 Sincronizacion bidireccional entre el sistema y un calendario de Google compartido. Permite que:
+
 - Las reservas y bloqueos creados en el sistema aparezcan en Google Calendar
 - Los eventos creados manualmente en Google Calendar se importen como bloqueos
 
@@ -2838,15 +2878,16 @@ Si `GOOGLE_CALENDAR_ID` no esta configurado, toda la funcionalidad de GCal se de
 
 Se ejecuta como fire-and-forget (no bloquea la operacion principal):
 
-| Accion en el sistema | Efecto en GCal |
-|---------------------|----------------|
+| Accion en el sistema               | Efecto en GCal                                                 |
+| ---------------------------------- | -------------------------------------------------------------- |
 | Crear reserva (manual, bot o iCal) | Crea evento all-day: `Reserva: {habitacion} - {nombreHuesped}` |
-| Actualizar reserva | Actualiza fechas/summary del evento |
-| Cancelar reserva | Elimina el evento de GCal |
-| Crear bloqueo | Crea evento all-day: `Bloqueado: {complejo} - {motivo}` |
-| Eliminar bloqueo | Elimina el evento de GCal |
+| Actualizar reserva                 | Actualiza fechas/summary del evento                            |
+| Cancelar reserva                   | Elimina el evento de GCal                                      |
+| Crear bloqueo                      | Crea evento all-day: `Bloqueado: {complejo} - {motivo}`        |
+| Eliminar bloqueo                   | Elimina el evento de GCal                                      |
 
 **Puntos de integracion:**
+
 - `reservaService.ts` — `createReserva()`, `updateReserva()`, `updateReservaEstado()`
 - `complejos.ts` routes — POST y DELETE de bloqueos
 - `icalService.ts` — reservas importadas por iCal
@@ -2855,15 +2896,16 @@ Se ejecuta como fire-and-forget (no bloquea la operacion principal):
 
 Se ejecuta cada 5 minutos via `gcalSyncJob.ts`:
 
-| Accion en GCal | Efecto en el sistema |
-|----------------|---------------------|
-| Crear evento | Crea `Bloqueo` con `origenGoogle: true` |
-| Modificar evento | Actualiza fechas del bloqueo |
-| Eliminar evento | Elimina el bloqueo correspondiente |
+| Accion en GCal   | Efecto en el sistema                    |
+| ---------------- | --------------------------------------- |
+| Crear evento     | Crea `Bloqueo` con `origenGoogle: true` |
+| Modificar evento | Actualiza fechas del bloqueo            |
+| Eliminar evento  | Elimina el bloqueo correspondiente      |
 
 ### 29.5 Proteccion Anti-loop
 
 Para evitar que un evento pushado al GCal se re-importe como bloqueo:
+
 1. Eventos creados por el sistema llevan `extendedProperties.private.chatbootManaged = 'true'`
 2. Al importar, se ignoran eventos con esta propiedad
 3. Bloqueos importados desde GCal tienen `origenGoogle: true`, lo que previene que se re-pusheen
@@ -2871,6 +2913,7 @@ Para evitar que un evento pushado al GCal se re-importe como bloqueo:
 ### 29.6 Matching de Complejo
 
 Al importar eventos de GCal, el sistema intenta determinar a que complejo pertenece:
+
 1. Busca el nombre del complejo o sus aliases en el summary del evento (case-insensitive)
 2. Si no encuentra match, usa el primer complejo activo como fallback
 
@@ -2907,6 +2950,7 @@ Al importar eventos de GCal, el sistema intenta determinar a que complejo perten
 **Opcion A — Postfix local (produccion actual):**
 
 En produccion se usa Postfix instalado en el host con OpenDKIM para firma DKIM. No requiere autenticacion:
+
 ```
 SMTP_HOST=host.docker.internal
 SMTP_PORT=25
@@ -2917,6 +2961,7 @@ SMTP_PASS=
 **Opcion B — Gmail SMTP (alternativa):**
 
 Requiere una cuenta de Gmail con "Contrasena de aplicacion":
+
 1. Habilitar verificacion en 2 pasos en la cuenta de Google
 2. Ir a myaccount.google.com > Seguridad > Contrasenas de aplicacion
 3. Generar contrasena para "Correo" / "Otro"
@@ -2934,35 +2979,35 @@ Modelo `BotConfig` para personalizar el comportamiento del bot desde el panel de
 
 ### 31.2 Campos Configurables
 
-| Campo | Default | Descripcion |
-|-------|---------|-------------|
-| `nombreAgente` | Las Grutas Departamentos | Nombre del asistente |
-| `ubicacion` | Las Grutas, Rio Negro | Ubicacion del alojamiento |
-| `tono` | amable, profesional y cercano | Tono de las respuestas |
-| `idioma` | es_AR | Idioma de las respuestas |
-| `usarEmojis` | false | Usar emojis en respuestas |
-| `longitudRespuesta` | corta | Longitud de respuestas (corta/media/larga) |
-| `autoPreReserva` | true | Crear pre-reserva automaticamente |
-| `modoEnvioFotos` | auto | Modo de envio de fotos |
-| `escalarSiQueja` | true | Escalar a humano si hay queja |
-| `escalarSiPago` | true | Escalar si el huesped habla de pago |
-| `mensajeBienvenida` | ... | Mensaje de bienvenida personalizable |
-| `mensajeDespedida` | ... | Mensaje de despedida |
-| `mensajeFueraHorario` | ... | Mensaje fuera de horario |
-| `mensajeEsperaHumano` | ... | Mensaje al escalar a humano |
-| `horarioInicio/Fin` | null | Horario de atencion (opcional) |
-| `telefonoContacto` | +54 2920 561033 | Telefono de contacto |
-| `logo` | null | URL del logo del bot |
-| `reglasPersonalizadas` | [] | Reglas custom del admin, inyectadas en prompt despues de R10 (max 20, 500 chars c/u). Ver seccion 46 |
+| Campo                  | Default                       | Descripcion                                                                                          |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `nombreAgente`         | Las Grutas Departamentos      | Nombre del asistente                                                                                 |
+| `ubicacion`            | Las Grutas, Rio Negro         | Ubicacion del alojamiento                                                                            |
+| `tono`                 | amable, profesional y cercano | Tono de las respuestas                                                                               |
+| `idioma`               | es_AR                         | Idioma de las respuestas                                                                             |
+| `usarEmojis`           | false                         | Usar emojis en respuestas                                                                            |
+| `longitudRespuesta`    | corta                         | Longitud de respuestas (corta/media/larga)                                                           |
+| `autoPreReserva`       | true                          | Crear pre-reserva automaticamente                                                                    |
+| `modoEnvioFotos`       | auto                          | Modo de envio de fotos                                                                               |
+| `escalarSiQueja`       | true                          | Escalar a humano si hay queja                                                                        |
+| `escalarSiPago`        | true                          | Escalar si el huesped habla de pago                                                                  |
+| `mensajeBienvenida`    | ...                           | Mensaje de bienvenida personalizable                                                                 |
+| `mensajeDespedida`     | ...                           | Mensaje de despedida                                                                                 |
+| `mensajeFueraHorario`  | ...                           | Mensaje fuera de horario                                                                             |
+| `mensajeEsperaHumano`  | ...                           | Mensaje al escalar a humano                                                                          |
+| `horarioInicio/Fin`    | null                          | Horario de atencion (opcional)                                                                       |
+| `telefonoContacto`     | +54 2920 561033               | Telefono de contacto                                                                                 |
+| `logo`                 | null                          | URL del logo del bot                                                                                 |
+| `reglasPersonalizadas` | []                            | Reglas custom del admin, inyectadas en prompt despues de R10 (max 20, 500 chars c/u). Ver seccion 46 |
 
 ### 31.3 Endpoints
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET` | `/api/bot/config` | Obtener configuracion actual |
-| `PATCH` | `/api/bot/config` | Actualizar configuracion parcialmente |
-| `POST` | `/api/bot/logo` | Subir logo (base64 en body, max 500KB) |
-| `DELETE` | `/api/bot/logo` | Eliminar logo |
+| Metodo   | Ruta              | Descripcion                            |
+| -------- | ----------------- | -------------------------------------- |
+| `GET`    | `/api/bot/config` | Obtener configuracion actual           |
+| `PATCH`  | `/api/bot/config` | Actualizar configuracion parcialmente  |
+| `POST`   | `/api/bot/logo`   | Subir logo (base64 en body, max 500KB) |
+| `DELETE` | `/api/bot/logo`   | Eliminar logo                          |
 
 ---
 
@@ -2974,20 +3019,22 @@ Endpoint publico REST que permite integrar el bot como widget de chat en la land
 
 ### 32.2 Endpoint
 
-| Metodo | Ruta | Auth | Descripcion |
-|--------|------|------|-------------|
-| `POST` | `/api/webchat/send` | No | Envia mensaje y recibe respuesta del bot |
+| Metodo | Ruta                | Auth | Descripcion                              |
+| ------ | ------------------- | ---- | ---------------------------------------- |
+| `POST` | `/api/webchat/send` | No   | Envia mensaje y recibe respuesta del bot |
 
 **Request body:**
+
 ```json
 {
-  "sessionId": "abc12345",   // ID de sesion unico del visitante (8-64 chars)
+  "sessionId": "abc12345", // ID de sesion unico del visitante (8-64 chars)
   "message": "Hola, quiero consultar disponibilidad",
-  "name": "Juan"             // Opcional, nombre del visitante
+  "name": "Juan" // Opcional, nombre del visitante
 }
 ```
 
 **Response:**
+
 ```json
 {
   "response": "Hola Juan! Bienvenido a Las Grutas Departamentos..."
@@ -3004,12 +3051,12 @@ Endpoint publico REST que permite integrar el bot como widget de chat en la land
 
 ### 32.4 Diferencias con WhatsApp
 
-| Aspecto | WhatsApp | Webchat |
-|---------|----------|---------|
-| Fotos | Se envian via `sendImage()` como imagenes adjuntas con caption | URLs en `metadata.imageUrls` para renderizado frontend |
-| Texto | Se envia via WhatsApp Cloud API | Se guarda en DB y se retorna en el response JSON |
-| Ubicacion | Google Maps link genera preview automatica | Link plano en texto |
-| Audio | Soportado (transcripcion via Claude) | No soportado |
+| Aspecto   | WhatsApp                                                       | Webchat                                                |
+| --------- | -------------------------------------------------------------- | ------------------------------------------------------ |
+| Fotos     | Se envian via `sendImage()` como imagenes adjuntas con caption | URLs en `metadata.imageUrls` para renderizado frontend |
+| Texto     | Se envia via WhatsApp Cloud API                                | Se guarda en DB y se retorna en el response JSON       |
+| Ubicacion | Google Maps link genera preview automatica                     | Link plano en texto                                    |
+| Audio     | Soportado (transcripcion via Claude)                           | No soportado                                           |
 
 ---
 
@@ -3027,6 +3074,7 @@ Endpoint publico REST que permite integrar el bot como widget de chat en la land
 - Parrafos de maximo 3 lineas seguidas antes de un salto
 
 **Ejemplo de formato correcto en WhatsApp:**
+
 ```
 Los datos para la transferencia son:
 
@@ -3046,15 +3094,16 @@ El saldo restante se abona al momento del check-in.
 **Solucion:** Se modifico `getDepartmentImages()` en `accommodationContext.ts` para retornar objetos `{ url, caption }` en vez de strings planos. Se actualizo `botEngine.ts` para enviar cada imagen con su caption via `sendImage(to, url, caption)`.
 
 **Archivos modificados:**
+
 - `server/src/data/accommodationContext.ts` — `getDepartmentImages()` retorna `{ url: string; caption: string | null }[]`
 - `server/src/services/botEngine.ts` — Usa `img.caption || "NombreDepto - Foto N"` como caption de cada imagen
 
 **Comportamiento por canal:**
 
-| Canal | Antes | Despues |
-|-------|-------|---------|
-| WhatsApp | Imagenes sin caption | Cada imagen con caption (ej: "Living comedor", "Pewmafe - Foto 2") |
-| Web chat | Lista de URLs como texto plano | Texto breve + `metadata.imageUrls` para renderizado frontend |
+| Canal    | Antes                          | Despues                                                            |
+| -------- | ------------------------------ | ------------------------------------------------------------------ |
+| WhatsApp | Imagenes sin caption           | Cada imagen con caption (ej: "Living comedor", "Pewmafe - Foto 2") |
+| Web chat | Lista de URLs como texto plano | Texto breve + `metadata.imageUrls` para renderizado frontend       |
 
 ### 33.3 Compartir Ubicacion via Google Maps
 
@@ -3063,6 +3112,7 @@ El saldo restante se abona al momento del check-in.
 **Solucion:** Se agrego la directiva de formato de ubicacion al system prompt. El link de Google Maps se envia en su propia linea, limpio, para que WhatsApp genere automaticamente la vista previa con el mapa.
 
 **Formato en el system prompt:**
+
 ```
 UBICACION / GOOGLE MAPS: Cuando el huesped pregunte la ubicacion,
 compartir el link de Google Maps en su propia linea:
@@ -3072,6 +3122,7 @@ https://www.google.com/maps/search/?api=1&query=...
 ```
 
 **Archivos modificados:**
+
 - `server/src/services/claudeService.ts` — Directiva de formato de ubicacion en el bloque `FORMATO WHATSAPP`
 
 **Contexto tecnico:** La URL de Google Maps se genera en `accommodationContext.ts` (linea 174) usando `encodeURIComponent(direccion, Rio Negro, Argentina)` para cada complejo. El formato `maps/search/?api=1&query=` es el formato oficial de Google Maps para links compartidos.
@@ -3088,18 +3139,18 @@ Modulo utilitario para manejar fechas y horas en timezone Argentina (UTC-3). Cri
 
 ### 34.2 Funciones
 
-| Funcion | Parametros | Retorno | Descripcion |
-|---------|-----------|---------|-------------|
-| `getArgentinaToday()` | — | `string` (YYYY-MM-DD) | Fecha de hoy en Argentina. Usa `Intl` timezone con fallback manual UTC-3 |
-| `getArgentinaTime()` | — | `string` (HH:MM) | Hora actual en Argentina (24h). Usa `toLocaleTimeString` con timezone |
-| `formatLocalDate(d)` | `Date` | `string` (YYYY-MM-DD) | Formatea Date a YYYY-MM-DD usando componentes locales |
+| Funcion               | Parametros | Retorno               | Descripcion                                                              |
+| --------------------- | ---------- | --------------------- | ------------------------------------------------------------------------ |
+| `getArgentinaToday()` | —          | `string` (YYYY-MM-DD) | Fecha de hoy en Argentina. Usa `Intl` timezone con fallback manual UTC-3 |
+| `getArgentinaTime()`  | —          | `string` (HH:MM)      | Hora actual en Argentina (24h). Usa `toLocaleTimeString` con timezone    |
+| `formatLocalDate(d)`  | `Date`     | `string` (YYYY-MM-DD) | Formatea Date a YYYY-MM-DD usando componentes locales                    |
 
 ### 34.3 Uso en el sistema
 
-| Archivo | Uso |
-|---------|-----|
+| Archivo            | Uso                                                                                                       |
+| ------------------ | --------------------------------------------------------------------------------------------------------- |
 | `claudeService.ts` | Inyecta `getArgentinaToday()` en el prompt del clasificador para resolver "mañana", "pasado mañana", etc. |
-| `botEngine.ts` | Usa `getArgentinaToday()` para resolver fechas relativas en `resolveRelativeDate()` |
+| `botEngine.ts`     | Usa `getArgentinaToday()` para resolver fechas relativas en `resolveRelativeDate()`                       |
 
 ### 34.4 Fallback robusto
 
@@ -3115,21 +3166,22 @@ Funcionalidad para consultar y editar el perfil del negocio en WhatsApp Business
 
 ### 35.2 Archivos
 
-| Archivo | Responsabilidad |
-|---------|----------------|
-| `server/src/routes/whatsappProfile.ts` | Endpoints GET/PATCH `/api/whatsapp/profile` con Zod validation |
-| `server/src/services/whatsappProfileService.ts` | Obtener/actualizar perfil via Meta Graph API (v20.0+). En modo simulador, retorna datos dummy |
-| `src/api/whatsappProfileApi.ts` | Cliente API frontend |
-| `src/components/whatsapp/WhatsAppProfilePage.tsx` | Pagina admin con formulario de edicion |
+| Archivo                                           | Responsabilidad                                                                               |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `server/src/routes/whatsappProfile.ts`            | Endpoints GET/PATCH `/api/whatsapp/profile` con Zod validation                                |
+| `server/src/services/whatsappProfileService.ts`   | Obtener/actualizar perfil via Meta Graph API (v20.0+). En modo simulador, retorna datos dummy |
+| `src/api/whatsappProfileApi.ts`                   | Cliente API frontend                                                                          |
+| `src/components/whatsapp/WhatsAppProfilePage.tsx` | Pagina admin con formulario de edicion                                                        |
 
 ### 35.3 Endpoints
 
-| Metodo | Ruta | Auth | Descripcion |
-|--------|------|------|-------------|
-| `GET` | `/api/whatsapp/profile` | Si (JWT) | Obtiene perfil actual (about, description, address, email, websites, vertical, profile_picture_url) |
-| `PATCH` | `/api/whatsapp/profile` | Si (JWT) | Actualiza campos del perfil |
+| Metodo  | Ruta                    | Auth     | Descripcion                                                                                         |
+| ------- | ----------------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `GET`   | `/api/whatsapp/profile` | Si (JWT) | Obtiene perfil actual (about, description, address, email, websites, vertical, profile_picture_url) |
+| `PATCH` | `/api/whatsapp/profile` | Si (JWT) | Actualiza campos del perfil                                                                         |
 
 **Validacion Zod del PATCH:**
+
 - `about`: string, max 139 caracteres
 - `description`: string, max 512 caracteres
 - `address`: string, max 256 caracteres
@@ -3144,6 +3196,7 @@ Cuando `SIMULATOR_MODE=true` o no hay credenciales de WhatsApp configuradas, el 
 ### 35.5 UI
 
 Pagina accesible desde el panel de admin con:
+
 - Campos editables: about, description, address, email, 2 websites, vertical (dropdown)
 - Indicadores de limite de caracteres (about: 139, description: 512, address: 256)
 - Foto de perfil en modo solo-lectura (no editable via API)
@@ -3162,11 +3215,11 @@ Lote de 10 correcciones y mejoras implementadas en una sola sesion.
 
 Refactorizado a un patron factory `createRateLimiter(namespace, maxRequests, windowSeconds)` que permite crear limiters con distintos limites por ruta. Cada namespace tiene su propia store en Redis (key prefix `chatboot:ratelimit:{namespace}:`) con fallback in-memory independiente.
 
-| Limiter | Namespace | Limite | Rutas |
-|---------|-----------|--------|-------|
-| `rateLimiter` | `api` | 100 req/min/IP | Rutas protegidas (existente) |
-| `loginRateLimiter` | `login` | 5 req/min/IP | `POST /api/auth/login`, `POST /api/auth/forgot-password` |
-| `webchatRateLimiter` | `webchat` | 30 req/min/IP | `POST /api/webchat/send` |
+| Limiter              | Namespace | Limite         | Rutas                                                    |
+| -------------------- | --------- | -------------- | -------------------------------------------------------- |
+| `rateLimiter`        | `api`     | 100 req/min/IP | Rutas protegidas (existente)                             |
+| `loginRateLimiter`   | `login`   | 5 req/min/IP   | `POST /api/auth/login`, `POST /api/auth/forgot-password` |
+| `webchatRateLimiter` | `webchat` | 30 req/min/IP  | `POST /api/webchat/send`                                 |
 
 ### 36.2 Titulares verificados en BotConfig
 
@@ -3181,6 +3234,7 @@ Movido el array hardcodeado `TRUSTED_HOLDERS` a un campo configurable `titulares
 **Archivo**: `server/src/services/webhookProcessor.ts`
 
 Nuevo branch para mensajes tipo `image` en el procesamiento de mensajes entrantes:
+
 - Guarda el mensaje con `tipo: 'image'`, `contenido: caption || '[Imagen recibida]'`
 - Almacena `metadata: { mediaId, mimeType }` para futura descarga
 - Si la conversacion esta en estado `bot`, escala a `espera_humano` con mensaje de sistema y responde al usuario: "Recibimos tu imagen. Un agente la va a revisar y te contacta en breve."
@@ -3192,12 +3246,12 @@ Nuevo branch para mensajes tipo `image` en el procesamiento de mensajes entrante
 
 **Migracion**: `20260318211244_add_performance_indexes`
 
-| Modelo | Index | Columnas | Uso |
-|--------|-------|----------|-----|
-| `Conversacion` | simple | `estado` | Filtrado por estado en listado de conversaciones |
-| `Reserva` | compuesto | `habitacion, estado` | Consultas de ocupacion por departamento |
-| `Reserva` | compuesto | `fechaEntrada, fechaSalida` | Consultas de rango de fechas |
-| `Bloqueo` | compuesto | `complejoId, fechaInicio, fechaFin` | Consultas de disponibilidad con bloqueos |
+| Modelo         | Index     | Columnas                            | Uso                                              |
+| -------------- | --------- | ----------------------------------- | ------------------------------------------------ |
+| `Conversacion` | simple    | `estado`                            | Filtrado por estado en listado de conversaciones |
+| `Reserva`      | compuesto | `habitacion, estado`                | Consultas de ocupacion por departamento          |
+| `Reserva`      | compuesto | `fechaEntrada, fechaSalida`         | Consultas de rango de fechas                     |
+| `Bloqueo`      | compuesto | `complejoId, fechaInicio, fechaFin` | Consultas de disponibilidad con bloqueos         |
 
 ### 36.5 Habitaciones dinamicas en inventarioService
 
@@ -3217,10 +3271,10 @@ Cuando se detectan fechas invertidas (`fecha_entrada > fecha_salida`), ademas de
 
 Dos nuevos intents agregados al clasificador (total: 12 intents):
 
-| Intent | Deteccion (fallback regex) | Accion |
-|--------|---------------------------|--------|
-| `cancelar_reserva` | `/cancel.*reserv\|anular.*reserv/` | Escala a `espera_humano` + mensaje sistema "Huesped solicito cancelar su reserva" |
-| `cambiar_reserva` | `/cambiar.*reserv\|modificar.*reserv\|mover.*reserv\|cambiar.*fecha/` | Escala a `espera_humano` + mensaje sistema "Huesped solicito modificar su reserva" |
+| Intent             | Deteccion (fallback regex)                                            | Accion                                                                             |
+| ------------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `cancelar_reserva` | `/cancel.*reserv\|anular.*reserv/`                                    | Escala a `espera_humano` + mensaje sistema "Huesped solicito cancelar su reserva"  |
+| `cambiar_reserva`  | `/cambiar.*reserv\|modificar.*reserv\|mover.*reserv\|cambiar.*fecha/` | Escala a `espera_humano` + mensaje sistema "Huesped solicito modificar su reserva" |
 
 Ambos intents se tratan como escalacion obligatoria (el bot no puede cancelar ni modificar reservas). El clasificador Claude Haiku los detecta en el prompt, y el fallback regex los detecta antes del intent generico `reservar` para evitar falsos positivos.
 
@@ -3228,7 +3282,7 @@ Ambos intents se tratan como escalacion obligatoria (el bot no puede cancelar ni
 
 **Archivo**: `server/src/app.ts`
 
-Cuando `ALLOWED_ORIGINS` es `*` y `NODE_ENV` es `production`, se loguea un warning via Pino: "ALLOWED_ORIGINS is set to '*' in production — this allows any origin. Set explicit origins in .env for security."
+Cuando `ALLOWED_ORIGINS` es `*` y `NODE_ENV` es `production`, se loguea un warning via Pino: "ALLOWED_ORIGINS is set to '\*' in production — this allows any origin. Set explicit origins in .env for security."
 
 ---
 
@@ -3244,11 +3298,11 @@ El bot ahora recolecta 3 datos adicionales del huesped durante el flujo de reser
 
 Se agregaron 3 nuevas reglas de extraccion de entidades al prompt del clasificador Haiku:
 
-| Entidad | Regla | Ejemplo |
-|---------|-------|---------|
-| `nombre_huesped` | Solo si el usuario dice su nombre | "soy Juan", "me llamo Maria Perez" |
-| `telefono` | Solo si da un numero de celular | "mi celular es 2920412345" |
-| `dni` | Solo si da su numero de documento | "mi DNI es 35123456", "documento 28.456.789" |
+| Entidad          | Regla                             | Ejemplo                                      |
+| ---------------- | --------------------------------- | -------------------------------------------- |
+| `nombre_huesped` | Solo si el usuario dice su nombre | "soy Juan", "me llamo Maria Perez"           |
+| `telefono`       | Solo si da un numero de celular   | "mi celular es 2920412345"                   |
+| `dni`            | Solo si da su numero de documento | "mi DNI es 35123456", "documento 28.456.789" |
 
 Las 3 entidades se agregaron a `VALID_ENTITY_KEYS` en `botEngine.ts` para que sean aceptadas por `sanitizeEntities()`.
 
@@ -3257,6 +3311,7 @@ Las 3 entidades se agregaron a `VALID_ENTITY_KEYS` en `botEngine.ts` para que se
 **Archivo**: `server/src/services/botEngine.ts` (funcion `sanitizeEntities`)
 
 El DNI se valida server-side:
+
 - Se eliminan puntos separadores (`28.456.789` → `28456789`)
 - Se verifica que sea un numero entre **5.000.000** y **99.999.999**
 - Si no cumple el rango, se descarta la entidad y se loguea un warning
@@ -3284,10 +3339,14 @@ Claude pregunta por **un dato a la vez** siguiendo las reglas de "PREGUNTAS PROG
 La condicion `allPresent` ahora requiere **7 campos** (antes 4):
 
 ```typescript
-const allPresent = mergedEntities.habitacion && mergedEntities.fecha_entrada &&
-                   mergedEntities.fecha_salida && mergedEntities.num_personas &&
-                   mergedEntities.nombre_huesped && mergedEntities.telefono &&
-                   mergedEntities.dni;
+const allPresent =
+  mergedEntities.habitacion &&
+  mergedEntities.fecha_entrada &&
+  mergedEntities.fecha_salida &&
+  mergedEntities.num_personas &&
+  mergedEntities.nombre_huesped &&
+  mergedEntities.telefono &&
+  mergedEntities.dni;
 ```
 
 La misma condicion se aplica a `prevHadAll` (para verificar que PASO 1 fue mostrado con todos los datos). Al crear la reserva, se pasan los datos extraidos:
@@ -3324,6 +3383,7 @@ model Reserva {
 **Archivo**: `server/src/routes/reservas.ts`
 
 El campo `dni` se agrego a los schemas Zod de:
+
 - `createManualSchema`: `dni: z.string().optional()`
 - `updateSchema`: `dni: z.string().nullable().optional()`
 
@@ -3347,14 +3407,14 @@ Se agrego `dni: string | null` a la interfaz `Reserva`, `dni?: string` a `CrearR
 
 **Archivo**: `server/src/services/claudeService.ts`
 
-| Seccion | Cambio |
-|---------|--------|
-| Regla 7 (FLUJO) | Agrega nombre, celular y DNI como datos requeridos |
-| Regla 7 (validacion) | DNI debe ser entre 5.000.000 y 99.999.999 |
-| Regla 8 PASO 1 | Resumen incluye nombre, telefono, DNI, precio total |
-| Regla 8 PASO 3 | Ya no pide DNI (se recolecta antes de PASO 1) |
+| Seccion                | Cambio                                                        |
+| ---------------------- | ------------------------------------------------------------- |
+| Regla 7 (FLUJO)        | Agrega nombre, celular y DNI como datos requeridos            |
+| Regla 7 (validacion)   | DNI debe ser entre 5.000.000 y 99.999.999                     |
+| Regla 8 PASO 1         | Resumen incluye nombre, telefono, DNI, precio total           |
+| Regla 8 PASO 3         | Ya no pide DNI (se recolecta antes de PASO 1)                 |
 | Instruccion `reservar` | Lista los 6 datos requeridos incluyendo nombre, celular y DNI |
-| Fallback `reservar` | Respuesta de fallback actualizada con los 6 campos |
+| Fallback `reservar`    | Respuesta de fallback actualizada con los 6 campos            |
 
 ### 37.10 DNI en modelo Huesped
 
@@ -3365,6 +3425,7 @@ Se agrego el campo `dni` tambien al modelo `Huesped`, ya que el DNI es un dato p
 **Migracion**: `20260319003537_add_dni_to_huespedes` — `ALTER TABLE "huespedes" ADD COLUMN "dni" TEXT`
 
 **Archivos actualizados**:
+
 - `shared/types/huesped.ts`: agregado `dni: string | null`
 - `server/src/routes/huespedes.ts`: agregado `dni` al schema Zod de update
 - `src/components/guests/GuestCard.tsx`: muestra DNI en sidebar del chat
@@ -3396,12 +3457,12 @@ La ubicacion de los complejos indicaba solo la distancia a la playa ("a 2 cuadra
 
 Se investigo en Google Maps y fuentes turisticas la posicion real de cada complejo respecto al centro de Las Grutas (zona peatonal Viedma / Primeras Bajadas):
 
-| Complejo | Direccion | Ubicacion anterior | Ubicacion corregida |
-|----------|-----------|-------------------|---------------------|
-| **LG** | Nahuel Huapi 75 (antes: Golfo San Jorge 560) | a 2 cuadras del mar (bajada Los Acantilados) | a 2 cuadras del centro y de la playa (Primeras Bajadas) |
-| **Luminar Mono** | Golfo San Jorge 560 | a 2-3 cuadras de la playa (bajada Los Acantilados) | a 6 cuadras del centro, a 2-3 cuadras de la playa (bajada Los Acantilados) |
-| **Luminar 2Amb** | Golfo San Jorge 560 | a 2 cuadras de la playa (bajada Los Acantilados) | a 6 cuadras del centro, a 2 cuadras de la playa (bajada Los Acantilados) |
-| **Pewmafe** | Punta Perdices 370 | a 2 cuadras de la playa (bajada La Rinconada) | a 20 cuadras del centro, a 2 cuadras de la playa (bajada La Rinconada, acceso norte) |
+| Complejo         | Direccion                                    | Ubicacion anterior                                 | Ubicacion corregida                                                                  |
+| ---------------- | -------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **LG**           | Nahuel Huapi 75 (antes: Golfo San Jorge 560) | a 2 cuadras del mar (bajada Los Acantilados)       | a 2 cuadras del centro y de la playa (Primeras Bajadas)                              |
+| **Luminar Mono** | Golfo San Jorge 560                          | a 2-3 cuadras de la playa (bajada Los Acantilados) | a 6 cuadras del centro, a 2-3 cuadras de la playa (bajada Los Acantilados)           |
+| **Luminar 2Amb** | Golfo San Jorge 560                          | a 2 cuadras de la playa (bajada Los Acantilados)   | a 6 cuadras del centro, a 2 cuadras de la playa (bajada Los Acantilados)             |
+| **Pewmafe**      | Punta Perdices 370                           | a 2 cuadras de la playa (bajada La Rinconada)      | a 20 cuadras del centro, a 2 cuadras de la playa (bajada La Rinconada, acceso norte) |
 
 **Orden de cercania al centro**: LG (2 cuadras) → Luminar (6 cuadras) → Pewmafe (20 cuadras)
 
@@ -3535,38 +3596,40 @@ Permitir al administrador eliminar registros de reservas (ej: canceladas, duplic
 
 **Nuevos endpoints:**
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
+| Metodo   | Ruta                | Descripcion                                                            |
+| -------- | ------------------- | ---------------------------------------------------------------------- |
 | `DELETE` | `/api/reservas/:id` | Elimina reserva. Recalcula inventario si tenia habitacion. Retorna 204 |
-| `DELETE` | `/api/emails/:id` | Elimina email procesado. Retorna 204 |
+| `DELETE` | `/api/emails/:id`   | Elimina email procesado. Retorna 204                                   |
 
 Ambos retornan 404 si el registro no existe.
 
 **Nuevas funciones de servicio:**
 
-| Archivo | Funcion | Descripcion |
-|---------|---------|-------------|
-| `reservaService.ts` | `deleteReserva(id)` | Busca la reserva, la elimina, y si tenia habitacion asignada recalcula disponibilidad del inventario con `recalcDisponible()` |
-| `emailQueryService.ts` | `deleteEmail(id)` | Busca el email, lo elimina de la DB |
+| Archivo                | Funcion             | Descripcion                                                                                                                   |
+| ---------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `reservaService.ts`    | `deleteReserva(id)` | Busca la reserva, la elimina, y si tenia habitacion asignada recalcula disponibilidad del inventario con `recalcDisponible()` |
+| `emailQueryService.ts` | `deleteEmail(id)`   | Busca el email, lo elimina de la DB                                                                                           |
 
 ### 40.3 Frontend
 
 **API clients:**
 
-| Archivo | Funcion |
-|---------|---------|
+| Archivo                 | Funcion                                            |
+| ----------------------- | -------------------------------------------------- |
 | `src/api/reservaApi.ts` | `deleteReserva(id)` — `fetch DELETE /reservas/:id` |
-| `src/api/emailApi.ts` | `deleteEmail(id)` — `fetch DELETE /emails/:id` |
+| `src/api/emailApi.ts`   | `deleteEmail(id)` — `fetch DELETE /emails/:id`     |
 
 **Fix en `apiClient.ts`:** Se agrego manejo de respuestas 204 No Content (retorna `undefined` en vez de intentar parsear JSON vacio).
 
 **ReservaList.tsx:**
+
 - Icono Trash2 rojo en columna Acciones (desktop) al lado del Pencil de edicion
 - Icono Trash2 rojo en el header del card (mobile) al lado del Pencil
 - `window.confirm('Seguro que queres eliminar esta reserva?')` antes de ejecutar
 - `useMutation` con invalidacion de `['reservas']` y `toast.error` en caso de fallo
 
 **EmailList.tsx:**
+
 - Columna "Acciones" nueva en tabla desktop con icono Trash2
 - Icono Trash2 en esquina del card mobile
 - `e.stopPropagation()` en ambos para evitar abrir el modal de detalle
@@ -3575,17 +3638,17 @@ Ambos retornan 404 si el registro no existe.
 
 ### 40.4 Archivos modificados
 
-| Archivo | Cambio |
-|---------|--------|
-| `server/src/services/reservaService.ts` | `+ deleteReserva(id)` |
-| `server/src/routes/reservas.ts` | `+ DELETE /reservas/:id` |
-| `server/src/services/emailQueryService.ts` | `+ deleteEmail(id)` |
-| `server/src/routes/emails.ts` | `+ DELETE /emails/:id` |
-| `src/api/apiClient.ts` | Fix: manejo de respuestas 204 No Content |
-| `src/api/reservaApi.ts` | `+ deleteReserva(id)` |
-| `src/api/emailApi.ts` | `+ deleteEmail(id)` |
-| `src/components/reservas/ReservaList.tsx` | Boton eliminar en tabla y cards |
-| `src/components/emails/EmailList.tsx` | Boton eliminar en tabla y cards, nueva columna Acciones |
+| Archivo                                    | Cambio                                                  |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `server/src/services/reservaService.ts`    | `+ deleteReserva(id)`                                   |
+| `server/src/routes/reservas.ts`            | `+ DELETE /reservas/:id`                                |
+| `server/src/services/emailQueryService.ts` | `+ deleteEmail(id)`                                     |
+| `server/src/routes/emails.ts`              | `+ DELETE /emails/:id`                                  |
+| `src/api/apiClient.ts`                     | Fix: manejo de respuestas 204 No Content                |
+| `src/api/reservaApi.ts`                    | `+ deleteReserva(id)`                                   |
+| `src/api/emailApi.ts`                      | `+ deleteEmail(id)`                                     |
+| `src/components/reservas/ReservaList.tsx`  | Boton eliminar en tabla y cards                         |
+| `src/components/emails/EmailList.tsx`      | Boton eliminar en tabla y cards, nueva columna Acciones |
 
 ---
 
@@ -3596,6 +3659,7 @@ Ambos retornan 404 si el registro no existe.
 Cuando un visitante envia el formulario de contacto desde la landing page, el endpoint `POST /api/contact` solo enviaba un email de notificacion a `info@lasgrutasdepartamentos.com`. No guardaba nada en la BD ni enviaba auto-respuesta al visitante.
 
 El flujo indirecto (IMAP poller recoge el email, detecta formulario, procesa, guarda en BD) no funcionaba confiablemente porque:
+
 - Depende de que IMAP este configurado y conectado al mismo buzon
 - En produccion con SMTP localhost:25 (Postfix), el email puede no llegar al buzon IMAP de cPanel
 - Hay 3 minutos de delay minimo entre polls
@@ -3603,6 +3667,7 @@ El flujo indirecto (IMAP poller recoge el email, detecta formulario, procesa, gu
 ### 41.2 Solucion
 
 Se modifico `POST /api/contact` para que directamente:
+
 1. Responda `{ ok: true }` al frontend inmediatamente (sin esperar procesamiento)
 2. En background (fire-and-forget):
    - Envie email de notificacion al admin (best-effort)
@@ -3635,10 +3700,10 @@ Landing POST /api/contact
 
 ### 41.6 Archivos modificados
 
-| Archivo | Cambio |
-|---------|--------|
+| Archivo                        | Cambio                                                                                                                                                   |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/src/routes/contact.ts` | Agregado: imports de `prisma`, `processIncomingEmail`, `crypto`. Respuesta inmediata al frontend. Background: auto-respuesta con Claude + guardado en BD |
-| `documentacion.md` | Seccion 41 documentando el nuevo flujo |
+| `documentacion.md`             | Seccion 41 documentando el nuevo flujo                                                                                                                   |
 
 ---
 
@@ -3651,14 +3716,15 @@ Cuando el huesped, en vez de confirmar "si quiero reservar", preguntaba sobre fo
 ### 42.2 Solucion
 
 Se actualizo el system prompt del bot en `claudeService.ts` (PASO 2):
+
 - "Si acepta **o pregunta sobre formas/medios de pago** (esto equivale a aceptar)" — pregunta de pago = aceptacion
 - "SIEMPRE primero indica que la sena se abona por transferencia bancaria y pasale los datos de la cuenta" — datos bancarios van primero, siempre
 - Si el huesped pregunta por tarjeta/MercadoPago: "PRIMERO da los datos bancarios como opcion principal, y DESPUES menciona MercadoPago como alternativa"
 
 ### 42.3 Archivo modificado
 
-| Archivo | Cambio |
-|---------|--------|
+| Archivo                                | Cambio                                                                                               |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `server/src/services/claudeService.ts` | PASO 2 del system prompt: pregunta sobre pago equivale a aceptacion, datos bancarios siempre primero |
 
 ---
@@ -3669,12 +3735,13 @@ Se actualizo el system prompt del bot en `claudeService.ts` (PASO 2):
 
 Se descubrio que habia **DOS servidores Node.js corriendo en paralelo** en produccion:
 
-| Instancia | Proceso | Puerto | BD | Gestionado por |
-|-----------|---------|--------|----|----------------|
-| Docker container | `tsx src/index.ts` | 5050 (interno Docker) | PostgreSQL Docker (container) | docker-compose |
-| Host nativo | `node dist/index.js` | 5050 (host) | PostgreSQL nativo (localhost:5432) | PM2 |
+| Instancia        | Proceso              | Puerto                | BD                                 | Gestionado por |
+| ---------------- | -------------------- | --------------------- | ---------------------------------- | -------------- |
+| Docker container | `tsx src/index.ts`   | 5050 (interno Docker) | PostgreSQL Docker (container)      | docker-compose |
+| Host nativo      | `node dist/index.js` | 5050 (host)           | PostgreSQL nativo (localhost:5432) | PM2            |
 
 El nginx del host hacia `proxy_pass http://localhost:5050` que iba al proceso PM2, **NO al container Docker**. Esto causaba:
+
 - Conversaciones del webchat se guardaban en la BD del host (no visible en el panel admin Docker)
 - Los datos bancarios y `titularesVerificados` de la BD del host estaban desactualizados
 - El bot escalaba SIEMPRE a `espera_humano` por titular no verificado (`titularesVerificados` vacio en BD host)
@@ -3703,6 +3770,7 @@ Docker: chatboot-app (:5050, port mapping 127.0.0.1:5050:5050)
 ```
 
 **NO DEBE existir** ningun otro proceso Node.js escuchando en el host. Verificar con:
+
 ```bash
 ss -tlnp | grep 5050
 # Debe mostrar SOLO el proceso de Docker (docker-proxy)
@@ -3730,11 +3798,11 @@ El script `deploy.sh update` hace: `git pull` → `docker compose build --no-cac
 
 ### 43.6 Archivos modificados
 
-| Archivo | Cambio |
-|---------|--------|
-| `docker-compose.prod.yml` | App expone `127.0.0.1:5050:5050`. Removidos servicios nginx y certbot de Docker |
-| `/etc/nginx/sites-enabled/chatbot-lasgrutas` (servidor) | `proxy_pass http://localhost:5050` (llega a Docker via port mapping) |
-| PM2 (servidor) | Proceso `chatboot` eliminado permanentemente |
+| Archivo                                                 | Cambio                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `docker-compose.prod.yml`                               | App expone `127.0.0.1:5050:5050`. Removidos servicios nginx y certbot de Docker |
+| `/etc/nginx/sites-enabled/chatbot-lasgrutas` (servidor) | `proxy_pass http://localhost:5050` (llega a Docker via port mapping)            |
+| PM2 (servidor)                                          | Proceso `chatboot` eliminado permanentemente                                    |
 
 ## 44. Fix SMTP desde Docker — Relay a Postfix del host (2026-03-20)
 
@@ -3749,12 +3817,12 @@ Los emails de auto-respuesta del formulario de contacto no llegaban al destinata
 
 ### 44.2 Solucion
 
-| Cambio | Donde | Detalle |
-|--------|-------|---------|
-| `extra_hosts: ["host.docker.internal:host-gateway"]` | `docker-compose.prod.yml` | Permite al container resolver `host.docker.internal` → IP del host |
-| `SMTP_HOST=host.docker.internal` | `.env` en servidor | El container envia SMTP al host via esta resolucion |
-| `useLocalMta` reconoce `host.docker.internal` | `server/src/services/emailService.ts` | No intenta autenticacion SMTP (Postfix local no la requiere) |
-| `mynetworks` ampliado | Postfix en host (`/etc/postfix/main.cf`) | `mynetworks = 127.0.0.0/8 ... 172.17.0.0/16 172.18.0.0/16` para permitir relay desde Docker |
+| Cambio                                               | Donde                                    | Detalle                                                                                     |
+| ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `extra_hosts: ["host.docker.internal:host-gateway"]` | `docker-compose.prod.yml`                | Permite al container resolver `host.docker.internal` → IP del host                          |
+| `SMTP_HOST=host.docker.internal`                     | `.env` en servidor                       | El container envia SMTP al host via esta resolucion                                         |
+| `useLocalMta` reconoce `host.docker.internal`        | `server/src/services/emailService.ts`    | No intenta autenticacion SMTP (Postfix local no la requiere)                                |
+| `mynetworks` ampliado                                | Postfix en host (`/etc/postfix/main.cf`) | `mynetworks = 127.0.0.0/8 ... 172.17.0.0/16 172.18.0.0/16` para permitir relay desde Docker |
 
 ### 44.3 Flujo SMTP corregido
 
@@ -3787,6 +3855,7 @@ curl -X POST https://chatbot.lasgrutasdepartamentos.com/api/contact \
 ### 45.1 Contexto
 
 El sitio `lasgrutasdepartamentos.com` estaba distribuido en 3 proveedores:
+
 - **DonWeb**: dominio + VPS Ubuntu (66.97.40.119) con el chatbot
 - **Hosting externo** (cPanel 198.54.114.136): WordPress (sitio viejo) + email
 - **Cloudflare**: DNS (controlado por la persona del hosting externo)
@@ -3797,16 +3866,17 @@ Esto causaba que no se pudiera configurar SPF/DKIM correctamente, los emails aut
 
 Se consolido **todo** en el VPS de DonWeb:
 
-| Componente | Antes | Despues |
-|------------|-------|---------|
-| Landing page | WordPress en cPanel externo | **React SPA (Vite) en Nginx** del VPS |
-| DNS | Cloudflare (ns kate/tim) | **DonWeb** (ns1/ns2.donweb.com) |
-| Email saliente | Sin DKIM, rechazado por Gmail | **Postfix + OpenDKIM** en el VPS |
-| Chatbot | Docker en VPS (sin cambios) | Docker en VPS (sin cambios) |
+| Componente     | Antes                         | Despues                               |
+| -------------- | ----------------------------- | ------------------------------------- |
+| Landing page   | WordPress en cPanel externo   | **React SPA (Vite) en Nginx** del VPS |
+| DNS            | Cloudflare (ns kate/tim)      | **DonWeb** (ns1/ns2.donweb.com)       |
+| Email saliente | Sin DKIM, rechazado por Gmail | **Postfix + OpenDKIM** en el VPS      |
+| Chatbot        | Docker en VPS (sin cambios)   | Docker en VPS (sin cambios)           |
 
 ### 45.3 Landing page — React SPA
 
 La landing page es una SPA React/Vite (NO WordPress). Incluye:
+
 - Formulario de contacto con auto-respuesta por email
 - Widget webchat integrado con el chatbot (`chatbot.lasgrutasdepartamentos.com`)
 - Links a WhatsApp, Instagram, Facebook
@@ -3814,6 +3884,7 @@ La landing page es una SPA React/Vite (NO WordPress). Incluye:
 - Galeria de fotos de los departamentos
 
 **Ubicacion en el servidor:**
+
 ```
 /var/www/lasgrutasdepartamentos.com/
 ├── index.html                    # Entry point React SPA
@@ -3833,6 +3904,7 @@ La landing page es una SPA React/Vite (NO WordPress). Incluye:
 **Total: 59 archivos, 4.8 MB.** Las imagenes estan en `wp-content/uploads/` porque el JS bundle las referencia con esas rutas absolutas (heredadas del WordPress original).
 
 **Nginx config** (`/etc/nginx/sites-available/lasgrutasdepartamentos`):
+
 ```nginx
 server {
     listen 80;
@@ -3869,12 +3941,13 @@ server {
 
 **Stack de email saliente (solo envio, no recepcion):**
 
-| Servicio | Funcion |
-|----------|---------|
-| Postfix | MTA — envia emails al exterior |
+| Servicio | Funcion                                                 |
+| -------- | ------------------------------------------------------- |
+| Postfix  | MTA — envia emails al exterior                          |
 | OpenDKIM | Firma DKIM en emails salientes (milter en puerto 12301) |
 
 **Configuracion Postfix** (`/etc/postfix/main.cf` — claves):
+
 ```
 myhostname = lasgrutasdepartamentos.com
 mydomain = lasgrutasdepartamentos.com
@@ -3889,12 +3962,15 @@ virtual_alias_maps = hash:/etc/postfix/virtual
 ```
 
 **Virtual aliases** (`/etc/postfix/virtual`):
+
 ```
 info@lasgrutasdepartamentos.com sergiomachado82@gmail.com
 ```
+
 Esto reenvía todos los emails dirigidos a `info@` hacia Gmail. Ejecutar `postmap /etc/postfix/virtual` despues de editar.
 
 **Configuracion OpenDKIM** (`/etc/opendkim.conf`):
+
 ```
 Syslog          yes
 UMask           007
@@ -3907,6 +3983,7 @@ TrustedHosts    /etc/opendkim/TrustedHosts
 ```
 
 **TrustedHosts** (`/etc/opendkim/TrustedHosts`):
+
 ```
 127.0.0.1
 localhost
@@ -3915,24 +3992,26 @@ lasgrutasdepartamentos.com
 172.17.0.0/16
 172.18.0.0/16
 ```
+
 Las redes Docker (`172.17/18`) deben estar incluidas para que OpenDKIM firme los emails enviados desde el container.
 
 **Archivos DKIM:**
+
 - Clave privada: `/etc/opendkim/keys/lasgrutasdepartamentos.com/default.private`
 - KeyTable: `default._domainkey.lasgrutasdepartamentos.com lasgrutasdepartamentos.com:default:/etc/opendkim/keys/lasgrutasdepartamentos.com/default.private`
 - SigningTable: `*@lasgrutasdepartamentos.com default._domainkey.lasgrutasdepartamentos.com`
 
 ### 45.5 DNS — Registros en DonWeb
 
-| Tipo | Nombre | Contenido |
-|------|--------|-----------|
-| A | `@` | `66.97.40.119` |
-| A | `www` | `66.97.40.119` |
-| A | `chatbot` | `66.97.40.119` |
-| MX | `@` | `10 lasgrutasdepartamentos.com` |
-| TXT (SPF) | `@` | `v=spf1 +ip4:66.97.40.119 ~all` |
-| TXT (DKIM) | `default._domainkey` | `v=DKIM1; h=rsa-sha256; k=rsa; s=email; p=MIIBIjAN...` |
-| TXT (DMARC) | `_dmarc` | `v=DMARC1; p=none; rua=mailto:info@lasgrutasdepartamentos.com` |
+| Tipo        | Nombre               | Contenido                                                      |
+| ----------- | -------------------- | -------------------------------------------------------------- |
+| A           | `@`                  | `66.97.40.119`                                                 |
+| A           | `www`                | `66.97.40.119`                                                 |
+| A           | `chatbot`            | `66.97.40.119`                                                 |
+| MX          | `@`                  | `10 lasgrutasdepartamentos.com`                                |
+| TXT (SPF)   | `@`                  | `v=spf1 +ip4:66.97.40.119 ~all`                                |
+| TXT (DKIM)  | `default._domainkey` | `v=DKIM1; h=rsa-sha256; k=rsa; s=email; p=MIIBIjAN...`         |
+| TXT (DMARC) | `_dmarc`             | `v=DMARC1; p=none; rua=mailto:info@lasgrutasdepartamentos.com` |
 
 **Nameservers:** `ns1.donweb.com` / `ns2.donweb.com`
 
@@ -3976,14 +4055,14 @@ Nginx del HOST (:80/:443 SSL, Certbot)
 
 ### 45.7 Recursos del VPS
 
-| Recurso | Valor |
-|---------|-------|
-| IP | 66.97.40.119 |
-| SSH | Puerto 5748 |
-| OS | Ubuntu 24.04 LTS |
-| CPU | 2 cores |
-| RAM | 1.9 GB + 2 GB swap |
-| Disco | 15 GB total, ~6 GB libre |
+| Recurso | Valor                    |
+| ------- | ------------------------ |
+| IP      | 66.97.40.119             |
+| SSH     | Puerto 5748              |
+| OS      | Ubuntu 24.04 LTS         |
+| CPU     | 2 cores                  |
+| RAM     | 1.9 GB + 2 GB swap       |
+| Disco   | 15 GB total, ~6 GB libre |
 
 ### 45.8 Verificacion post-migracion
 
@@ -4015,19 +4094,19 @@ echo | openssl s_client -connect lasgrutasdepartamentos.com:443 -servername lasg
 
 ### 45.9 Archivos de configuracion en el servidor
 
-| Archivo | Funcion |
-|---------|---------|
-| `/etc/nginx/sites-available/lasgrutasdepartamentos` | Nginx para landing page SPA + SSL |
-| `/etc/nginx/sites-available/chatbot-lasgrutas` | Nginx reverse proxy chatbot + SSL |
-| `/etc/postfix/main.cf` | Configuracion Postfix |
-| `/etc/opendkim.conf` | Configuracion OpenDKIM |
-| `/etc/opendkim/keys/lasgrutasdepartamentos.com/default.private` | Clave privada DKIM |
-| `/etc/opendkim/KeyTable` | Mapeo selector → clave DKIM |
-| `/etc/opendkim/SigningTable` | Mapeo dominio → selector |
-| `/etc/opendkim/TrustedHosts` | Hosts que firman con DKIM (incluye redes Docker) |
-| `/etc/postfix/virtual` | Alias virtuales (info@ → sergiomachado82@gmail.com) |
-| `/var/www/chatboot/.env` | Variables de entorno del chatbot (SMTP_HOST=host.docker.internal) |
-| `/var/www/chatboot/docker-compose.prod.yml` | Docker Compose produccion |
+| Archivo                                                         | Funcion                                                           |
+| --------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `/etc/nginx/sites-available/lasgrutasdepartamentos`             | Nginx para landing page SPA + SSL                                 |
+| `/etc/nginx/sites-available/chatbot-lasgrutas`                  | Nginx reverse proxy chatbot + SSL                                 |
+| `/etc/postfix/main.cf`                                          | Configuracion Postfix                                             |
+| `/etc/opendkim.conf`                                            | Configuracion OpenDKIM                                            |
+| `/etc/opendkim/keys/lasgrutasdepartamentos.com/default.private` | Clave privada DKIM                                                |
+| `/etc/opendkim/KeyTable`                                        | Mapeo selector → clave DKIM                                       |
+| `/etc/opendkim/SigningTable`                                    | Mapeo dominio → selector                                          |
+| `/etc/opendkim/TrustedHosts`                                    | Hosts que firman con DKIM (incluye redes Docker)                  |
+| `/etc/postfix/virtual`                                          | Alias virtuales (info@ → sergiomachado82@gmail.com)               |
+| `/var/www/chatboot/.env`                                        | Variables de entorno del chatbot (SMTP_HOST=host.docker.internal) |
+| `/var/www/chatboot/docker-compose.prod.yml`                     | Docker Compose produccion                                         |
 
 ### 45.10 Flujo de emails del formulario de contacto
 
@@ -4054,6 +4133,7 @@ POST /api/contact (chatbot backend)
 ```
 
 **Emails que se envian:**
+
 1. **Notificacion al admin**: De `info@lasgrutasdepartamentos.com` a `info@lasgrutasdepartamentos.com` → reenviado a `sergiomachado82@gmail.com` via virtual alias de Postfix
 2. **Auto-respuesta al visitante**: De `info@lasgrutasdepartamentos.com` al email que ingreso el visitante, con respuesta generada por Claude
 
@@ -4063,11 +4143,11 @@ Ambos emails se firman con DKIM (OpenDKIM) y pasan SPF (IPv4 66.97.40.119 autori
 
 Se agrego el logo de la empresa en las 3 plantillas HTML de email (`server/src/services/emailService.ts`):
 
-| Plantilla | Funcion | Descripcion |
-|-----------|---------|-------------|
-| `sendResetEmail` | Recuperacion de contrasena | Header azul (#1e40af) con logo centrado |
-| `sendContactEmail` | Notificacion al admin | Header azul con logo + subtitulo "Nueva consulta desde el formulario web" |
-| `sendAutoReplyEmail` | Auto-respuesta al visitante | Header azul con logo + subtitulo del alojamiento |
+| Plantilla            | Funcion                     | Descripcion                                                               |
+| -------------------- | --------------------------- | ------------------------------------------------------------------------- |
+| `sendResetEmail`     | Recuperacion de contrasena  | Header azul (#1e40af) con logo centrado                                   |
+| `sendContactEmail`   | Notificacion al admin       | Header azul con logo + subtitulo "Nueva consulta desde el formulario web" |
+| `sendAutoReplyEmail` | Auto-respuesta al visitante | Header azul con logo + subtitulo del alojamiento                          |
 
 La URL del logo es `https://lasgrutasdepartamentos.com/logo.png` (servido desde la landing page).
 
@@ -4076,6 +4156,7 @@ La URL del logo es `https://lasgrutasdepartamentos.com/logo.png` (servido desde 
 Se elimino la opcion de restringir "Ninos permitidos" en la configuracion de complejos, ya que todos los departamentos turisticos aceptan ninos sin excepcion.
 
 **Cambios:**
+
 - `src/components/complejos/ComplejoEditModal.tsx`: eliminado el toggle de la pestana Politicas, el campo del estado inicial del formulario y del payload de envio
 - `server/src/data/accommodationContext.ts`: se hardcodeo `Ninos: permitidos` en lugar de leer el campo `ninos` de la BD
 - La columna `ninos` en la BD se mantiene (default `true`) para no requerir migracion
@@ -4099,6 +4180,7 @@ Ejemplo: Complejo LG tiene capacidad 4 personas × 5 unidades = 20 (antes sumaba
 Ademas de las 44 imagenes de la landing page (descargadas del hosting cPanel), se detectaron 4 fotos adicionales del complejo Luminar Monoambiente referenciadas en la BD del chatbot que apuntaban a variantes de tamaño (`-805x453.jpg`) no incluidas en la descarga inicial.
 
 Se descargaron las 4 imagenes desde el hosting cPanel (198.54.114.136) a `/var/www/lasgrutasdepartamentos.com/wp-content/uploads/`:
+
 - `Luminar-Monoambiente-cocina-1-805x453.jpg`
 - `Luminar-Monoambiente-dormitorio-1-805x453.jpg`
 - `Luminar-Monoambiente-exterior-1-805x453.jpg`
@@ -4144,7 +4226,7 @@ Si no hay reglas personalizadas, el bloque no se agrega al prompt.
 En `server/src/routes/botConfig.ts`, el campo se valida con Zod:
 
 ```typescript
-reglasPersonalizadas: z.array(z.string().min(1).max(500)).max(20).optional()
+reglasPersonalizadas: z.array(z.string().min(1).max(500)).max(20).optional();
 ```
 
 ### 46.5 UI en BotConfigPage
@@ -4162,12 +4244,12 @@ Las reglas se guardan junto con el resto de la configuracion al presionar "Guard
 
 ### 46.6 Archivos modificados
 
-| Archivo | Cambio |
-|---------|--------|
-| `server/prisma/schema.prisma` | Agregado campo `reglasPersonalizadas String[]` a `BotConfig` |
-| `server/src/routes/botConfig.ts` | Agregada validacion Zod para `reglasPersonalizadas` |
-| `server/src/services/claudeService.ts` | Inyeccion de reglas personalizadas en el system prompt despues de R10 |
-| `src/api/botConfigApi.ts` | Agregado `reglasPersonalizadas: string[]` al interface `BotConfig` |
+| Archivo                                | Cambio                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| `server/prisma/schema.prisma`          | Agregado campo `reglasPersonalizadas String[]` a `BotConfig`               |
+| `server/src/routes/botConfig.ts`       | Agregada validacion Zod para `reglasPersonalizadas`                        |
+| `server/src/services/claudeService.ts` | Inyeccion de reglas personalizadas en el system prompt despues de R10      |
+| `src/api/botConfigApi.ts`              | Agregado `reglasPersonalizadas: string[]` al interface `BotConfig`         |
 | `src/components/bot/BotConfigPage.tsx` | Nueva seccion UI con lista, input, agregar/eliminar, ejemplos y contadores |
 
 ### 46.7 Que NO cambia
@@ -4175,3 +4257,888 @@ Las reglas se guardan junto con el resto de la configuracion al presionar "Guard
 - Las reglas R1-R10 siguen hardcodeadas y no se pueden editar desde el panel
 - El cache de `botConfigService.ts` (5 min TTL) aplica igual que para los demas campos
 - Las reglas personalizadas se incluyen en el bloque de system prompt cacheado (`cache_control: ephemeral`)
+
+---
+
+## 47. Mejoras UX y Arquitectura Frontend (2026-03-21)
+
+### 47.1 React Router — Navegacion con URLs reales
+
+Se migro de navegacion por estado interno (`view` string) a **React Router v7** con rutas reales SPA:
+
+| Ruta              | Componente            | Descripcion                               |
+| ----------------- | --------------------- | ----------------------------------------- |
+| `/`               | `DashboardPage`       | Dashboard principal                       |
+| `/chat`           | `ChatView`            | Lista de conversaciones + ventana de chat |
+| `/reservas`       | `ReservaList`         | Gestion de reservas                       |
+| `/propiedades`    | `ComplejoList`        | Gestion de propiedades/complejos          |
+| `/emails`         | `EmailList`           | Bandeja de emails                         |
+| `/whatsapp`       | `WhatsAppProfilePage` | Perfil de WhatsApp Business               |
+| `/bot`            | `BotConfigPage`       | Configuracion del bot                     |
+| `/logs`           | `IntegrationLogsPage` | Logs de integracion                       |
+| `/reset-password` | `ResetPasswordPage`   | Recuperacion de contrasena (publica)      |
+
+**Code splitting:** Todas las vistas excepto `LoginPage` y `Header` se cargan con `React.lazy()` + `<Suspense>` para reducir el bundle inicial.
+
+**SPA fallback en Nginx:** Se configuro `try_files $uri $uri/ /index.html` para que las rutas funcionen con refresh directo.
+
+**Archivos modificados:**
+
+- `src/App.tsx`: `BrowserRouter`, `Routes`, `Route`, `Navigate`, lazy imports
+- `src/main.tsx`: Wrap con `<BrowserRouter>`
+- `src/components/layout/Header.tsx`: `useNavigate()` + `useLocation()` en lugar de callbacks
+
+### 47.2 Indicador de conversaciones no leidas
+
+Se agrego un badge de conteo de mensajes no leidos en cada conversacion del `ChatList`.
+
+- Backend: campo `mensajesNoLeidos` (int, default 0) en el modelo `Conversacion`
+- Se incrementa cuando llega un mensaje del huesped y la conversacion no esta siendo vista por un agente
+- Se resetea a 0 cuando un agente abre la conversacion
+- Frontend: badge circular azul con el conteo en `ChatListItem`
+
+### 47.3 Shift+Enter para nueva linea en ChatInput
+
+El componente `ChatInput` ahora soporta:
+
+- **Enter**: envia el mensaje
+- **Shift+Enter**: inserta una nueva linea (textarea crece automaticamente)
+
+Se usa `<textarea>` con auto-resize en lugar de `<input>`.
+
+### 47.4 BotConfigPage con pestanas
+
+La pagina de configuracion del bot se reorganizo en 4 pestanas:
+
+| Pestana        | Contenido                                                                |
+| -------------- | ------------------------------------------------------------------------ |
+| General        | Nombre del bot, logo, nivel de urgencia, idioma                          |
+| Comportamiento | Tono, creatividad (temperature), reglas personalizadas                   |
+| Mensajes       | Mensajes personalizados (bienvenida, despedida, error, fuera de horario) |
+| Avanzado       | System prompt override, tokens max                                       |
+
+**Archivos:** `src/components/bot/BotConfigPage.tsx`
+
+### 47.5 Indicador de conexion WebSocket
+
+En el `Header`, junto al indicador de salud de servicios, se muestra el estado de la conexion WebSocket:
+
+- Verde: conectado
+- Rojo parpadeante: desconectado
+
+### 47.6 Eliminacion masiva de conversaciones
+
+Se implemento seleccion y eliminacion en lote de conversaciones desde el panel de chat.
+
+**Backend:**
+
+- `server/src/services/conversacionService.ts`: funcion `deleteConversaciones(ids)` que:
+  1. Elimina mensajes asociados (`prisma.mensaje.deleteMany`)
+  2. Desvincula reservas (`prisma.reserva.updateMany` → `conversacionId: null`)
+  3. Elimina conversaciones (`prisma.conversacion.deleteMany`)
+- `server/src/routes/conversaciones.ts`: endpoint `POST /conversaciones/bulk-delete` con validacion Zod (`ids: z.array(z.string()).min(1).max(50)`)
+
+**Frontend:**
+
+- `src/api/conversacionApi.ts`: funcion `deleteConversaciones(ids)`
+- `src/components/chat/ChatList.tsx`: modo seleccion con checkboxes, barra de acciones (seleccionar todas, eliminar, cancelar)
+- `src/components/chat/ChatListItem.tsx`: props opcionales `selectMode`, `isChecked`, `onToggleSelect`
+
+### 47.7 ConfirmDialog reutilizable
+
+Se creo el componente `src/components/ui/ConfirmDialog.tsx` que reemplaza `window.confirm()`:
+
+- Modal con overlay oscuro, titulo, mensaje, botones Cancelar/Confirmar
+- Boton confirmar configurable (color rojo para acciones destructivas)
+- Focus trap y cierre con Escape
+- Usado en: eliminacion de conversaciones, eliminacion de reservas, eliminacion de emails
+
+### 47.8 Notificaciones del navegador
+
+Se implementaron notificaciones push del navegador para conversaciones en estado `espera_humano`:
+
+- Hook `src/hooks/useNotifications.ts` que solicita permiso de notificaciones
+- Escucha eventos WebSocket de nuevas conversaciones que requieren atencion humana
+- Muestra notificacion del sistema con titulo y preview del mensaje
+- Click en la notificacion enfoca la ventana del panel
+
+### 47.9 Renombrado "Complejos" a "Propiedades"
+
+Se renombro la seccion "Complejos" a "Propiedades" en toda la UI para mayor claridad:
+
+- `src/components/layout/Header.tsx`: label del nav item
+- `src/App.tsx`: ruta `/complejos` → `/propiedades`
+- `src/components/complejos/ComplejoList.tsx`: titulo de la pagina
+
+Los archivos internos mantienen el nombre `complejo` para evitar migraciones innecesarias.
+
+### 47.10 Icono de canal en ChatListItem
+
+Cada conversacion muestra un icono indicando el canal de origen:
+
+- **Smartphone (verde)**: WhatsApp — se detecta si `huesped.waId` matchea `/^\d{7,}$/`
+- **Globe (azul)**: Webchat u otro canal
+
+Implementado en `src/components/chat/ChatListItem.tsx` con iconos de Lucide React.
+
+### 47.11 Border-radius unificado
+
+Se estandarizo el border-radius en toda la aplicacion:
+
+- `rounded-xl` → `rounded-md` en `LoginPage.tsx` y `ResetPasswordPage.tsx`
+- Consistencia visual entre login, modales y cards
+
+### 47.12 Columnas responsive en tabla de reservas
+
+En la tabla de reservas (`src/components/reservas/ReservaList.tsx`), 6 columnas secundarias se ocultan en pantallas menores a `xl` (1280px):
+
+- Telefono, DNI, Tarifa, Origen, Nro Factura, USD
+- Se usa `hidden xl:table-cell` en `<th>` y `<td>`
+- Las columnas principales (Huesped, Complejo, Check-in, Check-out, Estado, Acciones) siempre visibles
+
+---
+
+## 48. Auditoria de Configuracion del Bot (2026-03-21)
+
+### 48.1 Descripcion
+
+Sistema de auditoria que registra automaticamente cada cambio realizado en la configuracion del bot, guardando quien hizo el cambio, que campo se modifico, y los valores anterior y nuevo.
+
+### 48.2 Modelo de datos
+
+```prisma
+model BotConfigAudit {
+  id            String   @id @default(cuid())
+  agenteId      String?  @map("agente_id")
+  campo         String
+  valorAnterior String?  @map("valor_anterior")
+  valorNuevo    String?  @map("valor_nuevo")
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  @@index([creadoEn])
+  @@map("bot_config_audit")
+}
+```
+
+Migracion: `20260321161759_add_audit_and_integration_logs`
+
+### 48.3 Logica de auditoria
+
+En `server/src/services/botConfigService.ts`, la funcion `updateBotConfig` fue modificada:
+
+1. Recibe un parametro opcional `agenteId` (ID del usuario que hace el cambio)
+2. Compara cada campo del `data` con el valor actual de la configuracion
+3. Para cada campo que cambio, crea un registro en `BotConfigAudit` con:
+   - `agenteId`: quien hizo el cambio
+   - `campo`: nombre del campo modificado
+   - `valorAnterior`: valor anterior (serializado a string)
+   - `valorNuevo`: valor nuevo (serializado a string)
+4. Los registros se guardan de forma no-bloqueante con `.catch(() => {})` y try-catch defensivo
+
+### 48.4 Endpoint
+
+```
+GET /api/bot/config/history?limit=50
+```
+
+Retorna los ultimos N registros de auditoria ordenados por fecha descendente.
+
+### 48.5 UI — Historial de cambios
+
+En `BotConfigPage.tsx`:
+
+- Boton "Historial" junto al boton "Guardar cambios"
+- Panel colapsable que muestra los ultimos cambios
+- Cada entrada muestra: campo (con label legible), valor anterior → valor nuevo, fecha
+- Labels traducidos via `FIELD_LABELS` (ej: `tono` → "Tono", `mensajeBienvenida` → "Mensaje de bienvenida")
+
+### 48.6 Archivos modificados
+
+| Archivo                                   | Cambio                                                                      |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `server/prisma/schema.prisma`             | Modelo `BotConfigAudit`                                                     |
+| `server/src/services/botConfigService.ts` | Logica de diff + creacion de registros de auditoria                         |
+| `server/src/routes/botConfig.ts`          | Endpoint `GET /bot/config/history`, pasa `req.user?.id` a `updateBotConfig` |
+| `src/api/botConfigApi.ts`                 | Interface `BotConfigAuditEntry`, funcion `getBotConfigHistory()`            |
+| `src/components/bot/BotConfigPage.tsx`    | Componente `ConfigHistory`, boton "Historial", state `showHistory`          |
+
+---
+
+## 49. Logs de Integracion (2026-03-21)
+
+### 49.1 Descripcion
+
+Sistema centralizado de logging para errores y advertencias de servicios externos (WhatsApp, Claude, reservas, Google Sheets). Los errores se registran en la base de datos y se pueden consultar desde el panel admin.
+
+### 49.2 Modelo de datos
+
+```prisma
+model IntegrationLog {
+  id        String   @id @default(cuid())
+  servicio  String
+  nivel     String   @default("error")
+  mensaje   String
+  detalle   String?
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  @@index([servicio, creadoEn])
+  @@map("integration_logs")
+}
+```
+
+Migracion: `20260321161759_add_audit_and_integration_logs` (misma migracion que BotConfigAudit)
+
+### 49.3 Servicio
+
+`server/src/services/integrationLogService.ts` exporta:
+
+| Funcion                                              | Descripcion                      |
+| ---------------------------------------------------- | -------------------------------- |
+| `logIntegrationError(servicio, mensaje, detalle?)`   | Registra un error                |
+| `logIntegrationWarning(servicio, mensaje, detalle?)` | Registra una advertencia         |
+| `getIntegrationLogs({ servicio?, limit? })`          | Consulta logs (max 500)          |
+| `clearOldLogs(daysToKeep = 30)`                      | Elimina logs anteriores a N dias |
+
+Todas las funciones tienen try-catch defensivo — el logging nunca debe crashear la aplicacion.
+
+### 49.4 Puntos de integracion
+
+Se agrego `logIntegrationError` en los catch blocks de:
+
+| Archivo                                  | Servicio   | Contexto                            |
+| ---------------------------------------- | ---------- | ----------------------------------- |
+| `server/src/services/claudeService.ts`   | `claude`   | Error en clasificacion de intencion |
+| `server/src/services/claudeService.ts`   | `claude`   | Error en generacion de respuesta    |
+| `server/src/services/botEngine.ts`       | `whatsapp` | Error al enviar fotos               |
+| `server/src/services/botEngine.ts`       | `reservas` | Error al crear auto-reserva         |
+| `server/src/services/whatsappService.ts` | `whatsapp` | Error al enviar mensaje de WhatsApp |
+
+### 49.5 Endpoint
+
+```
+GET /api/integration-logs?servicio=whatsapp&limit=100
+```
+
+Parametros opcionales:
+
+- `servicio`: filtrar por servicio (whatsapp, claude, reservas, sheets)
+- `limit`: cantidad maxima de resultados (default 100, max 500)
+
+### 49.6 UI — Pagina de Logs
+
+`src/components/logs/IntegrationLogsPage.tsx`:
+
+- Accesible desde `/logs` o desde el enlace "Ver logs de integracion" en el indicador de salud del Header
+- Filtros por servicio: Todos, WhatsApp, Claude IA, Reservas, Sheets
+- Cada log muestra: nivel (ERROR/WARNING con color), servicio, mensaje, detalle (truncado), fecha
+- Border-left rojo para errores, amarillo para warnings
+- Auto-refresh cada 30 segundos
+
+### 49.7 Archivos creados/modificados
+
+| Archivo                                        | Cambio                                                          |
+| ---------------------------------------------- | --------------------------------------------------------------- |
+| `server/src/services/integrationLogService.ts` | **Nuevo** — servicio de logging                                 |
+| `server/src/routes/integrationLogs.ts`         | **Nuevo** — endpoint GET                                        |
+| `server/src/app.ts`                            | Registro de ruta `/api/integration-logs`                        |
+| `server/src/services/claudeService.ts`         | 2 llamadas a `logIntegrationError`                              |
+| `server/src/services/botEngine.ts`             | 2 llamadas a `logIntegrationError`                              |
+| `server/src/services/whatsappService.ts`       | 1 llamada a `logIntegrationError`                               |
+| `src/api/botConfigApi.ts`                      | Interface `IntegrationLogEntry`, funcion `getIntegrationLogs()` |
+| `src/components/logs/IntegrationLogsPage.tsx`  | **Nuevo** — pagina de logs                                      |
+| `src/App.tsx`                                  | Ruta `/logs`, lazy import de `IntegrationLogsPage`              |
+
+---
+
+## 50. Banner de Servicios Caidos y Health Compartido (2026-03-21)
+
+### 50.1 Descripcion
+
+Banner de alerta rojo en la parte superior del panel cuando uno o mas servicios criticos estan caidos, mas un hook compartido de health para evitar polling duplicado.
+
+### 50.2 Hook compartido — useHealth
+
+`src/hooks/useHealth.ts` implementa un **singleton** de polling de salud:
+
+- Un unico `setInterval` de 30 segundos comparte datos entre todos los componentes que usen el hook
+- Evita 3 llamadas simultaneas al endpoint `/api/health` (Header, ServiceBanner, ChatHeader)
+- Exporta `useHealth()` que retorna `{ status, isLoading }`
+- Helper `getCriticalFailures(status)` retorna lista de servicios criticos fallidos
+
+Servicios criticos: `database`, `redis`, `claude`, `whatsapp`.
+
+### 50.3 Banner — ServiceBanner
+
+`src/components/layout/ServiceBanner.tsx`:
+
+- Se renderiza debajo del `Header` en `App.tsx`
+- Solo visible cuando hay servicios criticos caidos
+- Barra roja full-width con icono de alerta y lista de servicios fallidos
+- Se oculta automaticamente cuando los servicios se recuperan
+
+### 50.4 Estado de WhatsApp en ChatHeader
+
+En `src/components/chat/ChatHeader.tsx`:
+
+- Se agrego el hook `useHealth`
+- Muestra indicador de estado de WhatsApp:
+  - **Verde**: "WA" — servicio activo
+  - **Rojo**: "WA offline" con icono AlertCircle — servicio caido
+
+### 50.5 Refactor del HealthIndicator en Header
+
+El componente `HealthIndicator` en `src/components/layout/Header.tsx`:
+
+- Migrado de fetch propio a `useHealth()` compartido
+- Se agrego enlace "Ver logs de integracion" (navega a `/logs`) en el dropdown de servicios
+
+### 50.6 Archivos creados/modificados
+
+| Archivo                                   | Cambio                                              |
+| ----------------------------------------- | --------------------------------------------------- |
+| `src/hooks/useHealth.ts`                  | **Nuevo** — singleton de health polling             |
+| `src/components/layout/ServiceBanner.tsx` | **Nuevo** — banner de servicios caidos              |
+| `src/App.tsx`                             | Import y render de `ServiceBanner`                  |
+| `src/components/layout/Header.tsx`        | Refactor HealthIndicator a useHealth + link a /logs |
+| `src/components/chat/ChatHeader.tsx`      | Indicador de estado WA                              |
+
+---
+
+## 51. Fix: Prisma Client y Modelos Nuevos (2026-03-21)
+
+### 51.1 Problema
+
+Al desplegar en produccion, la subida de logo del bot fallaba con:
+
+```
+Cannot read properties of undefined (reading 'createMany')
+```
+
+El error ocurria porque `prisma.botConfigAudit` era `undefined` — el cliente de Prisma no habia sido regenerado despues de agregar los modelos `BotConfigAudit` e `IntegrationLog`.
+
+### 51.2 Causa raiz
+
+El `.catch(() => {})` en la llamada a `prisma.botConfigAudit.createMany()` no atrapaba el error porque acceder a `.createMany` en `undefined` lanza un **TypeError sincrono**, no un rechazo de promesa.
+
+### 51.3 Solucion
+
+1. **Try-catch defensivo** en `botConfigService.ts`:
+
+```typescript
+if (auditEntries.length > 0) {
+  try {
+    prisma.botConfigAudit.createMany({ data: auditEntries }).catch(() => {});
+  } catch {
+    // Model may not exist if prisma client wasn't regenerated
+  }
+}
+```
+
+2. **Regenerar el cliente Prisma** en el servidor:
+
+```bash
+npx prisma generate
+pm2 restart chatbot
+```
+
+### 51.4 Leccion
+
+Siempre ejecutar `npx prisma generate` despues de aplicar migraciones que agregan nuevos modelos. El `prisma migrate deploy` crea las tablas en la BD pero no regenera el cliente TypeScript.
+
+---
+
+## 52. Accesibilidad Completa (2026-03-21)
+
+### 52.1 Descripcion
+
+Implementacion integral de mejoras de accesibilidad (WCAG 2.1 AA) en toda la interfaz del panel admin. El informe de auditoria (21-03-2026) puntuo Accesibilidad 4.5/10. Las mejoras cubren: navegacion por teclado, jerarquia de headings, semantica de modales, labels ARIA, y atributos de formulario.
+
+### 52.2 Skip-to-content y landmark `<main>`
+
+**`index.html`**: Se agrego `lang="es-AR"` al elemento `<html>` para que los lectores de pantalla identifiquen el idioma del contenido.
+
+**`src/App.tsx`**: Se agrego un enlace "skip-to-content" como primer elemento dentro del layout autenticado, antes del `<Header>`:
+
+```tsx
+<a
+  href="#main-content"
+  className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-3 focus:bg-blue-600 focus:text-white focus:rounded-md"
+>
+  {t('app.skipToContent')}
+</a>
+```
+
+El contenido principal se envuelve en `<main id="main-content">`, proporcionando un landmark semantico para navegacion por lectores de pantalla.
+
+### 52.3 Jerarquia de headings — h2 → h1
+
+Se corrigio la jerarquia de encabezados en 7 paginas principales. Cada pagina ahora tiene exactamente un `<h1>` como titulo principal:
+
+| Archivo                   | Antes       | Despues |
+| ------------------------- | ----------- | ------- |
+| `DashboardPage.tsx`       | `<h2>`      | `<h1>`  |
+| `ReservaList.tsx`         | `<h2>`      | `<h1>`  |
+| `ComplejoList.tsx`        | `<h2>`      | `<h1>`  |
+| `BotConfigPage.tsx`       | `<h2>`      | `<h1>`  |
+| `WhatsAppProfilePage.tsx` | `<h2>`      | `<h1>`  |
+| `IntegrationLogsPage.tsx` | `<h2>`      | `<h1>`  |
+| `EmailList.tsx`           | Sin heading | `<h1>`  |
+
+### 52.4 aria-label en botones de solo icono
+
+Se agrego `aria-label` con texto descriptivo (via `t()`) a 14+ botones que solo contenian un icono, en los siguientes componentes:
+
+| Archivo                 | Boton                     | aria-label                    |
+| ----------------------- | ------------------------- | ----------------------------- |
+| `ChatList.tsx`          | Trash2 (bulk delete)      | `t('chat.deleteSelected')`    |
+| `ChatList.tsx`          | X (cancelar seleccion)    | `t('chat.cancelSelection')`   |
+| `ComplejoCard.tsx`      | Pencil (editar)           | `t('complejos.editProperty')` |
+| `ComplejoEditModal.tsx` | X (cerrar modal)          | `t('common.close')`           |
+| `ComplejoEditModal.tsx` | Trash2 (eliminar items)   | `t('common.delete')`          |
+| `EmailDetailModal.tsx`  | X (cerrar modal)          | `t('common.close')`           |
+| `EmailList.tsx`         | Trash2 (eliminar email)   | `t('emails.delete')`          |
+| `ReservaList.tsx`       | Pencil (editar reserva)   | `t('reservas.editReserva')`   |
+| `ReservaList.tsx`       | Trash2 (eliminar reserva) | `t('reservas.deleteReserva')` |
+| `MediaUploadForm.tsx`   | Trash2 (eliminar imagen)  | `t('common.delete')`          |
+| `TarifaSection.tsx`     | Trash2 (eliminar tarifa)  | `t('common.delete')`          |
+
+### 52.5 Modales — semantica ARIA
+
+Se agrego `role="dialog"`, `aria-modal="true"` y `aria-labelledby` a los 3 modales principales:
+
+| Modal                 | Archivo                 | ID del titulo          |
+| --------------------- | ----------------------- | ---------------------- |
+| Editar propiedad      | `ComplejoEditModal.tsx` | `complejo-modal-title` |
+| Detalle de email      | `EmailDetailModal.tsx`  | `email-modal-title`    |
+| Formulario de reserva | `ReservaList.tsx`       | `reserva-modal-title`  |
+
+Ejemplo de implementacion:
+
+```tsx
+<div
+  className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="complejo-modal-title"
+>
+  <h3 id="complejo-modal-title">{t('complejos.editTitle')}</h3>
+</div>
+```
+
+### 52.6 Accesibilidad de teclado en elementos clickeables
+
+Se agrego soporte de teclado (Enter y Space) a 3 elementos con `onClick` que no eran botones nativos:
+
+| Archivo            | Elemento             | Fix aplicado                                               |
+| ------------------ | -------------------- | ---------------------------------------------------------- |
+| `ComplejoCard.tsx` | `<div>` card         | `role="button"`, `tabIndex={0}`, `onKeyDown` (Enter/Space) |
+| `EmailList.tsx`    | `<div>` email card   | `role="button"`, `tabIndex={0}`, `onKeyDown` (Enter/Space) |
+| `ReservaList.tsx`  | `<tr>` fila de tabla | `tabIndex={0}`, `onKeyDown` (Enter)                        |
+
+Patron implementado:
+
+```tsx
+<div
+  role="button"
+  tabIndex={0}
+  onClick={handler}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handler();
+    }
+  }}
+>
+```
+
+### 52.7 Atributos de formulario
+
+- **`required`** agregado a campos obligatorios en `ComplejoEditModal.tsx` (nombre) y `ReservaList.tsx` (nombre, fecha entrada, fecha salida)
+- **`alt`** agregado a `<img>` en `ComplejoCard.tsx` usando `complejo.nombre` como texto alternativo
+
+### 52.8 Mensajes con roles semanticos
+
+Se agrego `role="alert"` a mensajes de error y `role="status"` a mensajes de exito en formularios, para que los lectores de pantalla los anuncien automaticamente:
+
+```tsx
+{
+  error && (
+    <p role="alert" className="text-red-500 text-sm ...">
+      {error}
+    </p>
+  );
+}
+{
+  success && (
+    <p role="status" className="text-green-600 text-sm ...">
+      {success}
+    </p>
+  );
+}
+```
+
+### 52.9 Archivos modificados (accesibilidad)
+
+| Archivo                                           | Cambios                                                          |
+| ------------------------------------------------- | ---------------------------------------------------------------- |
+| `index.html`                                      | `lang="es-AR"` en `<html>`                                       |
+| `src/App.tsx`                                     | Skip-to-content, `<main>` landmark                               |
+| `src/components/chat/ChatList.tsx`                | aria-label en botones icono                                      |
+| `src/components/reservas/ReservaList.tsx`         | `<h1>`, modal dialog, required, tabIndex en `<tr>`               |
+| `src/components/reservas/ReservaCalendar.tsx`     | aria-label en controles                                          |
+| `src/components/complejos/ComplejoList.tsx`       | `<h1>`                                                           |
+| `src/components/complejos/ComplejoCard.tsx`       | role="button", tabIndex, onKeyDown, alt, aria-label              |
+| `src/components/complejos/ComplejoEditModal.tsx`  | role="dialog", aria-modal, aria-labelledby, required, aria-label |
+| `src/components/emails/EmailList.tsx`             | `<h1>`, role="button", tabIndex, onKeyDown, aria-label           |
+| `src/components/emails/EmailDetailModal.tsx`      | role="dialog", aria-modal, aria-labelledby, aria-label           |
+| `src/components/complejos/TarifaSection.tsx`      | aria-label en botones eliminar                                   |
+| `src/components/complejos/MediaUploadForm.tsx`    | aria-label en botones eliminar                                   |
+| `src/components/dashboard/DashboardPage.tsx`      | `<h1>`                                                           |
+| `src/components/bot/BotConfigPage.tsx`            | `<h1>`                                                           |
+| `src/components/whatsapp/WhatsAppProfilePage.tsx` | `<h1>`                                                           |
+| `src/components/logs/IntegrationLogsPage.tsx`     | `<h1>`                                                           |
+
+---
+
+## 53. Internacionalizacion Completa — es/en (2026-03-21)
+
+### 53.1 Descripcion
+
+Migracion completa de ~300 strings hardcoded a i18n usando react-i18next, creacion de locale ingles completo, y selector de idioma en el header. El informe de auditoria puntuo Internacionalizacion 5.0/10. Despues de esta implementacion, el 100% de los strings visibles al usuario pasan por `t()`.
+
+### 53.2 Arquitectura i18n
+
+**Framework**: i18next + react-i18next
+**Idiomas**: Español Argentina (`es`, default) e Ingles (`en`)
+**Persistencia**: `localStorage` key `app-language`
+**Config**: `src/i18n.ts`
+
+```typescript
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import es from './locales/es.json';
+import en from './locales/en.json';
+
+i18n.use(initReactI18next).init({
+  resources: {
+    es: { translation: es },
+    en: { translation: en },
+  },
+  lng: getSavedLanguage(), // lee de localStorage
+  fallbackLng: 'es',
+  interpolation: { escapeValue: false },
+});
+
+// Actualiza <html lang> al cambiar idioma
+i18n.on('languageChanged', (lng) => {
+  localStorage.setItem('app-language', lng);
+  document.documentElement.lang = lng === 'es' ? 'es-AR' : lng;
+});
+```
+
+### 53.3 Estructura de namespaces
+
+Los archivos `src/locales/es.json` y `src/locales/en.json` contienen ~350 keys organizadas en 18 namespaces:
+
+| Namespace       | Keys aprox. | Contenido                                                             |
+| --------------- | ----------- | --------------------------------------------------------------------- |
+| `auth`          | 12          | Login: titulo, campos, errores, validacion                            |
+| `resetPassword` | 10          | Reset de contraseña: titulo, campos, mensajes                         |
+| `common`        | 35          | Acciones genericas: guardar, cancelar, eliminar, cerrar, etc.         |
+| `nav`           | 8           | Navegacion: Dashboard, Chat, Reservas, Propiedades, etc.              |
+| `app`           | 20          | Titulo, simulador, modo oscuro, idioma, skip-to-content, servicios    |
+| `chat`          | 40          | Filtros, busqueda, seleccion, mensajes, controles, respuesta rapida   |
+| `dashboard`     | 30          | Estadisticas, metricas, funnel, ocupacion, recientes                  |
+| `reservas`      | 50          | Formulario, columnas tabla, filtros, estados, calendario, eliminacion |
+| `calendar`      | 12          | Nombres de meses en español                                           |
+| `complejos`     | 55          | Formulario, tabs, tarifas, bloqueos, media, sincronizacion, politicas |
+| `tarifas`       | 15          | Temporadas, precios, fechas, moneda                                   |
+| `emails`        | 25          | Estadisticas, filtros, tabla, detalle, estados, tipos                 |
+| `bot`           | 50          | Identidad, comportamiento, reglas, mensajes, historial, campos        |
+| `whatsapp`      | 20          | Formulario, industrias, advertencia simulador                         |
+| `logs`          | 8           | Titulo, servicios, niveles                                            |
+| `status`        | 8           | Bot, espera, humano, cerrado, confirmada, cancelada, etc.             |
+| `guests`        | 10          | Tarjeta de huesped, etiquetas                                         |
+| `confirm`       | 5           | Dialogo de confirmacion                                               |
+
+### 53.4 Selector de idioma
+
+En `src/components/layout/Header.tsx` se agrego un boton con icono Globe que alterna entre ES y EN:
+
+```tsx
+<button onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')} aria-label={t('app.languageLabel')}>
+  <Globe size={14} />
+  <span className="text-xs font-medium uppercase">{i18n.language}</span>
+</button>
+```
+
+El idioma se persiste en `localStorage` y sobrevive recargas. Al cambiar idioma, `<html lang>` se actualiza dinamicamente.
+
+### 53.5 Formato de moneda y numeros
+
+Se creo `src/utils/format.ts` con helpers de formateo localizados:
+
+```typescript
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export function formatNumber(n: number): string {
+  return new Intl.NumberFormat('es-AR').format(n);
+}
+```
+
+Se usa en: `ReservaList`, `DashboardPage`, `TarifaSection`, `ComplejoCard`, `ResumenPanel`.
+
+### 53.6 Patron de uso en componentes
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function MiComponente() {
+  const { t } = useTranslation();
+  return <h1>{t('namespace.key')}</h1>;
+}
+```
+
+Para `Badge.tsx` (componente sin hook React), se usa la instancia directa:
+
+```typescript
+import i18n from '../../i18n';
+const label = i18n.t('status.bot');
+```
+
+### 53.7 Correccion de acentos
+
+Se corrigieron ~80 strings en `es.json` que tenian acentos faltantes o inconsistentes. Ejemplos:
+
+| Antes               | Despues             |
+| ------------------- | ------------------- |
+| `"Configuracion"`   | `"Configuración"`   |
+| `"informacion"`     | `"información"`     |
+| `"telefono"`        | `"teléfono"`        |
+| `"direccion"`       | `"dirección"`       |
+| `"descripcion"`     | `"descripción"`     |
+| `"ubicacion"`       | `"ubicación"`       |
+| `"numero"`          | `"número"`          |
+| `"metricas"`        | `"métricas"`        |
+| `"deposito"`        | `"depósito"`        |
+| `"estadia"`         | `"estadía"`         |
+| `"politicas"`       | `"políticas"`       |
+| `"automaticamente"` | `"automáticamente"` |
+
+### 53.8 Componentes migrados a i18n (28 total)
+
+| #   | Componente                | Strings migradas                                   |
+| --- | ------------------------- | -------------------------------------------------- |
+| 1   | `App.tsx`                 | Simulador, volver, empty states                    |
+| 2   | `Header.tsx`              | Navegacion, logout, modo oscuro, idioma, servicios |
+| 3   | `ServiceBanner.tsx`       | Alerta de servicios caidos                         |
+| 4   | `DashboardPage.tsx`       | Estadisticas, metricas, titulos, empty states      |
+| 5   | `ChatList.tsx`            | Filtros, busqueda, seleccion, bulk actions         |
+| 6   | `ChatWindow.tsx`          | Mensajes, estados, controles                       |
+| 7   | `ChatInput.tsx`           | Placeholder, boton enviar                          |
+| 8   | `ChatListItem.tsx`        | Labels de estado, metadata                         |
+| 9   | `ChatSearchBar.tsx`       | Placeholder de busqueda                            |
+| 10  | `MessageBubble.tsx`       | Metadata de mensajes                               |
+| 11  | `ReservaList.tsx`         | Formulario completo, tabla, filtros, eliminacion   |
+| 12  | `ReservaCalendar.tsx`     | Meses, controles de navegacion                     |
+| 13  | `ResumenPanel.tsx`        | Panel de resumen con formato moneda                |
+| 14  | `ComplejoList.tsx`        | Titulo, boton crear                                |
+| 15  | `ComplejoCard.tsx`        | Labels, formato moneda, acciones                   |
+| 16  | `ComplejoEditModal.tsx`   | Formulario completo (~50 labels), tabs, validacion |
+| 17  | `TarifaSection.tsx`       | Temporadas, precios, formato moneda                |
+| 18  | `MediaUploadForm.tsx`     | Labels de carga de imagenes                        |
+| 19  | `EmailList.tsx`           | Estadisticas, filtros, tabla                       |
+| 20  | `EmailDetailModal.tsx`    | Labels de detalle, acciones                        |
+| 21  | `BotConfigPage.tsx`       | Formulario completo (~40 labels), secciones        |
+| 22  | `WhatsAppProfilePage.tsx` | Formulario, industrias                             |
+| 23  | `IntegrationLogsPage.tsx` | Titulo, filtros, niveles                           |
+| 24  | `Badge.tsx`               | Labels de estados via `i18n.t()`                   |
+| 25  | `ConfirmDialog.tsx`       | Botones confirmar/cancelar                         |
+| 26  | `GuestCard.tsx`           | Labels de huesped                                  |
+| 27  | `ChatHeader.tsx`          | Estado WA, controles                               |
+| 28  | `MediaGallery.tsx`        | Labels de galeria                                  |
+
+### 53.9 Archivos creados
+
+| Archivo               | Descripcion                                                 |
+| --------------------- | ----------------------------------------------------------- |
+| `src/locales/es.json` | Locale español (~350 keys, expandido desde ~35)             |
+| `src/locales/en.json` | **Nuevo** — locale ingles completo (~350 keys)              |
+| `src/utils/format.ts` | **Nuevo** — formatCurrency, formatNumber                    |
+| `src/i18n.ts`         | Actualizado — soporte multi-idioma, persistencia, html lang |
+
+---
+
+## 54. Consistencia de Marca y Design System (2026-03-21)
+
+### 54.1 Descripcion
+
+Estandarizacion visual de la interfaz siguiendo un design system unificado. El informe de auditoria puntuo Consistencia de Marca 6.0/10. Las mejoras cubren: tipografia, paleta de colores, border-radius, y documentacion del sistema de diseño.
+
+### 54.2 Tipografia — Inter
+
+Se agrego la fuente **Inter** de Google Fonts como tipografia principal de la aplicacion.
+
+**`index.html`** — Preconnect y carga de la fuente:
+
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+```
+
+**`src/index.css`** — Font stack actualizado:
+
+```css
+body {
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+```
+
+Pesos cargados: 400 (normal), 500 (medium), 600 (semibold), 700 (bold).
+
+### 54.3 Fix de doble uso del azul
+
+El informe identifico que el azul (`blue`) se usaba tanto para acciones primarias (botones, links) como para estados (`bot`, `completada`), generando confusion visual.
+
+**Solucion**: Se reasignaron colores en `Badge.tsx`:
+
+| Estado       | Color anterior | Color nuevo |
+| ------------ | -------------- | ----------- |
+| `bot`        | `blue`         | `cyan`      |
+| `completada` | `blue`         | `purple`    |
+
+El azul (`blue-600`) queda reservado exclusivamente para acciones primarias (botones, links, focus rings).
+
+**Codigo en `Badge.tsx`**:
+
+```typescript
+const COLORS: Record<string, string> = {
+  green: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  yellow: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+  cyan: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
+  purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+  // ... otros colores
+};
+
+export function estadoColor(estado: string): string {
+  const map: Record<string, string> = {
+    bot: 'cyan', // antes: 'blue'
+    completada: 'purple', // antes: 'blue'
+    // ...
+  };
+  return map[estado] ?? 'gray';
+}
+```
+
+### 54.4 Estandarizacion de border-radius
+
+Se corrigieron 72 instancias de border-radius inconsistente en 12 archivos:
+
+| Patron             | Uso correcto                        | Contexto               |
+| ------------------ | ----------------------------------- | ---------------------- |
+| `rounded-md` (6px) | Inputs, botones, selects, textareas | Elementos interactivos |
+| `rounded-lg` (8px) | Cards, modales, paneles, dropdowns  | Contenedores           |
+| `rounded-full`     | Badges, avatars, pills, dots        | Elementos circulares   |
+
+**Correcciones principales:**
+
+| Antes                        | Despues            | Archivos afectados                                                                           |
+| ---------------------------- | ------------------ | -------------------------------------------------------------------------------------------- |
+| `rounded` (4px) en inputs    | `rounded-md` (6px) | ChatInput, ChatSearchBar, ReservaList, ComplejoEditModal, BotConfigPage, WhatsAppProfilePage |
+| `rounded-xl` (12px) en cards | `rounded-lg` (8px) | DashboardPage, ReservaList, ComplejoCard                                                     |
+| `rounded` en botones         | `rounded-md`       | ChatList, EmailList, IntegrationLogsPage                                                     |
+| `rounded` en dropdowns       | `rounded-lg`       | ChatList, ReservaList                                                                        |
+
+### 54.5 Guia de tono y voz de marca
+
+Se creo `src/components/ui/DESIGN_SYSTEM.md` como referencia para desarrolladores, documentando:
+
+1. **Personalidad**: Profesional y cercano, trato de _vos_ (voseo rioplatense)
+2. **Reglas de escritura**:
+   - Voseo: "Ingresá", "Repetí", "Seleccioná"
+   - Acentos obligatorios (lista de palabras frecuentes)
+   - Mayusculas: solo la primera letra en titulos/botones
+   - Puntuacion: labels sin punto, mensajes de error con punto
+3. **Idiomas**: Español AR (principal), English (completo)
+4. **Paleta de colores**: con nota sobre reservar azul para acciones
+5. **Tipografia**: Inter con escala de tamaños (xs a 2xl)
+6. **Border-radius**: tabla con tokens y contextos de uso
+7. **Spacing**: gaps, padding, y margenes estandar
+8. **Inventario de componentes**: Badge, Avatar, EmptyState, ConfirmDialog, ErrorBoundary, Skeleton
+9. **Patrones comunes**: inputs, mensajes error/exito, cards, botones, modales
+
+### 54.6 Archivos modificados (consistencia de marca)
+
+| Archivo                                           | Cambios                                               |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| `index.html`                                      | Preconnect + carga de Inter                           |
+| `src/index.css`                                   | Font-family con Inter                                 |
+| `src/components/ui/Badge.tsx`                     | Colores cyan/purple, mapa de estados actualizado      |
+| `src/components/ui/DESIGN_SYSTEM.md`              | **Reescrito** — guia completa de design system        |
+| `src/components/chat/ChatInput.tsx`               | `rounded` → `rounded-md`                              |
+| `src/components/chat/ChatList.tsx`                | `rounded` → `rounded-md`/`rounded-lg`                 |
+| `src/components/chat/ChatSearchBar.tsx`           | `rounded` → `rounded-md`                              |
+| `src/components/reservas/ReservaList.tsx`         | `rounded-xl` → `rounded-lg`, `rounded` → `rounded-md` |
+| `src/components/complejos/ComplejoCard.tsx`       | `rounded-xl` → `rounded-lg`                           |
+| `src/components/complejos/ComplejoEditModal.tsx`  | `rounded` → `rounded-md`                              |
+| `src/components/dashboard/DashboardPage.tsx`      | `rounded-xl` → `rounded-lg`                           |
+| `src/components/bot/BotConfigPage.tsx`            | `rounded` → `rounded-md`                              |
+| `src/components/whatsapp/WhatsAppProfilePage.tsx` | `rounded` → `rounded-md`                              |
+| `src/components/emails/EmailList.tsx`             | `rounded` → `rounded-md`                              |
+| `src/components/logs/IntegrationLogsPage.tsx`     | `rounded` → `rounded-md`/`rounded-lg`                 |
+
+---
+
+## 55. Verificacion y Validacion (2026-03-21)
+
+### 55.1 Validacion tecnica
+
+Todas las mejoras de accesibilidad, i18n y consistencia de marca fueron verificadas con:
+
+| Verificacion                | Resultado            |
+| --------------------------- | -------------------- |
+| `npx tsc --noEmit`          | 0 errores TypeScript |
+| `npm run build` (Vite)      | Build exitoso        |
+| `npm run format` (Prettier) | Formato correcto     |
+
+### 55.2 Checklist de accesibilidad
+
+- [x] Tab navega entre todos los elementos interactivos con focus ring visible
+- [x] Skip-to-content link visible al presionar Tab
+- [x] Cada pagina tiene exactamente un `<h1>`
+- [x] Modales anuncian titulo via `aria-labelledby`
+- [x] Botones de solo icono tienen `aria-label`
+- [x] Elementos clickeables no-boton son accesibles por teclado (Enter/Space)
+- [x] Campos requeridos marcados con `required`
+- [x] Imagenes tienen atributo `alt`
+- [x] Mensajes de error/exito usan `role="alert"`/`role="status"`
+
+### 55.3 Checklist de i18n
+
+- [x] 100% de strings visibles pasan por `t()`
+- [x] Locale español completo (~350 keys) con acentos correctos
+- [x] Locale ingles completo (~350 keys)
+- [x] Selector de idioma en header (Globe icon)
+- [x] Idioma persiste en localStorage entre sesiones
+- [x] `<html lang>` se actualiza al cambiar idioma
+- [x] Formato de moneda usando `Intl.NumberFormat('es-AR')`
+
+### 55.4 Checklist de consistencia de marca
+
+- [x] Fuente Inter cargada y aplicada
+- [x] Azul reservado exclusivamente para acciones primarias
+- [x] Bot usa cyan, completada usa purple
+- [x] Border-radius estandarizado (rounded-md/rounded-lg/rounded-full)
+- [x] DESIGN_SYSTEM.md documentado con guia de tono, colores, tipografia, spacing
+- [x] Acentos correctos en todos los strings del locale español
