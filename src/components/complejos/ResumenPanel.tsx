@@ -6,7 +6,7 @@ interface ResumenPanelProps {
 
 export default function ResumenPanel({ complejos }: ResumenPanelProps) {
   const activos = complejos.filter((c) => c.activo);
-  const capacidadTotal = activos.reduce((sum, c) => sum + c.capacidad, 0);
+  const capacidadTotal = activos.reduce((sum, c) => sum + c.capacidad * c.cantidadUnidades, 0);
   const totalUnidades = activos.reduce((sum, c) => sum + c.cantidadUnidades, 0);
 
   const preciosBaja = activos.flatMap((c) =>
