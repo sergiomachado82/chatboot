@@ -1,42 +1,23 @@
-import { useState, useEffect, type ReactNode } from 'react';
-import { Building2 } from 'lucide-react';
-import { getPublicLogo } from '../../api/botConfigApi';
+import type { ReactNode } from 'react';
 
 interface AuthLayoutProps {
   children: ReactNode;
 }
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoLoaded, setLogoLoaded] = useState(false);
-
-  useEffect(() => {
-    getPublicLogo().then((url) => {
-      setLogoUrl(url);
-      setLogoLoaded(true);
-    }).catch(() => setLogoLoaded(true));
-  }, []);
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-sky-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4">
       <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-white/60 dark:border-gray-700/60 w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-6">
           <div className="mb-3">
-            {logoLoaded && logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="Logo"
-                className="h-16 w-auto object-contain"
-              />
-            ) : (
-              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center shadow-lg">
-                <Building2 className="text-white" size={32} />
-              </div>
-            )}
+            <img
+              src="/logo.jpg"
+              alt="Las Grutas Departamentos"
+              className="h-16 w-auto object-contain"
+            />
           </div>
           <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Panel de Agentes</h1>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Las Grutas Departamentos</p>
         </div>
 
         {children}
