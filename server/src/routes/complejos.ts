@@ -21,6 +21,8 @@ import { syncTarifaEspecialToInventario, restoreSeasonalPrices } from '../servic
 import { recalcDisponible, dateRange } from '../services/inventarioService.js';
 import { prisma } from '../lib/prisma.js';
 import { pushBloqueoToGCal, deleteBloqueoFromGCal } from '../services/googleCalendarService.js';
+import { requireRole } from '../middleware/requireRole.js';
+import { logAudit } from '../services/auditLogService.js';
 
 /** Complejos (properties) API routes. */
 const router = Router();
@@ -72,20 +74,21 @@ const createSchema = z.object({
   autoResponderEmail: z.boolean().optional(),
 });
 
-router.post('/complejos', async (req, res) => {
+router.post('/complejos', requireRole('admin'), async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
     return;
   }
   const complejo = await createComplejo(parsed.data);
+  logAudit({ agenteId: req.user?.id, accion: 'CREATE', entidad: 'complejo', entidadId: complejo.id, ip: req.ip });
   res.status(201).json(complejo);
 });
 
 // UPDATE
 const updateSchema = createSchema.partial();
 
-router.patch('/complejos/:id', async (req, res) => {
+router.patch('/complejos/:id', requireRole('admin'), async (req, res) => {
   const parsed = updateSchema.extend({ activo: z.boolean().optional() }).safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -93,6 +96,7 @@ router.patch('/complejos/:id', async (req, res) => {
   }
   try {
     const complejo = await updateComplejo(req.params.id, parsed.data);
+    logAudit({ agenteId: req.user?.id, accion: 'UPDATE', entidad: 'complejo', entidadId: req.params.id, ip: req.ip });
     res.json(complejo);
   } catch {
     res.status(404).json({ error: 'Not found' });
@@ -100,9 +104,10 @@ router.patch('/complejos/:id', async (req, res) => {
 });
 
 // DELETE (soft)
-router.delete('/complejos/:id', async (req, res) => {
+router.delete('/complejos/:id', requireRole('admin'), async (req, res) => {
   try {
     const complejo = await deleteComplejo(req.params.id);
+    logAudit({ agenteId: req.user?.id, accion: 'DELETE', entidad: 'complejo', entidadId: req.params.id, ip: req.ip });
     res.json(complejo);
   } catch {
     res.status(404).json({ error: 'Not found' });
@@ -116,7 +121,7 @@ const tarifaSchema = z.object({
   estadiaMinima: z.number().int().min(1).nullable().optional(),
 });
 
-router.put('/complejos/:id/tarifas', async (req, res) => {
+router.put('/complejos/:id/tarifas', requireRole('admin'), async (req, res) => {
   const parsed = tarifaSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -149,7 +154,7 @@ router.get('/complejos/:id/tarifas-especiales', async (req, res) => {
   res.json(items);
 });
 
-router.post('/complejos/:id/tarifas-especiales', async (req, res) => {
+router.post('/complejos/:id/tarifas-especiales', requireRole('admin'), async (req, res) => {
   const parsed = tarifaEspecialSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -174,7 +179,7 @@ router.post('/complejos/:id/tarifas-especiales', async (req, res) => {
   res.status(201).json(te);
 });
 
-router.patch('/complejos/:id/tarifas-especiales/:teId', async (req, res) => {
+router.patch('/complejos/:id/tarifas-especiales/:teId', requireRole('admin'), async (req, res) => {
   const parsed = tarifaEspecialUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -208,7 +213,7 @@ router.patch('/complejos/:id/tarifas-especiales/:teId', async (req, res) => {
   }
 });
 
-router.delete('/complejos/:id/tarifas-especiales/:teId', async (req, res) => {
+router.delete('/complejos/:id/tarifas-especiales/:teId', requireRole('admin'), async (req, res) => {
   try {
     const te = await deleteTarifaEspecial(req.params.teId);
 
@@ -234,7 +239,7 @@ router.get('/complejos/:id/bloqueos', async (req, res) => {
   res.json(items);
 });
 
-router.post('/complejos/:id/bloqueos', async (req, res) => {
+router.post('/complejos/:id/bloqueos', requireRole('admin'), async (req, res) => {
   const parsed = bloqueoSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -273,7 +278,7 @@ router.post('/complejos/:id/bloqueos', async (req, res) => {
   res.status(201).json(bloqueo);
 });
 
-router.delete('/complejos/:id/bloqueos/:bloqueoId', async (req, res) => {
+router.delete('/complejos/:id/bloqueos/:bloqueoId', requireRole('admin'), async (req, res) => {
   try {
     const complejo = await getComplejoById(req.params.id);
     if (!complejo) {
@@ -317,7 +322,7 @@ router.get('/complejos/:id/ical-feeds', async (req, res) => {
   res.json(feeds);
 });
 
-router.post('/complejos/:id/ical-feeds', async (req, res) => {
+router.post('/complejos/:id/ical-feeds', requireRole('admin'), async (req, res) => {
   const parsed = icalFeedSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -343,7 +348,7 @@ router.post('/complejos/:id/ical-feeds', async (req, res) => {
   }
 });
 
-router.delete('/complejos/:id/ical-feeds/:feedId', async (req, res) => {
+router.delete('/complejos/:id/ical-feeds/:feedId', requireRole('admin'), async (req, res) => {
   try {
     await prisma.icalFeed.delete({ where: { id: req.params.feedId } });
     res.json({ ok: true });
@@ -360,7 +365,7 @@ const addMediaSchema = z.object({
   orden: z.number().int().optional(),
 });
 
-router.post('/complejos/:id/media', async (req, res) => {
+router.post('/complejos/:id/media', requireRole('admin'), async (req, res) => {
   const parsed = addMediaSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -376,7 +381,7 @@ router.post('/complejos/:id/media', async (req, res) => {
   res.status(201).json(media);
 });
 
-router.delete('/complejos/:id/media/:mediaId', async (req, res) => {
+router.delete('/complejos/:id/media/:mediaId', requireRole('admin'), async (req, res) => {
   try {
     await removeMedia(req.params.mediaId);
     res.json({ ok: true });
@@ -389,7 +394,7 @@ const reorderSchema = z.object({
   orderedIds: z.array(z.string()),
 });
 
-router.patch('/complejos/:id/media/orden', async (req, res) => {
+router.patch('/complejos/:id/media/orden', requireRole('admin'), async (req, res) => {
   const parsed = reorderSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });

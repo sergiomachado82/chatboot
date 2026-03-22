@@ -3,10 +3,12 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma.js';
 import { z } from 'zod';
 import { passwordSchema } from '../utils/passwordPolicy.js';
+import { requireRole } from '../middleware/requireRole.js';
+import { logAudit } from '../services/auditLogService.js';
 
 const router = Router();
 
-router.get('/agentes', async (_req, res) => {
+router.get('/agentes', requireRole('admin'), async (_req, res) => {
   const agentes = await prisma.agente.findMany({
     select: { id: true, nombre: true, email: true, rol: true, activo: true, online: true, creadoEn: true },
     orderBy: { creadoEn: 'asc' },
@@ -21,12 +23,7 @@ const createSchema = z.object({
   rol: z.enum(['admin', 'agente']).default('agente'),
 });
 
-router.post('/agentes', async (req, res) => {
-  if (req.user?.rol !== 'admin') {
-    res.status(403).json({ error: 'Forbidden', message: 'Only admins can create agents' });
-    return;
-  }
-
+router.post('/agentes', requireRole('admin'), async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -44,6 +41,14 @@ router.post('/agentes', async (req, res) => {
     select: { id: true, nombre: true, email: true, rol: true, activo: true, online: true, creadoEn: true },
   });
 
+  logAudit({
+    agenteId: req.user?.id,
+    accion: 'CREATE',
+    entidad: 'agente',
+    entidadId: agente.id,
+    detalle: { email: agente.email, rol: agente.rol },
+    ip: req.ip,
+  });
   res.status(201).json(agente);
 });
 

@@ -49,6 +49,10 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
+        // 'unsafe-inline' required: React inline styles (style={{}}) in DashboardPage
+        // and other components generate inline styles. These are React-generated (not
+        // user-generated) so XSS risk is minimal. Removing requires refactoring all
+        // inline styles to CSS classes.
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:'],
         connectSrc: ["'self'", 'wss:', 'ws:'],

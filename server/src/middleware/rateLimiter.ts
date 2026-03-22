@@ -38,6 +38,13 @@ export function createRateLimiter(namespace: string, maxRequests: number, window
           await redis.expire(key, windowSeconds);
         }
 
+        const ttl = await redis.ttl(key);
+        const resetTimestamp = Math.floor(Date.now() / 1000) + (ttl > 0 ? ttl : windowSeconds);
+
+        res.set('X-RateLimit-Limit', String(maxRequests));
+        res.set('X-RateLimit-Remaining', String(Math.max(0, maxRequests - count)));
+        res.set('X-RateLimit-Reset', String(resetTimestamp));
+
         if (count > maxRequests) {
           res.status(429).json({ error: 'Too Many Requests', message: 'Rate limit exceeded' });
           return;
@@ -57,11 +64,20 @@ export function createRateLimiter(namespace: string, maxRequests: number, window
 
     if (!entry || now > entry.resetAt) {
       store.set(ip, { count: 1, resetAt: now + windowMs });
+      const resetTimestamp = Math.floor((now + windowMs) / 1000);
+      res.set('X-RateLimit-Limit', String(maxRequests));
+      res.set('X-RateLimit-Remaining', String(maxRequests - 1));
+      res.set('X-RateLimit-Reset', String(resetTimestamp));
       next();
       return;
     }
 
     entry.count++;
+    const resetTimestamp = Math.floor(entry.resetAt / 1000);
+    res.set('X-RateLimit-Limit', String(maxRequests));
+    res.set('X-RateLimit-Remaining', String(Math.max(0, maxRequests - entry.count)));
+    res.set('X-RateLimit-Reset', String(resetTimestamp));
+
     if (entry.count > maxRequests) {
       res.status(429).json({ error: 'Too Many Requests', message: 'Rate limit exceeded' });
       return;

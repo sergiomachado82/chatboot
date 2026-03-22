@@ -7,7 +7,7 @@ import { env } from '../config/env.js';
 interface TokenPayload {
   id: string;
   email: string;
-  rol: string;
+  rol: 'admin' | 'agente';
 }
 
 /**

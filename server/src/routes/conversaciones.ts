@@ -8,6 +8,8 @@ import {
 } from '../services/conversacionService.js';
 import { getByConversacion, createMensaje } from '../services/mensajeService.js';
 import { sendWhatsAppMessage } from '../services/whatsappService.js';
+import { requireRole } from '../middleware/requireRole.js';
+import { logAudit } from '../services/auditLogService.js';
 
 /** Conversaciones (conversations) API routes. */
 const router = Router();
@@ -30,13 +32,20 @@ const bulkDeleteSchema = z.object({
   ids: z.array(z.string()).min(1).max(50),
 });
 
-router.post('/conversaciones/bulk-delete', async (req, res) => {
+router.post('/conversaciones/bulk-delete', requireRole('admin'), async (req, res) => {
   const parsed = bulkDeleteSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
     return;
   }
   const deletedCount = await deleteConversaciones(parsed.data.ids);
+  logAudit({
+    agenteId: req.user?.id,
+    accion: 'BULK_DELETE',
+    entidad: 'conversacion',
+    detalle: { ids: parsed.data.ids, deletedCount },
+    ip: req.ip,
+  });
   res.json({ deletedCount });
 });
 

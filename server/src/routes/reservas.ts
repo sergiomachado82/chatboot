@@ -10,6 +10,8 @@ import {
   updateReservaEstado,
 } from '../services/reservaService.js';
 import { z } from 'zod';
+import { requireRole } from '../middleware/requireRole.js';
+import { logAudit } from '../services/auditLogService.js';
 
 /** Reservas (bookings) API routes. */
 const router = Router();
@@ -179,12 +181,13 @@ router.patch('/reservas/:id/estado', async (req, res) => {
   res.json(reserva);
 });
 
-router.delete('/reservas/:id', async (req, res) => {
+router.delete('/reservas/:id', requireRole('admin'), async (req, res) => {
   const deleted = await deleteReserva(req.params.id);
   if (!deleted) {
     res.status(404).json({ error: 'Not found' });
     return;
   }
+  logAudit({ agenteId: req.user?.id, accion: 'DELETE', entidad: 'reserva', entidadId: req.params.id, ip: req.ip });
   res.status(204).end();
 });
 

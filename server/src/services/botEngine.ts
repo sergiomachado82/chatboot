@@ -38,7 +38,7 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
  * failed to convert to YYYY-MM-DD. Returns the resolved date or null.
  * Uses Argentina timezone (UTC-3) to avoid date drift at night.
  */
-function resolveRelativeDate(value: string): string | null {
+export function resolveRelativeDate(value: string): string | null {
   const lower = value.toLowerCase().trim();
   const todayStr = getArgentinaToday();
   const [y, m, d] = todayStr.split('-').map(Number);
@@ -62,7 +62,7 @@ function resolveRelativeDate(value: string): string | null {
  * 3. Resolve relative dates ("mañana" → YYYY-MM-DD) as safety net
  * 4. Compute fecha_salida from fecha_entrada + num_noches if possible
  */
-function sanitizeEntities(raw: Record<string, unknown>): Record<string, string> {
+export function sanitizeEntities(raw: Record<string, unknown>): Record<string, string> {
   const clean: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(raw)) {

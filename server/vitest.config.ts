@@ -10,7 +10,7 @@ export default defineConfig({
       reporter: ['text', 'text-summary'],
       include: ['src/services/**', 'src/middleware/**', 'src/utils/**'],
       exclude: ['src/scripts/**', 'src/__tests__/**'],
-      thresholds: { lines: 2, functions: 2, branches: 1 },
+      thresholds: { lines: 18, functions: 20, branches: 16 },
     },
   },
   resolve: {

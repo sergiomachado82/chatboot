@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { getBotConfig, updateBotConfig, getBotConfigHistory } from '../services/botConfigService.js';
+import { requireRole } from '../middleware/requireRole.js';
+import { logAudit } from '../services/auditLogService.js';
 
 const MAX_LOGO_SIZE = 500 * 1024; // 500 KB base64
 
@@ -45,7 +47,7 @@ router.get('/bot/config', async (_req, res) => {
   }
 });
 
-router.patch('/bot/config', async (req, res) => {
+router.patch('/bot/config', requireRole('admin'), async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', details: parsed.error.flatten().fieldErrors });
@@ -54,6 +56,13 @@ router.patch('/bot/config', async (req, res) => {
 
   try {
     const updated = await updateBotConfig(parsed.data, req.user?.id);
+    logAudit({
+      agenteId: req.user?.id,
+      accion: 'UPDATE',
+      entidad: 'botConfig',
+      detalle: parsed.data as Record<string, unknown>,
+      ip: req.ip,
+    });
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Error al actualizar configuracion del bot', message: (err as Error).message });
@@ -74,7 +83,7 @@ const logoSchema = z.object({
   logo: z.string().max(MAX_LOGO_SIZE, 'El logo es demasiado grande (max 500KB)'),
 });
 
-router.post('/bot/logo', async (req, res) => {
+router.post('/bot/logo', requireRole('admin'), async (req, res) => {
   const parsed = logoSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation error', message: parsed.error.flatten().fieldErrors });
@@ -89,7 +98,7 @@ router.post('/bot/logo', async (req, res) => {
   }
 });
 
-router.delete('/bot/logo', async (_req, res) => {
+router.delete('/bot/logo', requireRole('admin'), async (_req, res) => {
   try {
     await updateBotConfig({ logo: null });
     res.json({ message: 'Logo eliminado' });
