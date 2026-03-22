@@ -22,19 +22,20 @@ import { recalcDisponible, dateRange } from '../services/inventarioService.js';
 import { prisma } from '../lib/prisma.js';
 import { pushBloqueoToGCal, deleteBloqueoFromGCal } from '../services/googleCalendarService.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { cacheControl, withETag } from '../middleware/cacheHeaders.js';
 import { logAudit } from '../services/auditLogService.js';
 
 /** Complejos (properties) API routes. */
 const router = Router();
 
 // LIST
-router.get('/complejos', async (_req, res) => {
+router.get('/complejos', cacheControl(60), withETag(), async (_req, res) => {
   const complejos = await listComplejos();
   res.json(complejos);
 });
 
 // GET ONE
-router.get('/complejos/:id', async (req, res) => {
+router.get('/complejos/:id', cacheControl(60), withETag(), async (req, res) => {
   const complejo = await getComplejoById(req.params.id);
   if (!complejo) {
     res.status(404).json({ error: 'Not found' });

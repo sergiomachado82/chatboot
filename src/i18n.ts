@@ -5,9 +5,19 @@ import en from './locales/en.json';
 
 const STORAGE_KEY = 'app-language';
 
+function getBrowserLanguage(): string {
+  try {
+    const browserLang = navigator.language?.slice(0, 2);
+    if (browserLang === 'es' || browserLang === 'en') return browserLang;
+  } catch {
+    // ignore
+  }
+  return 'es';
+}
+
 function getSavedLanguage(): string {
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? 'es';
+    return localStorage.getItem(STORAGE_KEY) ?? getBrowserLanguage();
   } catch {
     return 'es';
   }

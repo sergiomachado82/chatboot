@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, ArrowRight, ArrowLeft, Globe } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { login, forgotPassword } from '../../api/authApi';
 import AuthLayout from './AuthLayout';
 
@@ -58,6 +59,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <AuthLayout>
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={() => i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es')}
+          className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 flex items-center gap-1"
+          aria-label={t('app.languageLabel')}
+          title={t('app.languageLabel')}
+        >
+          <Globe size={14} />
+          <span className="text-xs font-medium uppercase">{i18n.language}</span>
+        </button>
+      </div>
       <div className="relative overflow-hidden">
         {/* Login form */}
         <div

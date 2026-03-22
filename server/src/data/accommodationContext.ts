@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma.js';
+import { cache } from '../services/cacheService.js';
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_KEY = 'bot:complejos';
+const CACHE_TTL = 300; // 5 minutes
 
 const GENERAL_INFO = `
 # Informacion del Alojamiento
@@ -94,11 +96,8 @@ interface ComplejoWithRelations {
   media: { url: string; caption: string | null; orden: number }[];
 }
 
-// --- In-memory cache for DB queries (5-min TTL) ---
-let complejosCache: { data: ComplejoWithRelations[]; expiry: number } | null = null;
-
-export function invalidateContextCache(): void {
-  complejosCache = null;
+export async function invalidateContextCache(): Promise<void> {
+  await cache.del(CACHE_KEY);
 }
 
 function formatNumber(n: number): string {
@@ -190,10 +189,8 @@ function buildTarifaRow(c: ComplejoWithRelations): string {
 }
 
 async function getActiveComplejos(): Promise<ComplejoWithRelations[]> {
-  const now = Date.now();
-  if (complejosCache && complejosCache.expiry > now) {
-    return complejosCache.data;
-  }
+  const cached = await cache.get<ComplejoWithRelations[]>(CACHE_KEY);
+  if (cached) return cached;
 
   const data = await prisma.complejo.findMany({
     where: { activo: true },
@@ -205,7 +202,7 @@ async function getActiveComplejos(): Promise<ComplejoWithRelations[]> {
     orderBy: { creadoEn: 'asc' },
   });
 
-  complejosCache = { data, expiry: now + CACHE_TTL_MS };
+  await cache.set(CACHE_KEY, data, CACHE_TTL);
   return data;
 }
 

@@ -1,5 +1,10 @@
 import { prisma } from '../lib/prisma.js';
 import { invalidateContextCache } from '../data/accommodationContext.js';
+import { cache } from './cacheService.js';
+
+const CACHE_LIST_KEY = 'complejos:list';
+const CACHE_ID_PREFIX = 'complejos:';
+const CACHE_TTL = 60; // 60 seconds
 
 const includeRelations = {
   tarifas: true,
@@ -26,16 +31,26 @@ function serializeComplejo(c: any) {
   };
 }
 
+async function invalidateComplejoCache(): Promise<void> {
+  await cache.invalidatePattern('complejos:*');
+  await invalidateContextCache();
+}
+
 /**
  * Lists all complejos with their related tarifas, media, bloqueos, and iCal feeds.
  * @returns An array of serialized complejo records ordered by creation date
  */
 export async function listComplejos() {
+  const cached = await cache.get<ReturnType<typeof serializeComplejo>[]>(CACHE_LIST_KEY);
+  if (cached) return cached;
+
   const complejos = await prisma.complejo.findMany({
     include: includeRelations,
     orderBy: { creadoEn: 'asc' },
   });
-  return complejos.map(serializeComplejo);
+  const result = complejos.map(serializeComplejo);
+  await cache.set(CACHE_LIST_KEY, result, CACHE_TTL);
+  return result;
 }
 
 /**
@@ -44,11 +59,18 @@ export async function listComplejos() {
  * @returns The serialized complejo record, or null if not found
  */
 export async function getComplejoById(id: string) {
+  const cacheKey = `${CACHE_ID_PREFIX}${id}`;
+  const cached = await cache.get<ReturnType<typeof serializeComplejo>>(cacheKey);
+  if (cached) return cached;
+
   const complejo = await prisma.complejo.findUnique({
     where: { id },
     include: includeRelations,
   });
-  return complejo ? serializeComplejo(complejo) : null;
+  if (!complejo) return null;
+  const result = serializeComplejo(complejo);
+  await cache.set(cacheKey, result, CACHE_TTL);
+  return result;
 }
 
 /**
@@ -115,7 +137,7 @@ export async function createComplejo(data: {
     },
     include: includeRelations,
   });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return serializeComplejo(complejo);
 }
 
@@ -162,7 +184,7 @@ export async function updateComplejo(
     data,
     include: includeRelations,
   });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return serializeComplejo(complejo);
 }
 
@@ -177,7 +199,7 @@ export async function deleteComplejo(id: string) {
     data: { activo: false },
     include: includeRelations,
   });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return serializeComplejo(complejo);
 }
 
@@ -200,7 +222,7 @@ export async function upsertTarifa(
     update: { precioNoche, estadiaMinima: estadiaMinima ?? null },
     create: { complejoId, temporada, precioNoche, estadiaMinima: estadiaMinima ?? null },
   });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return { ...tarifa, precioNoche: Number(tarifa.precioNoche) };
 }
 
@@ -245,7 +267,7 @@ export async function createTarifaEspecial(
       motivo: data.motivo ?? null,
     },
   });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return { ...te, precioNoche: Number(te.precioNoche) };
 }
 
@@ -270,7 +292,7 @@ export async function updateTarifaEspecial(
     where: { id },
     data,
   });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return { ...te, precioNoche: Number(te.precioNoche) };
 }
 
@@ -281,7 +303,7 @@ export async function updateTarifaEspecial(
  */
 export async function deleteTarifaEspecial(id: string) {
   const result = await prisma.tarifaEspecial.delete({ where: { id } });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return result;
 }
 
@@ -305,7 +327,7 @@ export async function addMedia(complejoId: string, url: string, tipo = 'image', 
   const media = await prisma.mediaFile.create({
     data: { complejoId, url, tipo, caption, orden },
   });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return media;
 }
 
@@ -316,7 +338,7 @@ export async function addMedia(complejoId: string, url: string, tipo = 'image', 
  */
 export async function removeMedia(mediaId: string) {
   const result = await prisma.mediaFile.delete({ where: { id: mediaId } });
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return result;
 }
 
@@ -329,7 +351,7 @@ export async function removeMedia(mediaId: string) {
 export async function reorderMedia(complejoId: string, orderedIds: string[]) {
   const updates = orderedIds.map((id, index) => prisma.mediaFile.update({ where: { id }, data: { orden: index } }));
   await prisma.$transaction(updates);
-  invalidateContextCache();
+  await invalidateComplejoCache();
   return prisma.mediaFile.findMany({
     where: { complejoId },
     orderBy: { orden: 'asc' },

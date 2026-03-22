@@ -1,23 +1,21 @@
 import { prisma } from '../lib/prisma.js';
 import type { BotConfig } from '@prisma/client';
+import { cache } from './cacheService.js';
 
-let cachedConfig: BotConfig | null = null;
-let cacheTime = 0;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_KEY = 'bot:config';
+const CACHE_TTL = 300; // 5 minutes
 
-/** Retrieves the current bot configuration, using a 5-minute in-memory cache. @returns The active BotConfig record */
+/** Retrieves the current bot configuration, using a 5-minute Redis cache. @returns The active BotConfig record */
 export async function getBotConfig(): Promise<BotConfig> {
-  if (cachedConfig && Date.now() - cacheTime < CACHE_TTL_MS) {
-    return cachedConfig;
-  }
+  const cached = await cache.get<BotConfig>(CACHE_KEY);
+  if (cached) return cached;
 
   let config = await prisma.botConfig.findFirst();
   if (!config) {
     config = await prisma.botConfig.create({ data: {} });
   }
 
-  cachedConfig = config;
-  cacheTime = Date.now();
+  await cache.set(CACHE_KEY, config, CACHE_TTL);
   return config;
 }
 
@@ -63,8 +61,7 @@ export async function updateBotConfig(
     }
   }
 
-  cachedConfig = updated;
-  cacheTime = Date.now();
+  await cache.del(CACHE_KEY);
   return updated;
 }
 
@@ -84,8 +81,7 @@ export async function getBotConfigHistory(limit = 50) {
   }
 }
 
-/** Invalidates the in-memory bot configuration cache, forcing a fresh DB read on next access. */
-export function invalidateBotConfigCache(): void {
-  cachedConfig = null;
-  cacheTime = 0;
+/** Invalidates the Redis bot configuration cache, forcing a fresh DB read on next access. */
+export async function invalidateBotConfigCache(): Promise<void> {
+  await cache.del(CACHE_KEY);
 }

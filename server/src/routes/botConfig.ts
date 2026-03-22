@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getBotConfig, updateBotConfig, getBotConfigHistory } from '../services/botConfigService.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { cacheControl, withETag } from '../middleware/cacheHeaders.js';
 import { logAudit } from '../services/auditLogService.js';
 
 const MAX_LOGO_SIZE = 500 * 1024; // 500 KB base64
@@ -38,7 +39,7 @@ const updateSchema = z.object({
   reglasPersonalizadas: z.array(z.string().min(1).max(500)).max(20).optional(),
 });
 
-router.get('/bot/config', async (_req, res) => {
+router.get('/bot/config', cacheControl(300), withETag(), async (_req, res) => {
   try {
     const config = await getBotConfig();
     res.json(config);

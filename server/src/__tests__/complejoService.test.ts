@@ -15,6 +15,15 @@ vi.mock('../data/accommodationContext.js', () => ({
   invalidateContextCache: vi.fn(),
 }));
 
+vi.mock('../services/cacheService.js', () => ({
+  cache: {
+    get: vi.fn(() => Promise.resolve(null)),
+    set: vi.fn(() => Promise.resolve()),
+    del: vi.fn(() => Promise.resolve()),
+    invalidatePattern: vi.fn(() => Promise.resolve()),
+  },
+}));
+
 import {
   listComplejos,
   getComplejoById,
